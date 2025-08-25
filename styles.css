@@ -1,0 +1,188 @@
+:root {
+  --nf-red: #e50914;
+  --nf-text: #e5e5e5;
+  --nf-muted: #b3b3b3;
+  --nf-font: "Arial", "Helvetica Neue", Helvetica, sans-serif; /* Force consistent font */
+}
+
+/* Reset / normalize for cross-platform consistency */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  background: url("IMG/background.jpg") center center / cover no-repeat fixed #000;
+  font-family: var(--nf-font);
+  color: #fff;
+  -webkit-font-smoothing: antialiased; /* Sharper fonts on Mac */
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.4;
+}
+
+/* Dark overlay */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.85) 0%,
+      rgba(0, 0, 0, 0.6) 60%,
+      rgba(0, 0, 0, 0.85) 100%
+    ),
+    rgba(0, 0, 0, 0.4);
+  z-index: 0;
+}
+
+/* Normalize form controls */
+input,
+button,
+select,
+textarea {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 0; /* removes Safari rounded corners */
+  font-family: var(--nf-font);
+}
+
+/* Logo */
+.brand {
+  position: fixed;
+  top: 20px;
+  left: 24px;
+  z-index: 2;
+}
+.brand img {
+  height: 38px;
+  width: auto;
+  display: block;
+}
+
+/* Sign-in panel */
+.signin-wrap {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+}
+.signin-card {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 48px 56px;
+  border-radius: 8px;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.35);
+}
+.signin-card h1 {
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+
+/* Inputs */
+.nf-input {
+  background: #333 !important;
+  border: none !important;
+  color: #fff !important;
+  height: 50px;
+  font-size: 1rem;
+  padding: 0 15px;
+}
+.nf-input::placeholder {
+  color: #8c8c8c;
+}
+.nf-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.35);
+  background: #3b3b3b;
+  color: #fff;
+}
+
+/* Buttons */
+.btn-nf-primary {
+  background: var(--nf-red);
+  border: none;
+  color: #fff;
+  font-weight: 700;
+  height: 48px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn-nf-primary:hover,
+.btn-nf-primary:focus {
+  background: #f6121d;
+  color: #fff;
+}
+
+.btn-nf-secondary {
+  background: #2d2d2d;
+  border: none;
+  color: #fff;
+  height: 48px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn-nf-secondary:hover,
+.btn-nf-secondary:focus {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+/* Divider */
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  color: #a3a3a3;
+  font-size: 0.9rem;
+  margin: 14px 0;
+}
+.divider::before,
+.divider::after {
+  content: "";
+  height: 1px;
+  background: #404040;
+  display: block;
+}
+
+/* Links & misc text */
+a.nf-link {
+  color: var(--nf-text);
+  text-decoration: none;
+}
+a.nf-link:hover {
+  text-decoration: underline;
+}
+.subtext {
+  color: var(--nf-muted);
+  font-size: 0.95rem;
+}
+
+/* Footer note */
+.captcha-note {
+  color: var(--nf-muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+/* Responsive adjustments */
+@media (max-width: 575.98px) {
+  .signin-card {
+    padding: 32px 24px;
+    max-width: 100%;
+  }
+  .brand img {
+    height: 32px;
+  }
+}
