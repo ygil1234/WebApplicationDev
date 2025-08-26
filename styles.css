@@ -35,9 +35,9 @@ body::before {
   inset: 0;
   background: linear-gradient(
       to top,
-      rgba(0, 0, 0, 0.55) 0%, 
-      rgba(0, 0, 0, 0.35) 60%, 
-      rgba(0, 0, 0, 0.55) 100% 
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0.35) 60%,
+      rgba(0, 0, 0, 0.55) 100%
     ),
     rgba(0, 0, 0, 0.2);
 }
@@ -183,5 +183,223 @@ a.nf-link:hover {
   }
   .brand img {
     height: 32px;
+  }
+}
+
+/* Netflix Profiles Page */
+
+/* Netflix fonts usage */
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans_W_Th.woff2') format('woff2'),
+       url('/fonts/NetflixSans_W_Th.woff') format('woff');
+  font-weight: 100;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans_W_Lt.woff2') format('woff2'),
+       url('/fonts/NetflixSans_W_Lt.woff') format('woff');
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans_W_Rg.woff2') format('woff2'),
+       url('/fonts/NetflixSans_W_Rg.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans_W_Md.woff2') format('woff2'),
+       url('/fonts/NetflixSans_W_Md.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans_W_Bd.woff2') format('woff2'),
+       url('/fonts/NetflixSans_W_Bd.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Netflix Sans';
+  src: url('/fonts/NetflixSans_W_Blk.woff2') format('woff2'),
+       url('/fonts/NetflixSans_W_Blk.woff') format('woff');
+  font-weight: 900;
+  font-style: normal;
+}
+
+
+/* Profiles page body styling */
+.profiles-body {
+  background: #141414 !important;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Netflix Sans', var(--nf-font);
+}
+
+.profiles-body::before {
+  display: none; /* Remove the overlay from sign-in page */
+}
+
+/* Main container for profiles page */
+.profiles-container {
+  text-align: center;
+  max-width: 1200px;
+  width: 100%;
+  padding: 0 20px;
+}
+
+/* Main title styling */
+.profiles-title {
+  color: #ffffff;
+  font-size: 3.5vw;
+  font-weight: 400;
+  margin-bottom: 30px;
+  letter-spacing: 0.01em;
+}
+
+/* Profiles grid container */
+.profiles-grid {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  margin-bottom: 100px;
+  flex-wrap: wrap;
+}
+
+/* Individual profile item */
+.profile-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+
+/* Profile avatar container */
+.profile-avatar {
+  width: 190px;
+  height: 190px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 15px;
+  transition: border 0.2s ease;
+}
+
+.profile-avatar:hover {
+  box-shadow: 0 0 0 3px #ffffff;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Profile name input styling */
+.profile-name {
+  background: transparent !important;
+  border: none !important;
+  color: #808080 !important;
+  font-size: 1.3vw;
+  font-weight: 400;
+  text-align: center;
+  font-family: 'Netflix Sans', var(--nf-font);
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  max-width: 150px;
+  cursor: pointer;
+}
+
+.profile-name:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+  background: transparent !important;
+}
+
+/* Manage Profiles button */
+.manage-profiles-btn {
+  background: transparent;
+  border: 1px solid #808080;
+  color: #808080;
+  font-size: 1.2vw;
+  font-weight: 400;
+  font-family: 'Netflix Sans', var(--nf-font);
+  padding: 0.5em 1.5em;
+  cursor: pointer;
+  letter-spacing: 2px;
+}
+
+.manage-profiles-btn:hover {
+  color: #ffffff;
+  border-color: #ffffff;
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .profiles-title {
+    font-size: 48px;
+  }
+  
+  .profile-name {
+    font-size: 16px;
+  }
+  
+  .manage-profiles-btn {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 768px) {
+  .profiles-grid {
+    gap: 20px;
+  }
+  
+  .profile-avatar {
+    width: 120px;
+    height: 120px;
+  }
+  
+  .profiles-title {
+    font-size: 36px;
+    margin-bottom: 40px;
+  }
+  
+  .profile-name {
+    font-size: 14px;
+  }
+  
+  .manage-profiles-btn {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profiles-grid {
+    gap: 15px;
+  }
+  
+  .profile-avatar {
+    width: 100px;
+    height: 100px;
+  }
+  
+  .profiles-title {
+    font-size: 28px;
   }
 }
