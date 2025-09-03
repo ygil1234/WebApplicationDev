@@ -297,10 +297,16 @@ a.nf-link:hover {
   border-radius: 6px;
   overflow: hidden;
   margin-bottom: 15px;
-  transition: border 0.2s ease;
+  transition: box-shadow 0.2s ease;
+  box-shadow: 0 0 0 3px #808080;
 }
 
 .profile-avatar:hover {
+  box-shadow: 0 0 0 3px #ffffff;
+}
+
+/* White frame whenever the tile is hovered */
+.profile-item:hover .profile-avatar {
   box-shadow: 0 0 0 3px #ffffff;
 }
 
@@ -315,7 +321,7 @@ a.nf-link:hover {
 .profile-name {
   background: transparent !important;
   border: none !important;
-  color: #808080 !important;
+  color: #808080 !important; /* default = white */
   font-size: 1.3vw;
   font-weight: 400;
   text-align: center;
@@ -325,6 +331,11 @@ a.nf-link:hover {
   width: 100%;
   max-width: 150px;
   cursor: pointer;
+  transition: color .2s ease;  /* smooth flip */
+}
+
+.profile-item:hover .profile-name:not(:focus) {
+  color: #ffffff !important;
 }
 
 .profile-name:focus {
