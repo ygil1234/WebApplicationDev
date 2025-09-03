@@ -1,0 +1,8 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Bell dome + body (outline only) -->
+  <path d="M6 10c0-3.314 2.686-6 6-6s6 2.686 6 6v5l2 2H4l2-2v-5z" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round"></path>
+  <!-- Clapper dot -->
+  <circle cx="12" cy="18" r="1.2" fill="#FFFFFF"></circle>
+  <!-- Stand bar below the bell -->
+  <rect x="6" y="20" width="12" height="1.8" rx="0.9" fill="#FFFFFF"></rect>
+</svg>
