@@ -325,7 +325,6 @@ a.nf-link:hover {
   width: 100%;
   max-width: 150px;
   cursor: pointer;
-  transition: color .2s ease;  /* smooth flip */
 }
 
 .profile-item:hover .profile-name:not(:focus) {
