@@ -34,7 +34,7 @@ form.addEventListener("submit", function (event) {
   let valid = true;
 
   // Email check
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(emailInput.value.trim())) {
     showError(emailInput, "Please enter a valid email address.");
     valid = false;
