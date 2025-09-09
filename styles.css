@@ -89,6 +89,18 @@ textarea {
   margin-bottom: 18px;
 }
 
+.login-input-error {
+  border: 2px solid #e50914 !important;
+  background: #3b1f1f !important;
+}
+
+/* Error message text under input */
+.login-error-message {
+  color: #e50914;
+  font-size: 0.9rem;
+  margin-top: 4px;
+}
+
 /* Inputs */
 .nf-input {
   background: #333 !important;
