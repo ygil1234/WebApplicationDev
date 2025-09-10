@@ -28,16 +28,35 @@
         <img class="nf-icon" src="IMG/icons/search.svg" alt="" />
       </a>
 
+      <a class="nf-profile nf-iconlink" href="profiles.html" aria-label="Profile">
+        <img id="navAvatar" class="nf-avatar" src="IMG/profile1.jpg" alt="Profile" />
+        <img class="nf-caret" src="IMG/icons/caret-down.svg" alt="" />
+      </a>
+
+      <!--  Adding Hello + Name of Profile  -->
+      <div id="greet" style="white-space:nowrap; opacity:.9;"></div>
+
+      <!-- פעמון -->
       <a class="nf-iconlink" href="#" aria-label="Notifications">
         <img class="nf-icon" src="IMG/icons/bell-outline.svg" alt="" />
       </a>
 
-      <a class="nf-profile nf-iconlink" href="#" aria-label="Profile">
-        <img class="nf-avatar" src="IMG/profile1.jpg" alt="Profile" />
-        <img class="nf-caret" src="IMG/icons/caret-down.svg" alt="" />
-      </a>
+      <!-- Logout Button -->
+      <a id="logoutLink" class="nf-nav__menu-link" href="#" style="margin-left:8px;">Logout</a>
     </div>
   </header>
+
   <main class="nf-nav-spacer" aria-hidden="true"></main>
+
+  <script src="JS/feed.js" defer></script>
+  <script>
+    // Retrieve selected profile from localStorage
+    document.getElementById('logoutLink')?.addEventListener('click', function (e) {
+      e.preventDefault();
+      localStorage.removeItem('selectedProfileId');
+      localStorage.removeItem('auth'); 
+      window.location.href = 'login.html';
+    });
+  </script>
 </body>
 </html>

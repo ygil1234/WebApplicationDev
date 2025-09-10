@@ -56,6 +56,6 @@ form.addEventListener("submit", function (event) {
     localStorage.setItem("password", passwordInput.value.trim());
 
     // Redirect to the next page
-    window.location.href = "feed.html";
+    window.location.href = "profiles.html";
   }
 });

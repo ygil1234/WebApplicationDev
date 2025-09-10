@@ -422,10 +422,6 @@ a.nf-link:hover {
   }
 }
 
-
-.nf-nav-page {
-}
-
 .nf-nav {
   position: fixed;
   top: 0;
@@ -541,4 +537,20 @@ a.nf-link:hover {
   display: block;
   border-radius: 4px;
   object-fit: cover;
+}
+.nf-nav__actions .nf-nav__menu-link {
+  text-decoration: none;
+  font-size: 14px;
+  color: #fff;
+  transition: color .15s ease;
+}
+
+.nf-nav__actions .nf-nav__menu-link:hover {
+  color: var(--nf-muted);
+}
+
+.nf-nav__actions .nf-nav__menu-link:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+  border-radius: 3px;
 }
