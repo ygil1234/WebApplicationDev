@@ -28,7 +28,7 @@
         <img class="nf-icon" src="IMG/icons/search.svg" alt="" />
       </a>
 
-      <a class="nf-profile nf-iconlink" href="profiles.html" aria-label="Profile">
+      <a class="nf-profile nf-iconlink" aria-label="Profile">
         <img id="navAvatar" class="nf-avatar" src="IMG/profile1.jpg" alt="Profile" />
         <img class="nf-caret" src="IMG/icons/caret-down.svg" alt="" />
       </a>
@@ -46,17 +46,59 @@
     </div>
   </header>
 
-  <main class="nf-nav-spacer" aria-hidden="true"></main>
+  <main>
+    <!-- Hero / Billboard -->
+    <section id="hero" class="nf-hero" aria-label="Featured">
+  <div class="nf-hero__bg" id="heroBg"></div>
+  <div class="nf-hero__meta" dir="ltr">
+    <h1 class="nf-hero__title" id="heroTitle"></h1>
+    <div class="nf-hero__sub" id="heroSub"></div>
+    <div class="nf-hero__actions">
+      <button class="nf-cta nf-cta--info" id="btnInfo" aria-haspopup="dialog" aria-controls="infoDialog">
+        <svg viewBox="0 0 24 24" width="24" height="24" class="nf-cta__icon" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" role="img">
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2ZM0 12C0 5.37258 5.37258 0 12 0C18.6274 0 24 5.37258 24 12C24 18.6274 18.6274 24 12 24C5.37258 24 0 18.6274 0 12ZM13 10V18H11V10H13ZM12 8.5C12.8284 8.5 13.5 7.82843 13.5 7C13.5 6.17157 12.8284 5.5 12 5.5C11.1716 5.5 10.5 6.17157 10.5 7C10.5 7.82843 11.1716 8.5 12 8.5Z" fill="currentColor"></path>
+        </svg>
+        <span>מידע נוסף</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+  
+    <!-- Rows container -->
+    <section id="rows" class="nf-rows" aria-label="Browse"></section>
+    
+  </main>
+  <!-- Modal: More Info -->
+<div class="nf-modal" id="infoDialog" role="dialog" aria-modal="true" aria-labelledby="infoTitle" hidden>
+  <div class="nf-modal__panel" dir="rtl">
+    <button class="nf-modal__close" id="closeInfo" aria-label="סגור">×</button>
+    <h2 class="nf-modal__title" id="infoTitle"></h2>
+    <p class="nf-modal__meta" id="infoMeta"></p>
+    <p class="nf-modal__desc" id="infoDesc"></p>
+    <div class="nf-modal__actions">
+      <button class="nf-cta nf-cta--play" id="modalPlay">
+        <svg viewBox="0 0 24 24" aria-hidden="true" class="nf-cta__icon"><path d="M6 4l14 8-14 8z"></path></svg>
+        <span>הפעל</span>
+      </button>
+    </div>
+  </div>
+</div>
+
 
   <script src="JS/feed.js" defer></script>
   <script>
-    // Retrieve selected profile from localStorage
-    document.getElementById('logoutLink')?.addEventListener('click', function (e) {
-      e.preventDefault();
-      localStorage.removeItem('selectedProfileId');
-      localStorage.removeItem('auth'); 
-      window.location.href = 'login.html';
-    });
+    (function () {
+      const logoutLink = document.getElementById('logoutLink');
+      if (!logoutLink) return;
+  
+      logoutLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        localStorage.clear();
+        window.location.href = 'login.html';
+      });
+    })();
   </script>
+  
 </body>
 </html>
