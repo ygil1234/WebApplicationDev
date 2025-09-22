@@ -27,7 +27,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const avatarEl = document.getElementById("navAvatar");
   if (avatarEl) {
     avatarEl.src = current.avatar;
-    avatarEl.alt = `${current.name} — Profile`;
+    avatarEl.alt = `${current.name} - Profile`;
   }
 
   // Logout
