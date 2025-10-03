@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const API_BASE = "http://localhost:3000/api";
+
   const PROFILES = [
     { id: 1, name: "Chucha",   avatar: "IMG/profile1.jpg" },
     { id: 2, name: "Schnizel", avatar: "IMG/profile2.jpg" },
@@ -7,7 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
     { id: 5, name: "Sasha",    avatar: "IMG/profile5.jpg" },
   ];
 
-  // Ensure a profile is selected
+  // --- Profile & Authentication Setup ---
   const selectedIdStr = localStorage.getItem("selectedProfileId");
   const selectedId = selectedIdStr ? Number(selectedIdStr) : NaN;
   if (!selectedId || Number.isNaN(selectedId)) {
@@ -35,63 +37,15 @@ document.addEventListener("DOMContentLoaded", () => {
   if (logoutLink) {
     logoutLink.addEventListener("click", (e) => {
       e.preventDefault();
-      localStorage.clear();
-      window.location.href = "login.html";
+      localStorage.removeItem("selectedProfileId");
+      window.location.href = "index.html";
     });
   }
+  
+  // --- Local Data - יישאר לצורך fallback ---
+  let CATALOG = [];
 
-  // Catalog
-  const CATALOG = [
-    { id: "m7",  title: "The Godfather",               year: 1972, genres: ["Crime","Drama"],         likes: 5400, cover: "IMG/feed/godfather.jpg",          type: "Movie" },
-    { id: "m8",  title: "The Godfather Part II",       year: 1974, genres: ["Crime","Drama"],         likes: 4600, cover: "IMG/feed/godfather2.jpg",         type: "Movie" },
-    { id: "m9",  title: "The Shawshank Redemption",    year: 1994, genres: ["Drama"],                 likes: 6200, cover: "IMG/feed/shawshank.jpg",          type: "Movie" },
-    { id: "m10", title: "Pulp Fiction",                year: 1994, genres: ["Crime","Drama"],         likes: 5100, cover: "IMG/feed/pulpfiction.jpg",        type: "Movie" },
-    { id: "m11", title: "The Dark Knight",             year: 2008, genres: ["Action","Crime"],        likes: 7000, cover: "IMG/feed/thedarlknight.jpg",      type: "Movie" },
-    { id: "m12", title: "Schindler's List",            year: 1993, genres: ["Biography","Drama","History"], likes: 4300, cover: "IMG/feed/schindlerlist.jpg", type: "Movie" },
-    { id: "m13", title: "Fight Club",                  year: 1999, genres: ["Drama","Thriller"],      likes: 3900, cover: "IMG/feed/fightclub.jpg",          type: "Movie" },
-    { id: "m14", title: "Forrest Gump",                year: 1994, genres: ["Drama","Romance"],       likes: 4800, cover: "IMG/feed/forrestgump.jpg",        type: "Movie" },
-    { id: "m15", title: "The Matrix",                  year: 1999, genres: ["Sci-Fi","Action"],       likes: 5200, cover: "IMG/feed/thematrix.jpg",          type: "Movie" },
-    { id: "m16", title: "Star Wars: A New Hope",       year: 1977, genres: ["Sci-Fi","Adventure"],    likes: 5600, cover: "IMG/feed/starwars.jpg",           type: "Movie" },
-    { id: "m17", title: "The Empire Strikes Back",     year: 1980, genres: ["Sci-Fi","Adventure"],    likes: 5300, cover: "IMG/feed/starwars5.jpg",          type: "Movie" },
-    { id: "m18", title: "Back to the Future",          year: 1985, genres: ["Adventure","Sci-Fi"],    likes: 3600, cover: "IMG/feed/backtothefuture.jpg",    type: "Movie" },
-    { id: "m19", title: "Titanic",                     year: 1997, genres: ["Romance","Drama"],       likes: 4700, cover: "IMG/feed/titanic.jpg",            type: "Movie" },
-    { id: "m20", title: "Jurassic Park",               year: 1993, genres: ["Adventure","Sci-Fi"],    likes: 3900, cover: "IMG/feed/jurassicpark.jpg",       type: "Movie" },
-    { id: "m21", title: "Casablanca",                  year: 1942, genres: ["Romance","Drama"],       likes: 3200, cover: "IMG/feed/casablanca.jpg",         type: "Movie" },
-    { id: "m22", title: "Citizen Kane",                year: 1941, genres: ["Drama","Mystery"],       likes: 2800, cover: "IMG/feed/citizenkane.jpg",        type: "Movie" },
-    { id: "m23", title: "Psycho",                      year: 1960, genres: ["Horror","Thriller"],     likes: 3000, cover: "IMG/feed/psycho.jpg",             type: "Movie" },
-    { id: "m24", title: "The Wizard of Oz",            year: 1939, genres: ["Fantasy","Family"],      likes: 3100, cover: "IMG/feed/wizardofoz.jpg",         type: "Movie" },
-    { id: "m25", title: "LOTR: The Fellowship of the Ring", year: 2001, genres: ["Adventure","Fantasy"], likes: 5200, cover: "IMG/feed/lotr1.jpg",          type: "Movie" },
-    { id: "m26", title: "Goodfellas",                  year: 1990, genres: ["Crime","Drama"],         likes: 3500, cover: "IMG/feed/goodfellas.jpg",         type: "Movie" },
-    { id: "m27", title: "Seven Samurai",               year: 1954, genres: ["Action","Adventure","Drama"], likes: 2600, cover: "IMG/feed/sevensamurai.jpg", type: "Movie" },
-    { id: "m28", title: "Spirited Away",               year: 2001, genres: ["Animation","Fantasy","Adventure"], likes: 3400, cover: "IMG/feed/spiritedaway.jpg", type: "Movie" },
-    { id: "m29", title: "The Lion King",               year: 1994, genres: ["Animation","Family"],    likes: 4500, cover: "IMG/feed/lionking.jpg",           type: "Movie" },
-    { id: "m30", title: "Apocalypse Now",              year: 1979, genres: ["Drama","War"],           likes: 2900, cover: "IMG/feed/apocalypsenow.jpg",      type: "Movie" },
-    { id: "m31", title: "The Silence of the Lambs",    year: 1991, genres: ["Thriller","Crime"],      likes: 3800, cover: "IMG/feed/silenceofthelambs.jpg",  type: "Movie" },
-
-    { id: "s1",  title: "Friends",                    year: 1994, genres: ["Comedy","Romance"],            likes: 7200, cover: "IMG/feed/friends.jpg",        type: "Series" },
-    { id: "s2",  title: "The Office (US)",            year: 2005, genres: ["Comedy"],                      likes: 6900, cover: "IMG/feed/theofficeus.jpg",    type: "Series" },
-    { id: "s3",  title: "Seinfeld",                   year: 1989, genres: ["Comedy"],                      likes: 6100, cover: "IMG/feed/seinfeld.jpg",       type: "Series" },
-    { id: "s4",  title: "The Simpsons",               year: 1989, genres: ["Animation","Comedy","Family"], likes: 6400, cover: "IMG/feed/simpsons.jpg",       type: "Series" },
-    { id: "s5",  title: "Breaking Bad",               year: 2008, genres: ["Crime","Drama","Thriller"],    likes: 7800, cover: "IMG/feed/breakingbad.jpg",    type: "Series" },
-    { id: "s6",  title: "Game of Thrones",            year: 2011, genres: ["Fantasy","Drama","Adventure"], likes: 7600, cover: "IMG/feed/gameofthrones.jpg",  type: "Series" },
-    { id: "s7",  title: "Stranger Things",            year: 2016, genres: ["Sci-Fi","Horror","Drama"],     likes: 7300, cover: "IMG/feed/strangerthings.jpg", type: "Series" },
-    { id: "s8",  title: "The Sopranos",               year: 1999, genres: ["Crime","Drama"],               likes: 6200, cover: "IMG/feed/sopranos.jpg",       type: "Series" },
-    { id: "s9",  title: "The Wire",                   year: 2002, genres: ["Crime","Drama"],               likes: 5900, cover: "IMG/feed/thewire.jpg",        type: "Series" },
-    { id: "s10", title: "Sherlock",                   year: 2010, genres: ["Crime","Mystery","Drama"],     likes: 5600, cover: "IMG/feed/sherlock.jpg",       type: "Series" },
-    { id: "s11", title: "House M.D.",                 year: 2004, genres: ["Drama","Medical"],             likes: 5500, cover: "IMG/feed/housemd.jpg",        type: "Series" },
-    { id: "s12", title: "Lost",                       year: 2004, genres: ["Drama","Mystery","Sci-Fi"],    likes: 5400, cover: "IMG/feed/lost.jpg",           type: "Series" },
-    { id: "s13", title: "Westworld",                  year: 2016, genres: ["Sci-Fi","Drama","Western"],    likes: 4800, cover: "IMG/feed/westworld.jpg",      type: "Series" },
-    { id: "s14", title: "True Detective",             year: 2014, genres: ["Crime","Drama","Mystery"],     likes: 5200, cover: "IMG/feed/truedetective.jpg",  type: "Series" },
-    { id: "s15", title: "Chernobyl",                  year: 2019, genres: ["Drama","History","Mini-Series"], likes: 5100, cover: "IMG/feed/chernobyl.jpg",    type: "Series" },
-    { id: "s16", title: "The Crown",                  year: 2016, genres: ["Drama","History"],             likes: 4700, cover: "IMG/feed/thecrown.jpg",       type: "Series" },
-    { id: "s17", title: "Mad Men",                    year: 2007, genres: ["Drama"],                       likes: 5000, cover: "IMG/feed/madmen.jpg",         type: "Series" },
-    { id: "s18", title: "How I Met Your Mother",      year: 2005, genres: ["Comedy","Romance"],            likes: 5300, cover: "IMG/feed/himym.jpg",          type: "Series" },
-    { id: "s19", title: "The Big Bang Theory",        year: 2007, genres: ["Comedy"],                      likes: 5600, cover: "IMG/feed/bigbangtheory.jpg",  type: "Series" },
-    { id: "s20", title: "Avatar: The Last Airbender", year: 2005, genres: ["Animation","Action","Fantasy"],likes: 5800, cover: "IMG/feed/avatar.jpg",         type: "Series" },
-    { id: "s21", title: "Rick and Morty",             year: 2013, genres: ["Animation","Sci-Fi","Comedy"], likes: 6000, cover: "IMG/feed/rickandmorty.jpg",  type: "Series" }
-  ];
-
-  // Likes state (per profile)
+  // --- Likes state (per profile) ---
   const likesKey = `likes_by_${selectedId}`;
   const likesState = JSON.parse(localStorage.getItem(likesKey) || "{}");
   function getLikeEntry(item) {
@@ -106,7 +60,60 @@ document.addEventListener("DOMContentLoaded", () => {
     return getLikeEntry(item).count;
   }
 
-  // Featured = single pass (no full sort)
+  // --- Progress (per profile) ---
+  const progressKey = `progress_by_${selectedId}`;
+  const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
+
+  // --- API Functions ---
+  async function fetchContent(params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      if (params.q) queryParams.append('q', params.q);
+      if (params.genre) queryParams.append('genre', params.genre);
+      if (params.type) queryParams.append('type', params.type);
+      if (params.year_from) queryParams.append('year_from', params.year_from);
+      if (params.year_to) queryParams.append('year_to', params.year_to);
+      if (params.sort) queryParams.append('sort', params.sort);
+      if (params.limit) queryParams.append('limit', params.limit);
+
+      const url = `${API_BASE}/search?${queryParams.toString()}`;
+      console.log('Fetching:', url);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Search results:', data);
+      return data.results || [];
+    } catch (error) {
+      console.error('Error fetching content:', error);
+      // Fallback to local catalog if server fails
+      return CATALOG;
+    }
+  }
+
+  async function loadInitialContent() {
+    try {
+      // טעינת כל התוכן בלי פילטרים
+      const content = await fetchContent({ limit: 200 });
+      CATALOG = content;
+      
+      // אתחול progress אם ריק
+      if (!Object.keys(progress).length) {
+        CATALOG.slice(0, 8).forEach(i => (progress[i.id] = Math.floor(Math.random() * 80) + 10));
+        localStorage.setItem(progressKey, JSON.stringify(progress));
+      }
+      
+      // הצגת featured ו-rows ראשוניים
+      displayFeatured();
+      await displayDefaultRows();
+    } catch (error) {
+      console.error('Error loading initial content:', error);
+    }
+  }
+
+  // --- Display Functions ---
   function mostLiked(items) {
     return items.reduce(
       (best, cur) => (currentCount(cur) > currentCount(best) ? cur : best),
@@ -114,10 +121,11 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  // Billboard
-  const hero = document.getElementById("hero");
-  const featured = mostLiked(CATALOG);
-  if (hero && featured) {
+  function displayFeatured() {
+    const hero = document.getElementById("hero");
+    if (!CATALOG.length || !hero) return;
+    
+    const featured = mostLiked(CATALOG);
     hero.innerHTML = `
       <div class="nf-hero__bg" style="background-image:url('${featured.cover}')"></div>
       <div class="nf-hero__meta" dir="rtl">
@@ -139,40 +147,41 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
-  // Rows model
-  const rowsRoot = document.getElementById("rows");
+  async function displayDefaultRows() {
+    const rowsRoot = document.getElementById("rows");
+    if (!rowsRoot) return;
+    
+    rowsRoot.innerHTML = "";
+    
+    // Popular
+    const popular = await fetchContent({ sort: 'popular', limit: 14 });
+    
+    // Continue Watching
+    const continueWatching = CATALOG.filter(i => progress[i.id] > 0).slice(0, 12);
+    
+    // By Genre
+    const sciFi = await fetchContent({ genre: 'sci-fi', limit: 14 });
+    const drama = await fetchContent({ genre: 'drama', limit: 14 });
+    const classics = await fetchContent({ year_to: 1999, limit: 12 });
 
-  // Progress (per profile) to power "Continue Watching"
-  const progressKey = `progress_by_${selectedId}`;
-  const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
-  if (!Object.keys(progress).length) {
-    CATALOG.slice(0, 8).forEach(i => (progress[i.id] = Math.floor(Math.random() * 80) + 10));
-    localStorage.setItem(progressKey, JSON.stringify(progress));
+    const rows = [
+      { id: "row-popular", title: "Popular on Netflix", items: popular },
+      { id: "row-continue", title: `Continue Watching for ${current.name}`, items: continueWatching, withProgress: true },
+      { id: "row-sci", title: "Sci-Fi & Fantasy", items: sciFi },
+      { id: "row-drama", title: "Critically-acclaimed Drama", items: drama },
+      { id: "row-classic", title: "Classics", items: classics },
+    ];
+
+    rows.forEach(r => {
+      if (r.items.length > 0) {
+        rowsRoot.appendChild(makeRow(r));
+      }
+    });
+    
+    refreshAllArrows();
   }
 
-  const byGenre = (g) => CATALOG.filter((i) => i.genres.includes(g));
-  const classics = CATALOG.filter((i) => i.year <= 1999).slice(0, 12);
-  const popular  = CATALOG.slice().sort((a, b) => currentCount(b) - currentCount(a)).slice(0, 14);
-  const continueWatching = CATALOG.filter((i) => progress[i.id] > 0).slice(0, 12);
-
-  let rowsModel = [
-    { id: "row-popular",  title: "Popular on Netflix", items: popular },
-    { id: "row-continue", title: `Continue Watching for ${current.name}`, items: continueWatching, withProgress: true },
-    { id: "row-sci",      title: "Sci-Fi & Fantasy", items: byGenre("Sci-Fi").concat(byGenre("Fantasy")).slice(0, 14) },
-    { id: "row-drama",    title: "Critically-acclaimed Drama", items: byGenre("Drama").slice(0, 14) },
-    { id: "row-classic",  title: "Classics", items: classics },
-  ];
-
-  // Optional A→Z sort
-  const alphaToggle = document.getElementById("alphaToggle");
-  function sortRowItems(model, alpha) {
-    const copy = JSON.parse(JSON.stringify(model));
-    if (!alpha) return copy;
-    copy.forEach((r) => r.items.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" })));
-    return copy;
-  }
-
-  // Card factory
+  // --- Card & Row Creation ---
   function createCard(item, withProgress = false) {
     const p = progress[item.id] || 0;
     const entry = getLikeEntry(item);
@@ -187,7 +196,6 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
       <div class="nf-card__meta">
         <div class="nf-card__title" title="${item.title}">${item.title}</div>
-        <!-- year + type under the title -->
         <div class="nf-card__sub">${item.year} • ${item.type}</div>
         <button class="btn btn-sm rounded-pill like-btn ${entry.liked ? "liked" : ""}" type="button" aria-pressed="${entry.liked}" aria-label="Like ${item.title}">
           <span class="heart" aria-hidden="true">
@@ -202,66 +210,80 @@ document.addEventListener("DOMContentLoaded", () => {
     return card;
   }
 
-  // Arrow enable/disable with a small threshold (prevents “right arrow active at end”)
+  function setBtnDisabled(btn, isDisabled) {
+    btn.disabled = isDisabled;                      // חוסם קליקים/פוקוס ברירת מחדל
+    btn.setAttribute("aria-disabled", String(isDisabled));
+    if (isDisabled) {
+      btn.classList.add("is-disabled");
+      btn.setAttribute("tabindex", "-1");           // מוציא מה-tab order
+    } else {
+      btn.classList.remove("is-disabled");
+      btn.removeAttribute("tabindex");
+    }
+  }
+  
   function updateArrowStates(scroller, leftArrow, rightArrow) {
     const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
     const x = scroller.scrollLeft;
-    leftArrow.disabled  = x <= 5;
-    rightArrow.disabled = x >= (maxScroll - 5);
+    setBtnDisabled(leftArrow,  x <= 5);
+    setBtnDisabled(rightArrow, x >= (maxScroll - 5));
   }
+  
 
-  // Build a row
   function makeRow({ id, title, items, withProgress = false }) {
     const section = document.createElement("section");
     section.className = "nf-row";
     section.innerHTML = `
       <h2 class="nf-row__title">${title}</h2>
       <div class="nf-row__viewport">
-        <button class="btn nf-row__arrow nf-row__arrow--left" aria-label="Scroll left" disabled>
+        <button type="button" class="btn nf-row__arrow nf-row__arrow--left" aria-label="Scroll left" disabled>
           <svg viewBox="0 0 24 24" width="36" height="36" class="nf-icon" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
         </button>
         <div class="nf-row__scroller" id="${id}"></div>
-        <button class="btn nf-row__arrow nf-row__arrow--right" aria-label="Scroll right">
+        <button type="button" class="btn nf-row__arrow nf-row__arrow--right" aria-label="Scroll right">
           <svg viewBox="0 0 24 24" width="36" height="36" class="nf-icon" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
         </button>
       </div>
-    `;
+    `;  
     const scroller = section.querySelector(".nf-row__scroller");
-    items.forEach((item) => scroller.appendChild(createCard(item, withProgress)));
+    items.forEach(item => scroller.appendChild(createCard(item, withProgress)));
 
-    const left  = section.querySelector(".nf-row__arrow--left");
+    const left = section.querySelector(".nf-row__arrow--left");
     const right = section.querySelector(".nf-row__arrow--right");
-    const scrollAmount = () => scroller.clientWidth; // page at a time
+    const scrollAmount = () => scroller.clientWidth;
 
-    // Initial arrow state (after layout)
     requestAnimationFrame(() => updateArrowStates(scroller, left, right));
 
-    // Update arrow states on scroll (light debounce)
     let scrollTimeout;
     scroller.addEventListener("scroll", () => {
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => updateArrowStates(scroller, left, right), 50);
     });
 
-    left.addEventListener("click", () => {
+    left.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (!left.disabled) {
         scroller.scrollBy({ left: -scrollAmount(), behavior: "smooth" });
         setTimeout(() => updateArrowStates(scroller, left, right), 350);
       }
     });
-
-    right.addEventListener("click", () => {
+    
+    right.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       if (!right.disabled) {
-        scroller.scrollBy({ left: scrollAmount(), behavior: "smooth" });
+        scroller.scrollBy({ left:  scrollAmount(), behavior: "smooth" });
         setTimeout(() => updateArrowStates(scroller, left, right), 350);
       }
     });
+    
 
     return section;
   }
 
   function refreshAllArrows() {
-    document.querySelectorAll(".nf-row").forEach((row) => {
+    document.querySelectorAll(".nf-row").forEach(row => {
       const scroller = row.querySelector(".nf-row__scroller");
       const left = row.querySelector(".nf-row__arrow--left");
       const right = row.querySelector(".nf-row__arrow--right");
@@ -269,80 +291,102 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  function renderRows(alpha = false) {
+  // --- Like Handling ---
+  const rowsRoot = document.getElementById("rows");
+  if (rowsRoot) {
+    rowsRoot.addEventListener("click", (e) => {
+      const btn = e.target.closest(".like-btn");
+      if (!btn) return;
+      const card = btn.closest(".nf-card");
+      if (!card) return;
+      const id = card.dataset.itemId;
+      const item = CATALOG.find(i => i.id === id);
+      if (!item) return;
+
+      const entry = getLikeEntry(item);
+      const goingLiked = !entry.liked;
+      entry.liked = goingLiked;
+      entry.count = Math.max(0, entry.count + (goingLiked ? 1 : -1));
+      likesState[id] = entry;
+      saveLikes();
+
+      btn.classList.toggle("liked", entry.liked);
+      btn.setAttribute("aria-pressed", String(entry.liked));
+      const countEl = btn.querySelector(".like-count");
+      if (countEl) countEl.textContent = entry.count;
+
+      btn.classList.remove("burst");
+      void btn.offsetWidth;
+      btn.classList.add("burst");
+    }, false);
+  }
+
+  // --- Search with Server ---
+  const searchInput = document.getElementById("searchInput");
+  let searchTimeout;
+
+  async function performSearch(query) {
+    clearTimeout(searchTimeout);
+    
+    searchTimeout = setTimeout(async () => {
+      const q = (query || "").trim();
+      
+      if (!q) {
+        await displayDefaultRows();
+        return;
+      }
+
+      try {
+        const results = await fetchContent({ q, limit: 50 });
+        displaySearchResults(results, q);
+      } catch (error) {
+        console.error('Search error:', error);
+      }
+    }, 300); 
+  }
+
+  function displaySearchResults(results, query) {
+    const rowsRoot = document.getElementById("rows");
     if (!rowsRoot) return;
+    
     rowsRoot.innerHTML = "";
-    const model = sortRowItems(rowsModel, alpha);
-    model.forEach((r) => rowsRoot.appendChild(makeRow(r)));
+    
+    if (results.length === 0) {
+      rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results found for "${query}"</div>`;
+      return;
+    }
+
+    const searchRow = {
+      id: "row-search",
+      title: `Search Results for "${query}" (${results.length})`,
+      items: results
+    };
+    
+    rowsRoot.appendChild(makeRow(searchRow));
     refreshAllArrows();
   }
 
-  // Initial render
-  renderRows(!!(alphaToggle && alphaToggle.checked));
-
-  // Like handling
-  if (rowsRoot) {
-    rowsRoot.addEventListener(
-      "click",
-      (e) => {
-        const btn = e.target.closest(".like-btn");
-        if (!btn) return;
-        const card = btn.closest(".nf-card");
-        if (!card) return;
-        const id = card.dataset.itemId;
-        const item = CATALOG.find((i) => i.id === id);
-        if (!item) return;
-
-        const entry = getLikeEntry(item);
-        const goingLiked = !entry.liked;
-        entry.liked = goingLiked;
-        entry.count = Math.max(0, entry.count + (goingLiked ? 1 : -1));
-        likesState[id] = entry;
-        saveLikes();
-
-        btn.classList.toggle("liked", entry.liked);
-        btn.setAttribute("aria-pressed", String(entry.liked));
-        const countEl = btn.querySelector(".like-count");
-        if (countEl) countEl.textContent = entry.count;
-
-        // restart burst animation
-        btn.classList.remove("burst");
-        void btn.offsetWidth;
-        btn.classList.add("burst");
-      },
-      false
-    );
-  }
-
-  // Search filter
-  const searchInput = document.getElementById("searchInput");
-  function applyFilter(query) {
-    const q = (query || "").trim().toLowerCase();
-    document.querySelectorAll(".nf-row").forEach((row) => {
-      let visibleInRow = 0;
-      row.querySelectorAll(".nf-card").forEach((card) => {
-        const title = card.dataset.title || "";
-        const match = !q || title.includes(q);
-        card.style.display = match ? "" : "none";
-        if (match) visibleInRow++;
-      });
-      row.style.display = visibleInRow ? "" : "none";
-    });
-    refreshAllArrows(); // after filtering
-  }
   if (searchInput) {
-    searchInput.addEventListener("input", (e) => applyFilter(e.target.value));
+    searchInput.addEventListener("input", (e) => performSearch(e.target.value));
   }
 
-  // A→Z toggle
+  // --- A→Z Toggle ---
+  const alphaToggle = document.getElementById("alphaToggle");
   if (alphaToggle) {
-    alphaToggle.addEventListener("change", () => {
-      renderRows(alphaToggle.checked);
-      applyFilter(searchInput ? searchInput.value : "");
+    alphaToggle.addEventListener("change", async () => {
+      const sort = alphaToggle.checked ? 'alpha' : 'popular';
+      const currentQuery = searchInput ? searchInput.value.trim() : '';
+      
+      if (currentQuery) {
+        const results = await fetchContent({ q: currentQuery, sort, limit: 50 });
+        displaySearchResults(results, currentQuery);
+      } else {
+        await displayDefaultRows();
+      }
     });
   }
 
-  // Search box open/close UX
+  // --- Search Box UX ---
   const searchBox = document.getElementById("searchBox");
   const searchBtn = document.getElementById("searchBtn");
   const searchField = document.getElementById("searchInput");
@@ -358,13 +402,18 @@ document.addEventListener("DOMContentLoaded", () => {
       searchField.value = val;
     }
   }
+
   function closeSearch(force = false) {
     if (!searchBox) return;
     if (force || !searchField || !searchField.value.trim()) {
       searchBox.classList.remove("is-open");
       searchBox.setAttribute("aria-expanded", "false");
+      if (!searchField.value.trim()) {
+        displayDefaultRows(); // חזרה לתצוגה רגילה
+      }
     }
   }
+
   if (searchBtn) {
     searchBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -372,18 +421,26 @@ document.addEventListener("DOMContentLoaded", () => {
       else openSearch();
     });
   }
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       closeSearch(true);
-      if (searchField) searchField.blur();
+      if (searchField) {
+        searchField.value = "";
+        searchField.blur();
+        displayDefaultRows();
+      }
     }
   });
+
   document.addEventListener("click", (e) => {
     if (!searchBox) return;
     const within = searchBox.contains(e.target);
     if (!within) closeSearch();
   });
 
-  // Keep arrows correct when layout changes
   window.addEventListener("resize", refreshAllArrows);
+
+  // --- Initialize ---
+  loadInitialContent();
 });
