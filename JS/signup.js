@@ -16,7 +16,7 @@
     form,
     [
       { el: emailEl, rules: [{ test: validators.email, message: "Please enter a valid email." }] },
-      { el: userEl,  rules: [{ test: validators.minLength(3), message: "Username must be at least 3 characters." }] },
+      { el: userEl, rules: [{ test: validators.username, message: "Username must be 3-20 characters, letters/numbers/underscores only." }] },
       { el: passEl,  rules: [{ test: validators.minLength(6), message: "Password must be at least 6 characters." }] }
     ],
     async () => {

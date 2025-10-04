@@ -1,4 +1,3 @@
-// JS/client_validation.js
 (function () {
   function showError(input, message) {
     let error = input.nextElementSibling;
@@ -8,6 +7,7 @@
       input.parentNode.appendChild(error);
     }
     error.textContent = message;
+    error.classList.remove("d-none");
     input.classList.add("login-input-error");
   }
 
@@ -15,6 +15,7 @@
     const error = input.nextElementSibling;
     if (error && error.classList.contains("login-error-message")) {
       error.textContent = "";
+      error.classList.add("d-none");
     }
     input.classList.remove("login-input-error");
   }
@@ -26,6 +27,10 @@
     },
     minLength(len) {
       return (value) => String(value || "").trim().length >= len;
+    },
+    username(value) {
+      const usernameRegex = /^[a-zA-Z0-9_]{3,15}$/;
+      return usernameRegex.test(String(value).trim());
     }
   };
 

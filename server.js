@@ -37,55 +37,60 @@ function validPassword(pw) {
   return typeof pw === "string" && pw.trim().length >= 6;
 }
 
-function validUsername(name) { 
-  return typeof name === "string" && name.trim().length >= 3;
+function validUsername(name) {
+  const usernameRegex = /^[a-zA-Z0-9_]{3,15}$/;
+  return usernameRegex.test(String(name || "").trim());
 }
 
+/* ========== SIGNUP (distinct errors preserved) ========== */
 app.post("/api/signup", (req, res) => {
-  const { email, username, password } = req.body || {};
+  const email = String(req.body?.email || "").trim();
+  const username = String(req.body?.username || "").trim();
+  const password = String(req.body?.password || "");
 
   if (!validEmail(email)) return res.status(400).json({ error: "Invalid email." });
-  if (!username || String(username).trim().length < 3) return res.status(400).json({ error: "Username must be at least 3 characters." });
+  if (!validUsername(username)) return res.status(400).json({ error: "Username must be 3-15 characters, letters/numbers/underscores only." });
   if (!validPassword(password)) return res.status(400).json({ error: "Password must be at least 6 characters." });
 
   const users = readUsers();
 
-  if (users.find((u) => String(u.email).toLowerCase() === String(email).toLowerCase())) {
-    return res.status(409).json({ error: "Email already registered." });
-  }
-  if (users.find((u) => String(u.username).toLowerCase() === String(username).toLowerCase())) {
-    return res.status(409).json({ error: "Username already taken." });
-  }
+  const emailTaken = users.some(u => String(u.email).toLowerCase() === email.toLowerCase());
+  if (emailTaken) return res.status(409).json({ error: "Email already registered." });
+
+  const usernameTaken = users.some(u => String(u.username).toLowerCase() === username.toLowerCase());
+  if (usernameTaken) return res.status(409).json({ error: "Username already taken." });
 
   const newUser = { email, username, password };
   users.push(newUser);
   writeUsers(users);
 
-  res.status(201).json({ message: "User created.", user: { email, username } });
-  console.log(`User ${newUser.username} created successfully`);
+  console.log(`User ${username} created successfully`);
+  return res.status(201).json({ message: "User created.", user: { email, username } });
 });
 
+/* ========== LOGIN (now with separated errors) ========== */
 app.post("/api/login", (req, res) => {
-  const { identifier, password } = req.body || {};
-  const id = (identifier || "").trim();
+  const email = String(req.body?.email || "").trim();
+  const password = String(req.body?.password || "");
 
-  const isEmail = validEmail(id);
-  const isUser = validUsername(id);
-
-  if (!id || (!isEmail && !isUser)) {
-    return res.status(400).json({ error: "Enter a valid email or a username." });
-  }
+  if (!validEmail(email)) return res.status(400).json({ error: "Invalid email." });
   if (!validPassword(password)) return res.status(400).json({ error: "Password must be at least 6 characters." });
 
-  const users = readUsers();
-  const user = isEmail
-    ? users.find((u) => String(u.email).toLowerCase() === id.toLowerCase() && String(u.password) === String(password))
-    : users.find((u) => String(u.username).toLowerCase() === id.toLowerCase() && String(u.password) === String(password));
 
-  if (!user) return res.status(401).json({ error: "Email/username or password doesn’t exist" });
+  const users = readUsers();
+
+  const user = users.find(u => String(u.email).toLowerCase() === email.toLowerCase());
+  if (!user) return res.status(401).json({ error: "Email not found." });
+
+  if (String(user.password) !== password) {
+    return res.status(401).json({ error: "Incorrect password." });
+  }
 
   console.log(`User ${user.username} logged on successfully`);
-  return res.status(200).json({ message: "Login successful.", user: { email: user.email, username: user.username } });
+  return res.status(200).json({
+    message: "Login successful.",
+    user: { email: user.email, username: user.username }
+  });
 });
 
 app.listen(PORT, () => {

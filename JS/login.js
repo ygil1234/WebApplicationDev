@@ -26,8 +26,8 @@
         el: emailInput,
         rules: [
           {
-            test: (value) => validators.email(value) || validators.minLength(3)(value),
-            message: "Enter a valid email or a username."
+            test: validators.email,
+            message: "Please enter a valid email address."
           }
         ]
       },
@@ -41,7 +41,7 @@
     async () => {
       clearGeneral();
       const payload = {
-        identifier: emailInput.value.trim(),
+        email: emailInput.value.trim(),
         password: passwordInput.value.trim()
       };
       try {
@@ -58,7 +58,7 @@
           return;
         }
 
-        localStorage.setItem("identifier", payload.identifier);
+        localStorage.setItem("mail", payload.email);
         localStorage.setItem("password", payload.password);
         window.location.href = "profiles.html";
       } catch {
