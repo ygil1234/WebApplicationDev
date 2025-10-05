@@ -68,7 +68,6 @@ app.post("/api/signup", (req, res) => {
   return res.status(201).json({ message: "User created.", user: { email, username } });
 });
 
-/* ========== LOGIN (now with separated errors) ========== */
 app.post("/api/login", (req, res) => {
   const email = String(req.body?.email || "").trim();
   const password = String(req.body?.password || "");
