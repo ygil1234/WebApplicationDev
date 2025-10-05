@@ -13,7 +13,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Greet + avatar in navbar
   const greetEl = document.getElementById("greet");
   if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
-
   const avatarEl = document.getElementById("navAvatar");
   if (avatarEl) {
     avatarEl.src = profileAvatar;
@@ -30,62 +29,62 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-// ---------- Pretty alert helpers (toast-style) ----------
-function ensureAlertRoot() {
-  let root = document.getElementById('nf-alert-root');
-  if (!root) {
-    root = document.createElement('div');
-    root.id = 'nf-alert-root';
-    root.className = 'nf-alert-root';
-    document.body.appendChild(root);
+  // Alert helpers
+  function ensureAlertRoot() {
+    let root = document.getElementById('nf-alert-root');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'nf-alert-root';
+      root.className = 'nf-alert-root';
+      document.body.appendChild(root);
+    }
+    return root;
   }
-  return root;
-}
 
-function showAlert({ type = 'error', title = 'Something went wrong', message = '', details = '', actions = [] } = {}) {
-  const root = ensureAlertRoot();
-  const el = document.createElement('div');
-  el.className = `nf-alert nf-alert--${type}`;
-  el.innerHTML = `
-    ${title ? `<div class="nf-alert__title">${title}</div>` : ""}
-    ${message ? `<div class="nf-alert__message">${message}</div>` : ""}
-    ${details ? `<pre class="nf-alert__details"></pre>` : ""}
-    <div class="nf-alert__actions"></div>
-  `;
-  if (details) el.querySelector('.nf-alert__details').textContent = details;
+  function showAlert({ type = 'error', title = 'Something went wrong', message = '', details = '', actions = [] } = {}) {
+    const root = ensureAlertRoot();
+    const el = document.createElement('div');
+    el.className = `nf-alert nf-alert--${type}`;
+    el.innerHTML = `
+      ${title ? `<div class="nf-alert__title">${title}</div>` : ""}
+      ${message ? `<div class="nf-alert__message">${message}</div>` : ""}
+      ${details ? `<pre class="nf-alert__details"></pre>` : ""}
+      <div class="nf-alert__actions"></div>
+    `;
+    if (details) el.querySelector('.nf-alert__details').textContent = details;
 
-  const actionsBox = el.querySelector('.nf-alert__actions');
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'nf-alert__btn';
-  closeBtn.textContent = 'Close';
-  closeBtn.addEventListener('click', () => el.remove());
-  actionsBox.appendChild(closeBtn);
+    const actionsBox = el.querySelector('.nf-alert__actions');
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'nf-alert__btn';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', () => el.remove());
+    actionsBox.appendChild(closeBtn);
 
-  (actions || []).forEach(a => {
-    const b = document.createElement('button');
-    b.className = 'nf-alert__btn';
-    b.textContent = a?.label || 'OK';
-    b.addEventListener('click', () => {
-      try { a?.handler && a.handler(); } finally { el.remove(); }
+    (actions || []).forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'nf-alert__btn';
+      b.textContent = a?.label || 'OK';
+      b.addEventListener('click', () => {
+        try { a?.handler && a.handler(); } finally { el.remove(); }
+      });
+      actionsBox.appendChild(b);
     });
-    actionsBox.appendChild(b);
-  });
 
-  root.appendChild(el);
-  setTimeout(() => el.classList.add('is-shown'), 10);
-  // Auto-dismiss for non-errors; keep errors until closed
-  if (type !== 'error') setTimeout(() => el.remove(), 12000);
-}
+    root.appendChild(el);
+    setTimeout(() => el.classList.add('is-shown'), 10);
+    // Auto-dismiss for non-errors; keep errors until closed
+    if (type !== 'error') setTimeout(() => el.remove(), 12000);
+  }
 
-function showFetchError(context, errSummary, raw) {
-  showAlert({
-    type: 'error',
-    title: "Can't load content",
-    message: context || "We couldn't load the catalog from the server.",
-    details: (errSummary ? errSummary + '\n\n' : '') + (raw || ''),
-    actions: [{ label: 'Retry', handler: () => window.location.reload() }]
-  });
-}
+  function showFetchError(context, errSummary, raw) {
+    showAlert({
+      type: 'error',
+      title: "Can't load content",
+      message: context || "We couldn't load the catalog from the server.",
+      details: (errSummary ? errSummary + '\n\n' : '') + (raw || ''),
+      actions: [{ label: 'Retry', handler: () => window.location.reload() }]
+    });
+  }
 
   //  Fetch catalog from server 
   async function fetchWithTimeout(resource, options = {}) {
@@ -184,35 +183,6 @@ function showFetchError(context, errSummary, raw) {
     }
   }
 
-  function normalize(raw) {
-    const list =
-      Array.isArray(raw) ? raw :
-      (raw && typeof raw === 'object' && Array.isArray(raw.items)) ? raw.items :
-      (raw && typeof raw === 'object' && Array.isArray(raw.catalog)) ? raw.catalog :
-      (raw && typeof raw === 'object' && Array.isArray(raw.data)) ? raw.data :
-      (raw && typeof raw === 'object' ? Object.values(raw).filter(Array.isArray).flat() : []);
-
-    return list.map(it => {
-      const title = it.title || it.name || 'Untitled';
-      const genres =
-        Array.isArray(it.genres) ? it.genres :
-        Array.isArray(it.genre) ? it.genre :
-        (typeof it.genre === 'string' ? it.genre.split(',').map(s=>s.trim()).filter(Boolean) : []);
-      const type = it.type || (it.seasons ? 'Series' : 'Movie');
-
-      return {
-        id: String(it.id ?? title),
-        title,
-        year: it.year ?? it.releaseYear ?? '',
-        genres,
-        likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
-        cover: it.cover || it.poster || it.image || it.img || '',
-        backdrop: it.backdrop || it.background || '',
-        type
-      };
-    });
-  }
-
   const CATALOG = await fetchCatalog();
 
   // If catalog is empty, show an empty state and stop further rendering
@@ -272,6 +242,7 @@ function showFetchError(context, errSummary, raw) {
       </div>
     `;
   }
+
   // Rows model
   const rowsRoot = document.getElementById("rows");
 
@@ -305,6 +276,7 @@ function showFetchError(context, errSummary, raw) {
     return copy;
   }
 
+  // Card factory
   function createCard(item, withProgress = false) {
     const p = progress[item.id] || 0;
     const entry = getLikeEntry(item);
@@ -417,30 +389,30 @@ function showFetchError(context, errSummary, raw) {
     rowsRoot.addEventListener(
       "click",
       (e) => {
-      const btn = e.target.closest(".like-btn");
-      if (!btn) return;
-      const card = btn.closest(".nf-card");
-      if (!card) return;
-      const id = card.dataset.itemId;
-      const item = CATALOG.find((i) => i.id === id);
-      if (!item) return;
+        const btn = e.target.closest(".like-btn");
+        if (!btn) return;
+        const card = btn.closest(".nf-card");
+        if (!card) return;
+        const id = card.dataset.itemId;
+        const item = CATALOG.find((i) => i.id === id);
+        if (!item) return;
 
-      const entry = getLikeEntry(item);
-      const goingLiked = !entry.liked;
-      entry.liked = goingLiked;
-      entry.count = Math.max(0, entry.count + (goingLiked ? 1 : -1));
-      likesState[id] = entry;
-      saveLikes();
+        const entry = getLikeEntry(item);
+        const goingLiked = !entry.liked;
+        entry.liked = goingLiked;
+        entry.count = Math.max(0, entry.count + (goingLiked ? 1 : -1));
+        likesState[id] = entry;
+        saveLikes();
 
-      btn.classList.toggle("liked", entry.liked);
-      btn.setAttribute("aria-pressed", String(entry.liked));
-      const countEl = btn.querySelector(".like-count");
-      if (countEl) countEl.textContent = entry.count;
+        btn.classList.toggle("liked", entry.liked);
+        btn.setAttribute("aria-pressed", String(entry.liked));
+        const countEl = btn.querySelector(".like-count");
+        if (countEl) countEl.textContent = entry.count;
 
-      btn.classList.remove("burst");
-      void btn.offsetWidth;
-      btn.classList.add("burst");
-    });
+        btn.classList.remove("burst");
+        void btn.offsetWidth;
+        btn.classList.add("burst");
+      });
   }
 
   // Search filter
