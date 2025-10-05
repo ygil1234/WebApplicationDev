@@ -66,9 +66,9 @@
           }
           return;
         }
-
-        localStorage.setItem("mail", payload.email);
-        localStorage.setItem("password", payload.password);
+        const data = await res.json();
+        localStorage.setItem("loggedInUser", data.user.username);
+        localStorage.setItem("loggedInUserEmail", data.user.email);
         window.location.href = "profiles.html";
       } catch {
         showGeneral("Server Unreachable");

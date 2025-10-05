@@ -53,7 +53,7 @@
 
         successBox.classList.remove("d-none");
         successBox.textContent = "Account created! Redirecting…";
-        setTimeout(() => { window.location.href = "login.html"; }, 900);
+        setTimeout(() => { window.location.href = "login.html"; }, 2000);
         window.location.href = "login.html";
       } catch (_) {
         generalErr.classList.remove("d-none");
