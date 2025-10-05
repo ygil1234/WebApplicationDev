@@ -1,33 +1,23 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const PROFILES = [
-    { id: 1, name: "Chucha",   avatar: "IMG/profile1.jpg" },
-    { id: 2, name: "Schnizel", avatar: "IMG/profile2.jpg" },
-    { id: 3, name: "Pilpel",   avatar: "IMG/profile3.jpg" },
-    { id: 4, name: "Alex",     avatar: "IMG/profile4.jpg" },
-    { id: 5, name: "Sasha",    avatar: "IMG/profile5.jpg" },
-  ];
-
-  // Ensure a profile is selected
+  // Get profile info from localStorage
   const selectedIdStr = localStorage.getItem("selectedProfileId");
   const selectedId = selectedIdStr ? Number(selectedIdStr) : NaN;
-  if (!selectedId || Number.isNaN(selectedId)) {
-    window.location.href = "profiles.html";
-    return;
-  }
-  const current = PROFILES.find(p => p.id === selectedId);
-  if (!current) {
-    localStorage.removeItem("selectedProfileId");
+  const profileName = localStorage.getItem("selectedProfileName");
+  const profileAvatar = localStorage.getItem("selectedProfileAvatar");
+  
+  if (!selectedId || Number.isNaN(selectedId) || !profileName || !profileAvatar) {
     window.location.href = "profiles.html";
     return;
   }
 
   // Greet + avatar in navbar
   const greetEl = document.getElementById("greet");
-  if (greetEl) greetEl.textContent = `Hello, ${current.name}`;
+  if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
+  
   const avatarEl = document.getElementById("navAvatar");
   if (avatarEl) {
-    avatarEl.src = current.avatar;
-    avatarEl.alt = `${current.name} - Profile`;
+    avatarEl.src = profileAvatar;
+    avatarEl.alt = `${profileName} - Profile`;
   }
 
   // Logout
@@ -157,7 +147,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let rowsModel = [
     { id: "row-popular",  title: "Popular on Netflix", items: popular },
-    { id: "row-continue", title: `Continue Watching for ${current.name}`, items: continueWatching, withProgress: true },
+    { id: "row-continue", title: `Continue Watching for ${profileName}`, items: continueWatching, withProgress: true },
     { id: "row-sci",      title: "Sci-Fi & Fantasy", items: byGenre("Sci-Fi").concat(byGenre("Fantasy")).slice(0, 14) },
     { id: "row-drama",    title: "Critically-acclaimed Drama", items: byGenre("Drama").slice(0, 14) },
     { id: "row-classic",  title: "Classics", items: classics },
@@ -187,7 +177,6 @@ document.addEventListener("DOMContentLoaded", () => {
       </div>
       <div class="nf-card__meta">
         <div class="nf-card__title" title="${item.title}">${item.title}</div>
-        <!-- year + type under the title -->
         <div class="nf-card__sub">${item.year} • ${item.type}</div>
         <button class="btn btn-sm rounded-pill like-btn ${entry.liked ? "liked" : ""}" type="button" aria-pressed="${entry.liked}" aria-label="Like ${item.title}">
           <span class="heart" aria-hidden="true">
@@ -202,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return card;
   }
 
-  // Arrow enable/disable with a small threshold (prevents “right arrow active at end”)
+  // Arrow enable/disable with a small threshold
   function updateArrowStates(scroller, leftArrow, rightArrow) {
     const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
     const x = scroller.scrollLeft;
@@ -231,12 +220,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const left  = section.querySelector(".nf-row__arrow--left");
     const right = section.querySelector(".nf-row__arrow--right");
-    const scrollAmount = () => scroller.clientWidth; // page at a time
+    const scrollAmount = () => scroller.clientWidth;
 
-    // Initial arrow state (after layout)
     requestAnimationFrame(() => updateArrowStates(scroller, left, right));
 
-    // Update arrow states on scroll (light debounce)
     let scrollTimeout;
     scroller.addEventListener("scroll", () => {
       clearTimeout(scrollTimeout);
@@ -305,7 +292,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const countEl = btn.querySelector(".like-count");
         if (countEl) countEl.textContent = entry.count;
 
-        // restart burst animation
         btn.classList.remove("burst");
         void btn.offsetWidth;
         btn.classList.add("burst");
@@ -328,7 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
       row.style.display = visibleInRow ? "" : "none";
     });
-    refreshAllArrows(); // after filtering
+    refreshAllArrows();
   }
   if (searchInput) {
     searchInput.addEventListener("input", (e) => applyFilter(e.target.value));
@@ -384,6 +370,5 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!within) closeSearch();
   });
 
-  // Keep arrows correct when layout changes
   window.addEventListener("resize", refreshAllArrows);
 });

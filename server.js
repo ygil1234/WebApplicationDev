@@ -7,12 +7,17 @@ const app = express();
 const PORT = 3000;
 
 const USERS_FILE = path.join(__dirname, "users.json");
+const PROFILES_FILE = path.join(__dirname, "profiles.json");
 
 app.use(express.json());
 app.use(express.static(__dirname));
 
 if (!fs.existsSync(USERS_FILE)) {
   fs.writeFileSync(USERS_FILE, "[]", "utf-8");
+}
+
+if (!fs.existsSync(PROFILES_FILE)) {
+  fs.writeFileSync(PROFILES_FILE, "[]", "utf-8");
 }
 
 function readUsers() {
@@ -26,6 +31,19 @@ function readUsers() {
 
 function writeUsers(arr) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(arr, null, 2), "utf-8");
+}
+
+function readProfiles() {
+  try {
+    const raw = fs.readFileSync(PROFILES_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function writeProfiles(arr) {
+  fs.writeFileSync(PROFILES_FILE, JSON.stringify(arr, null, 2), "utf-8");
 }
 
 function validEmail(v) {
@@ -42,7 +60,7 @@ function validUsername(name) {
   return usernameRegex.test(String(name || "").trim());
 }
 
-/* ========== SIGNUP (distinct errors preserved) ========== */
+/* ========== SIGNUP ========== */
 app.post("/api/signup", (req, res) => {
   const email = String(req.body?.email || "").trim();
   const username = String(req.body?.username || "").trim();
@@ -68,13 +86,13 @@ app.post("/api/signup", (req, res) => {
   return res.status(201).json({ message: "User created.", user: { email, username } });
 });
 
+/* ========== LOGIN ========== */
 app.post("/api/login", (req, res) => {
   const email = String(req.body?.email || "").trim();
   const password = String(req.body?.password || "");
 
   if (!validEmail(email)) return res.status(400).json({ error: "Invalid email." });
   if (!validPassword(password)) return res.status(400).json({ error: "Password must be at least 6 characters." });
-
 
   const users = readUsers();
 
@@ -85,11 +103,95 @@ app.post("/api/login", (req, res) => {
     return res.status(401).json({ error: "Incorrect password." });
   }
 
-  console.log(`User ${user.username} logged on successfully`);
+  console.log(`User ${user.username} logged in successfully`);
   return res.status(200).json({
     message: "Login successful.",
-    user: { email: user.email, username: user.username }
+    user: { 
+      email: user.email, 
+      username: user.username 
+    }
   });
+});
+
+/* ========== PROFILES ========== */
+
+// GET /api/profiles
+app.get("/api/profiles", (req, res) => {
+  const userId = req.query.userId;
+
+  if (!userId) {
+    return res.status(400).json({ error: "User ID is required." });
+  }
+
+  try {
+    const allProfiles = readProfiles();
+    const userProfiles = allProfiles.filter(p => p.userId === userId);
+    
+    console.log(`Retrieved ${userProfiles.length} profiles for user: ${userId}`);
+    return res.status(200).json(userProfiles);
+  } catch (error) {
+    console.error("Error reading profiles:", error);
+    return res.status(500).json({ error: "Failed to load profiles." });
+  }
+});
+
+// POST /api/profiles
+app.post("/api/profiles", (req, res) => {
+  const { userId, name, avatar } = req.body;
+
+  if (!userId || !name || !avatar) {
+    return res.status(400).json({ error: "User ID, name, and avatar are required." });
+  }
+
+  if (typeof name !== "string" || name.trim().length < 2) {
+    return res.status(400).json({ error: "Profile name must be at least 2 characters." });
+  }
+
+  if (name.trim().length > 20) {
+    return res.status(400).json({ error: "Profile name must be at most 20 characters." });
+  }
+
+  try {
+    const allProfiles = readProfiles();
+    const userProfiles = allProfiles.filter(p => p.userId === userId);
+
+    if (userProfiles.length >= 5) {
+      return res.status(400).json({ error: "Maximum of 5 profiles per user." });
+    }
+
+    const nameExists = userProfiles.some(
+      p => p.name.toLowerCase() === name.trim().toLowerCase()
+    );
+    
+    if (nameExists) {
+      return res.status(409).json({ error: "Profile name already exists." });
+    }
+
+    const maxId = allProfiles.length > 0 
+      ? Math.max(...allProfiles.map(p => p.id || 0))
+      : 0;
+    
+    const newProfile = {
+      id: maxId + 1,
+      userId: userId,
+      name: name.trim(),
+      avatar: avatar,
+      createdAt: new Date().toISOString(),
+      likedContent: []
+    };
+
+    allProfiles.push(newProfile);
+    writeProfiles(allProfiles);
+
+    console.log(`Profile "${newProfile.name}" created for user: ${userId}`);
+    return res.status(201).json({ 
+      message: "Profile created successfully.", 
+      profile: newProfile 
+    });
+  } catch (error) {
+    console.error("Error creating profile:", error);
+    return res.status(500).json({ error: "Failed to create profile." });
+  }
 });
 
 app.listen(PORT, () => {
