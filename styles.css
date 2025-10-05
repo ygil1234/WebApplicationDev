@@ -1474,3 +1474,40 @@ body.modal-open {
     gap: 8px;
   }
 }
+
+/* Toast Alerts */
+.nf-alert-root{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.nf-alert{ min-width:280px; max-width:460px; background:#181818; color:#fff; border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:14px 16px; box-shadow:0 10px 30px rgba(0,0,0,.5); opacity:0; transform:translateY(-6px); transition:opacity .18s ease, transform .18s ease; }
+.nf-alert.is-shown{ opacity:1; transform:translateY(0); }
+.nf-alert--error{ border-color:#e50914; }
+.nf-alert__title{ font-weight:700; margin:0 0 4px; }
+.nf-alert__message{ margin:0 0 8px; color:#ddd; }
+.nf-alert__details{ white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.85rem; color:#aaa; max-height:160px; overflow:auto; border-top:1px dashed rgba(255,255,255,.15); margin-top:8px; padding-top:8px; }
+.nf-alert__actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:10px; }
+.nf-alert__btn{ background:#2d2d2d; color:#fff; border:none; border-radius:6px; height:36px; padding:0 12px; cursor:pointer; }
+.nf-alert__btn:hover{ background:#3a3a3a; }
+
+/* Empty State */
+.nf-empty{ text-align:center; color:#e5e5e5; padding:8vh 2vw; }
+.nf-empty__icon{ font-size:42px; margin-bottom:8px; }
+.nf-empty__title{ font-size:clamp(18px,2.4vw,28px); margin:10px 0 6px; }
+.nf-empty__text{ color:#bdbdbd; margin:0 0 14px; }
+.nf-empty__btn{
+  background:#0ea5e9;
+  color:#001018;
+  border:none;
+  padding:10px 16px;
+  border-radius:999px;
+  font-weight:700;
+  cursor:pointer;
+}

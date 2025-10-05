@@ -1,4 +1,5 @@
 document.addEventListener("DOMContentLoaded", async () => {
+  // Get profile info from localStorage
   const selectedIdStr = localStorage.getItem("selectedProfileId");
   const selectedId = selectedIdStr ? Number(selectedIdStr) : NaN;
   const profileName = localStorage.getItem("selectedProfileName");
@@ -9,67 +10,204 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  // Greet + avatar in navbar
   const greetEl = document.getElementById("greet");
   if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
+
   const avatarEl = document.getElementById("navAvatar");
   if (avatarEl) {
     avatarEl.src = profileAvatar;
     avatarEl.alt = `${profileName} - Profile`;
   }
 
-  // --------- Fetch catalog from server (fallback to /content.json) ---------
+  // Logout
+  const logoutLink = document.getElementById("logoutLink");
+  if (logoutLink) {
+    logoutLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      localStorage.clear();
+      window.location.href = "login.html";
+    });
+  }
+
+// ---------- Pretty alert helpers (toast-style) ----------
+function ensureAlertRoot() {
+  let root = document.getElementById('nf-alert-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'nf-alert-root';
+    root.className = 'nf-alert-root';
+    document.body.appendChild(root);
+  }
+  return root;
+}
+
+function showAlert({ type = 'error', title = 'Something went wrong', message = '', details = '', actions = [] } = {}) {
+  const root = ensureAlertRoot();
+  const el = document.createElement('div');
+  el.className = `nf-alert nf-alert--${type}`;
+  el.innerHTML = `
+    ${title ? `<div class="nf-alert__title">${title}</div>` : ""}
+    ${message ? `<div class="nf-alert__message">${message}</div>` : ""}
+    ${details ? `<pre class="nf-alert__details"></pre>` : ""}
+    <div class="nf-alert__actions"></div>
+  `;
+  if (details) el.querySelector('.nf-alert__details').textContent = details;
+
+  const actionsBox = el.querySelector('.nf-alert__actions');
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'nf-alert__btn';
+  closeBtn.textContent = 'Close';
+  closeBtn.addEventListener('click', () => el.remove());
+  actionsBox.appendChild(closeBtn);
+
+  (actions || []).forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'nf-alert__btn';
+    b.textContent = a?.label || 'OK';
+    b.addEventListener('click', () => {
+      try { a?.handler && a.handler(); } finally { el.remove(); }
+    });
+    actionsBox.appendChild(b);
+  });
+
+  root.appendChild(el);
+  setTimeout(() => el.classList.add('is-shown'), 10);
+  // Auto-dismiss for non-errors; keep errors until closed
+  if (type !== 'error') setTimeout(() => el.remove(), 12000);
+}
+
+function showFetchError(context, errSummary, raw) {
+  showAlert({
+    type: 'error',
+    title: "Can't load content",
+    message: context || "We couldn't load the catalog from the server.",
+    details: (errSummary ? errSummary + '\n\n' : '') + (raw || ''),
+    actions: [{ label: 'Retry', handler: () => window.location.reload() }]
+  });
+}
+
+  //  Fetch catalog from server 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 8000, ...opts } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(resource, { ...opts, signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
+  // API-only, with polished error UX
   async function fetchCatalog() {
-    const tryApi = async () => {
-      const res = await fetch("/api/content", { headers: { "Accept": "application/json" } });
-      if (!res.ok) return [];
-      const data = await res.json();
-      const norm = normalize(data);
-      return norm;
-    };
-    const tryStatic = async () => {
-      const res = await fetch("/content.json", { headers: { "Accept": "application/json" } });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return normalize(data);
-    };
+    const errors = [];
 
     try {
-      const api = await tryApi();
-      if (Array.isArray(api) && api.length) return api;
-    } catch {}
-    try {
-      const stat = await tryStatic();
-      if (Array.isArray(stat) && stat.length) return stat;
-    } catch {}
-    return [];
+      const res = await fetchWithTimeout('/api/content', {
+        headers: { 'Accept': 'application/json' },
+        timeout: 8000
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        showAlert({
+          type: 'error',
+          title: 'Session expired',
+          message: 'Please sign in again to see your catalog.',
+          actions: [{ label: 'Go to login', handler: () => (window.location.href = 'login.html') }]
+        });
+        return [];
+      }
+      if (res.status >= 500) {
+        showFetchError(
+          'The server is temporarily unavailable.',
+          'Try again in a minute or contact support.',
+          `HTTP ${res.status}`
+        );
+        return [];
+      }
+      if (!res.ok) {
+        showFetchError(
+          "We couldn't load the catalog from the server.",
+          'Check that /api/content exists and returns valid JSON.',
+          `HTTP ${res.status}`
+        );
+        return [];
+      }
+
+      // Parse + normalize
+      const data = await res.json();
+      const norm =
+        Array.isArray(data) ? data :
+        (data && typeof data === 'object' && Array.isArray(data.items)) ? data.items :
+        (data && typeof data === 'object' && Array.isArray(data.catalog)) ? data.catalog :
+        (data && typeof data === 'object' && Array.isArray(data.data)) ? data.data :
+        (data && typeof data === 'object' ? Object.values(data).filter(Array.isArray).flat() : []);
+
+      if (!Array.isArray(norm) || norm.length === 0) {
+        showFetchError(
+          'No titles are available right now.',
+          'Ensure content.json exists next to server.js and contains items.',
+          'API returned an empty array'
+        );
+        return [];
+      }
+
+      return norm.map(it => {
+        const title = it.title || it.name || 'Untitled';
+        const genres =
+          Array.isArray(it.genres) ? it.genres :
+          Array.isArray(it.genre) ? it.genre :
+          (typeof it.genre === 'string' ? it.genre.split(',').map(s=>s.trim()).filter(Boolean) : []);
+        const type = it.type || (it.seasons ? 'Series' : 'Movie');
+
+        return {
+          id: String(it.id ?? title),
+          title,
+          year: it.year ?? it.releaseYear ?? '',
+          genres,
+          likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
+          cover: it.cover || it.poster || it.image || it.img || '',
+          backdrop: it.backdrop || it.background || '',
+          type
+        };
+      });
+    } catch (e) {
+      const msg = (e?.name === 'AbortError') ? 'The request took too long and was canceled.' : (e?.message || String(e));
+      showFetchError(
+        "We couldn't load the catalog.",
+        'Troubleshooting tips:\n• Check your internet\n• Ensure the server is running\n• Verify /api/content returns valid JSON',
+        msg
+      );
+      return [];
+    }
   }
 
   function normalize(raw) {
-    const list = (() => {
-      if (Array.isArray(raw)) return raw;
-      if (raw && typeof raw === "object") {
-        if (Array.isArray(raw.items)) return raw.items;
-        if (Array.isArray(raw.catalog)) return raw.catalog;
-        if (Array.isArray(raw.data)) return raw.data;
-        const vals = Object.values(raw).filter(Array.isArray).flat();
-        if (Array.isArray(vals)) return vals;
-      }
-      return [];
-    })();
+    const list =
+      Array.isArray(raw) ? raw :
+      (raw && typeof raw === 'object' && Array.isArray(raw.items)) ? raw.items :
+      (raw && typeof raw === 'object' && Array.isArray(raw.catalog)) ? raw.catalog :
+      (raw && typeof raw === 'object' && Array.isArray(raw.data)) ? raw.data :
+      (raw && typeof raw === 'object' ? Object.values(raw).filter(Array.isArray).flat() : []);
+
     return list.map(it => {
-      const title = it.title || it.name || "Untitled";
-      const genres = Array.isArray(it.genres) ? it.genres
-                    : Array.isArray(it.genre) ? it.genre
-                    : (typeof it.genre === "string" ? it.genre.split(",").map(s=>s.trim()).filter(Boolean) : []);
-      const type = it.type || (it.seasons ? "Series" : "Movie");
+      const title = it.title || it.name || 'Untitled';
+      const genres =
+        Array.isArray(it.genres) ? it.genres :
+        Array.isArray(it.genre) ? it.genre :
+        (typeof it.genre === 'string' ? it.genre.split(',').map(s=>s.trim()).filter(Boolean) : []);
+      const type = it.type || (it.seasons ? 'Series' : 'Movie');
+
       return {
         id: String(it.id ?? title),
         title,
-        year: it.year ?? it.releaseYear ?? "",
+        year: it.year ?? it.releaseYear ?? '',
         genres,
         likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
-        cover: it.cover || it.poster || it.image || it.img || "",
-        backdrop: it.backdrop || it.background || "",
+        cover: it.cover || it.poster || it.image || it.img || '',
+        backdrop: it.backdrop || it.background || '',
         type
       };
     });
@@ -77,7 +215,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   const CATALOG = await fetchCatalog();
 
-  // --------- Likes state (per profile) ---------
+  // If catalog is empty, show an empty state and stop further rendering
+  if (!Array.isArray(CATALOG) || CATALOG.length === 0) {
+    const rows = document.getElementById('rows');
+    if (rows) {
+      rows.innerHTML = `
+        <div class="nf-empty">
+          <div class="nf-empty__icon">🌀</div>
+          <h2 class="nf-empty__title">No titles (yet)</h2>
+          <p class="nf-empty__text">We couldn't load the catalog. Try again in a moment.</p>
+          <button class="btn nf-empty__btn" type="button" onclick="location.reload()">Retry</button>
+        </div>`;
+    }
+    return;
+  }
+
+  // Likes state (per profile)
   const likesKey = `likes_by_${selectedId}`;
   const likesState = JSON.parse(localStorage.getItem(likesKey) || "{}");
   function getLikeEntry(item) {
@@ -88,12 +241,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   function saveLikes() { localStorage.setItem(likesKey, JSON.stringify(likesState)); }
   function currentCount(item) { return getLikeEntry(item).count; }
 
-  // --------- Hero (featured) ---------
+  // Featured = single pass (no full sort)
   function mostLiked(items) {
     if (!items.length) return null;
     return items.reduce((best, cur) => (currentCount(cur) > currentCount(best) ? cur : best), items[0]);
   }
 
+  // Billboard
   const hero = document.getElementById("hero");
   const featured = mostLiked(CATALOG);
   if (hero && featured) {
@@ -118,10 +272,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `;
   }
-
-  // --------- Rows model ---------
+  // Rows model
   const rowsRoot = document.getElementById("rows");
 
+  // Progress (per profile) to power "Continue Watching"
   const progressKey = `progress_by_${selectedId}`;
   const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
   if (!Object.keys(progress).length) {
@@ -142,6 +296,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "row-classic",  title: "Classics", items: classics },
   ];
 
+  // Optional A→Z sort
   const alphaToggle = document.getElementById("alphaToggle");
   function sortRowItems(model, alpha) {
     const copy = JSON.parse(JSON.stringify(model));
@@ -181,6 +336,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return card;
   }
 
+  // Arrow enable/disable with a small threshold
   function updateArrowStates(scroller, leftArrow, rightArrow) {
     const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
     const x = scroller.scrollLeft;
@@ -188,6 +344,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     rightArrow.disabled = x >= (maxScroll - 5);
   }
 
+  // Build a row
   function makeRow({ id, title, items, withProgress = false }) {
     const section = document.createElement("section");
     section.className = "nf-row";
@@ -257,7 +414,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Like handling
   if (rowsRoot) {
-    rowsRoot.addEventListener("click", (e) => {
+    rowsRoot.addEventListener(
+      "click",
+      (e) => {
       const btn = e.target.closest(".like-btn");
       if (!btn) return;
       const card = btn.closest(".nf-card");
@@ -284,7 +443,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // --------- Search filter ---------
+  // Search filter
   const searchInput = document.getElementById("searchInput");
   function applyFilter(query) {
     const q = (query || "").trim().toLowerCase();
@@ -304,7 +463,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     searchInput.addEventListener("input", (e) => applyFilter(e.target.value));
   }
 
-  // --------- A→Z toggle ---------
+  // A→Z toggle
   if (alphaToggle) {
     alphaToggle.addEventListener("change", () => {
       renderRows(alphaToggle.checked);
@@ -312,7 +471,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // --------- Search box open/close UX ---------
+  // Search box open/close UX
   const searchBox = document.getElementById("searchBox");
   const searchBtn = document.getElementById("searchBtn");
   const searchField = document.getElementById("searchInput");
