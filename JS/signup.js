@@ -36,13 +36,24 @@
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          generalErr.classList.remove("d-none");
-          alert(`Error ${res.status}: ${data?.error || "Unknown error"}`);
-          generalErr.textContent = data?.error || "Unable to create account.";
+          const msg = `[${res.status}] ${data?.error || "Unable to create account."}`;
+
+          if (/email/i.test(data?.error || "")) {
+            showError(emailEl, msg);
+          } else if (/username/i.test(data?.error || "")) {
+            showError(userEl, msg);
+          } else if (/password/i.test(data?.error || "")) {
+            showError(passEl, msg);
+          } else {
+            generalErr.classList.remove("d-none"); 
+            generalErr.textContent = msg;
+          }
           return;
         }
 
-        alert("User Created Successfully!");
+        successBox.classList.remove("d-none");
+        successBox.textContent = "Account created! Redirecting…";
+        setTimeout(() => { window.location.href = "login.html"; }, 900);
         window.location.href = "login.html";
       } catch (_) {
         generalErr.classList.remove("d-none");
