@@ -1,61 +1,70 @@
-const form = document.getElementById("signinForm");
-const emailInput = document.getElementById("emailPhone");
-const passwordInput = document.getElementById("password");
+// JS/login.js
+(function () {
+  const form = document.getElementById("signinForm");
+  const emailInput = document.getElementById("emailPhone");
+  const passwordInput = document.getElementById("password");
+  const generalErr = document.getElementById("loginGeneralError");
 
-// Show error
-function showError(input, message) {
-  let error = input.nextElementSibling;
-  if (!error || !error.classList.contains("login-error-message")) {
-    error = document.createElement("div");
-    error.classList.add("login-error-message");
-    input.parentNode.appendChild(error);
-  }
-  error.textContent = message;
+  const { validators, attach } = window.Validation;
 
-  // CSS input error
-  input.classList.add("login-input-error");
-}
-
-// Clear error
-function clearError(input) {
-  let error = input.nextElementSibling;
-  if (error && error.classList.contains("login-error-message")) {
-    error.textContent = "";
+  function showGeneral(message) {
+    if (!generalErr) return;
+    generalErr.classList.remove("d-none");
+    generalErr.textContent = message;
   }
 
-  // CSS input error
-  input.classList.remove("login-input-error");
-}
-
-// Validation
-form.addEventListener("submit", function (event) {
-  event.preventDefault();
-
-  let valid = true;
-
-  // Email check
-  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  if (!emailRegex.test(emailInput.value.trim())) {
-    showError(emailInput, "Please enter a valid email address.");
-    valid = false;
-  } else {
-    clearError(emailInput);
+  function clearGeneral() {
+    if (!generalErr) return;
+    generalErr.classList.add("d-none");
+    generalErr.textContent = "";
   }
 
-  // Password check
-  if (passwordInput.value.trim().length < 6) {
-    showError(passwordInput, "Password must be at least 6 characters.");
-    valid = false;
-  } else {
-    clearError(passwordInput);
-  }
+  attach(
+    form,
+    [
+      {
+        el: emailInput,
+        rules: [
+          {
+            test: validators.email,
+            message: "Please enter a valid email address."
+          }
+        ]
+      },
+      {
+        el: passwordInput,
+        rules: [
+          { test: validators.minLength(6), message: "Password must be at least 6 characters." }
+        ]
+      }
+    ],
+    async () => {
+      clearGeneral();
+      const payload = {
+        email: emailInput.value.trim(),
+        password: passwordInput.value.trim()
+      };
+      try {
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
 
-  if (valid) {
-    // Save inputs to the localStorage
-    localStorage.setItem("mail", emailInput.value.trim());
-    localStorage.setItem("password", passwordInput.value.trim());
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showGeneral(data?.error || "Unable to sign in.");
+          alert(`Error ${res.status}: ${data?.error || "Unknown error"}`);
+          return;
+        }
 
-    // Redirect to the next page
-    window.location.href = "profiles.html";
-  }
-});
+        localStorage.setItem("mail", payload.email);
+        localStorage.setItem("password", payload.password);
+        window.location.href = "profiles.html";
+      } catch {
+        showGeneral("Server Unreachable");
+        alert("Network error");
+      }
+    }
+  );
+})();
