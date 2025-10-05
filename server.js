@@ -194,6 +194,35 @@ app.post("/api/profiles", (req, res) => {
   }
 });
 
+
+// ========== CONTENT CATALOG ==========
+app.get("/api/content", (req, res) => {
+  try {
+    const file = path.join(__dirname, "content.json");
+    if (!fs.existsSync(file)) {
+      return res.status(200).json([]);
+    }
+    const raw = fs.readFileSync(file, "utf-8");
+    const data = JSON.parse(raw);
+
+    let out = [];
+    if (Array.isArray(data)) out = data;
+    else if (Array.isArray(data?.items)) out = data.items;
+    else if (Array.isArray(data?.catalog)) out = data.catalog;
+    else if (Array.isArray(data?.data)) out = data.data;
+    else if (data && typeof data === "object") {
+      const vals = Object.values(data).filter(Array.isArray).flat();
+      if (Array.isArray(vals)) out = vals;
+    }
+
+    return res.status(200).json(out);
+  } catch (err) {
+    console.error("Failed to load content.json:", err);
+    return res.status(500).json({ error: "Failed to load content." });
+  }
+});
+
+
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
