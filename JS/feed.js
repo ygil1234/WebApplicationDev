@@ -412,7 +412,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.classList.remove("burst");
         void btn.offsetWidth;
         btn.classList.add("burst");
-      });
+      },
+      false
+    );
   }
 
   // Search filter
