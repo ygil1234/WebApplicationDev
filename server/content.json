@@ -1,49 +1,564 @@
 [
-    { "id": "m7",  "title": "The Godfather",               "year": 1972, "genres": ["Crime","Drama"],         "likes": 5400, "cover": "IMG/feed/godfather.jpg",          "type": "Movie" },
-    { "id": "m8",  "title": "The Godfather Part II",       "year": 1974, "genres": ["Crime","Drama"],         "likes": 4600, "cover": "IMG/feed/godfather2.jpg",         "type": "Movie" },
-    { "id": "m9",  "title": "The Shawshank Redemption",    "year": 1994, "genres": ["Drama"],                 "likes": 6200, "cover": "IMG/feed/shawshank.jpg",          "type": "Movie" },
-    { "id": "m10", "title": "Pulp Fiction",                "year": 1994, "genres": ["Crime","Drama"],         "likes": 5100, "cover": "IMG/feed/pulpfiction.jpg",        "type": "Movie" },
-    { "id": "m11", "title": "The Dark Knight",             "year": 2008, "genres": ["Action","Crime"],        "likes": 7000, "cover": "IMG/feed/thedarlknight.jpg",      "type": "Movie" },
-    { "id": "m12", "title": "Schindler's List",            "year": 1993, "genres": ["Biography","Drama","History"], "likes": 4300, "cover": "IMG/feed/schindlerlist.jpg", "type": "Movie" },
-    { "id": "m13", "title": "Fight Club",                  "year": 1999, "genres": ["Drama","Thriller"],      "likes": 3900, "cover": "IMG/feed/fightclub.jpg",          "type": "Movie" },
-    { "id": "m14", "title": "Forrest Gump",                "year": 1994, "genres": ["Drama","Romance"],       "likes": 4800, "cover": "IMG/feed/forrestgump.jpg",        "type": "Movie" },
-    { "id": "m15", "title": "The Matrix",                  "year": 1999, "genres": ["Sci-Fi","Action"],       "likes": 5200, "cover": "IMG/feed/thematrix.jpg",          "type": "Movie" },
-    { "id": "m16", "title": "Star Wars: A New Hope",       "year": 1977, "genres": ["Sci-Fi","Adventure"],    "likes": 5600, "cover": "IMG/feed/starwars.jpg",           "type": "Movie" },
-    { "id": "m17", "title": "The Empire Strikes Back",     "year": 1980, "genres": ["Sci-Fi","Adventure"],    "likes": 5300, "cover": "IMG/feed/starwars5.jpg",          "type": "Movie" },
-    { "id": "m18", "title": "Back to the Future",          "year": 1985, "genres": ["Adventure","Sci-Fi"],    "likes": 3600, "cover": "IMG/feed/backtothefuture.jpg",    "type": "Movie" },
-    { "id": "m19", "title": "Titanic",                     "year": 1997, "genres": ["Romance","Drama"],       "likes": 4700, "cover": "IMG/feed/titanic.jpg",            "type": "Movie" },
-    { "id": "m20", "title": "Jurassic Park",               "year": 1993, "genres": ["Adventure","Sci-Fi"],    "likes": 3900, "cover": "IMG/feed/jurassicpark.jpg",       "type": "Movie" },
-    { "id": "m21", "title": "Casablanca",                  "year": 1942, "genres": ["Romance","Drama"],       "likes": 3200, "cover": "IMG/feed/casablanca.jpg",         "type": "Movie" },
-    { "id": "m22", "title": "Citizen Kane",                "year": 1941, "genres": ["Drama","Mystery"],       "likes": 2800, "cover": "IMG/feed/citizenkane.jpg",        "type": "Movie" },
-    { "id": "m23", "title": "Psycho",                      "year": 1960, "genres": ["Horror","Thriller"],     "likes": 3000, "cover": "IMG/feed/psycho.jpg",             "type": "Movie" },
-    { "id": "m24", "title": "The Wizard of Oz",            "year": 1939, "genres": ["Fantasy","Family"],      "likes": 3100, "cover": "IMG/feed/wizardofoz.jpg",         "type": "Movie" },
-    { "id": "m25", "title": "LOTR: The Fellowship of the Ring", "year": 2001, "genres": ["Adventure","Fantasy"], "likes": 5200, "cover": "IMG/feed/lotr1.jpg",          "type": "Movie" },
-    { "id": "m26", "title": "Goodfellas",                  "year": 1990, "genres": ["Crime","Drama"],         "likes": 3500, "cover": "IMG/feed/goodfellas.jpg",         "type": "Movie" },
-    { "id": "m27", "title": "Seven Samurai",               "year": 1954, "genres": ["Action","Adventure","Drama"], "likes": 2600, "cover": "IMG/feed/sevensamurai.jpg", "type": "Movie" },
-    { "id": "m28", "title": "Spirited Away",               "year": 2001, "genres": ["Animation","Fantasy","Adventure"], "likes": 3400, "cover": "IMG/feed/spiritedaway.jpg", "type": "Movie" },
-    { "id": "m29", "title": "The Lion King",               "year": 1994, "genres": ["Animation","Family"],    "likes": 4500, "cover": "IMG/feed/lionking.jpg",           "type": "Movie" },
-    { "id": "m30", "title": "Apocalypse Now",              "year": 1979, "genres": ["Drama","War"],           "likes": 2900, "cover": "IMG/feed/apocalypsenow.jpg",      "type": "Movie" },
-    { "id": "m31", "title": "The Silence of the Lambs",    "year": 1991, "genres": ["Thriller","Crime"],      "likes": 3800, "cover": "IMG/feed/silenceofthelambs.jpg",  "type": "Movie" },
-    { "id": "s1",  "title": "Friends",                    "year": 1994, "genres": ["Comedy","Romance"],            "likes": 7200, "cover": "IMG/feed/friends.jpg",        "type": "Series" },
-    { "id": "s2",  "title": "The Office (US)",            "year": 2005, "genres": ["Comedy"],                      "likes": 6900, "cover": "IMG/feed/theofficeus.jpg",    "type": "Series" },
-    { "id": "s3",  "title": "Seinfeld",                   "year": 1989, "genres": ["Comedy"],                      "likes": 6100, "cover": "IMG/feed/seinfeld.jpg",       "type": "Series" },
-    { "id": "s4",  "title": "The Simpsons",               "year": 1989, "genres": ["Animation","Comedy","Family"], "likes": 6400, "cover": "IMG/feed/simpsons.jpg",       "type": "Series" },
-    { "id": "s5",  "title": "Breaking Bad",               "year": 2008, "genres": ["Crime","Drama","Thriller"],    "likes": 7800, "cover": "IMG/feed/breakingbad.jpg",    "type": "Series" },
-    { "id": "s6",  "title": "Game of Thrones",            "year": 2011, "genres": ["Fantasy","Drama","Adventure"], "likes": 7600, "cover": "IMG/feed/gameofthrones.jpg",  "type": "Series" },
-    { "id": "s7",  "title": "Stranger Things",            "year": 2016, "genres": ["Sci-Fi","Horror","Drama"],     "likes": 7300, "cover": "IMG/feed/strangerthings.jpg", "type": "Series" },
-    { "id": "s8",  "title": "The Sopranos",               "year": 1999, "genres": ["Crime","Drama"],               "likes": 6200, "cover": "IMG/feed/sopranos.jpg",       "type": "Series" },
-    { "id": "s9",  "title": "The Wire",                   "year": 2002, "genres": ["Crime","Drama"],               "likes": 5900, "cover": "IMG/feed/thewire.jpg",        "type": "Series" },
-    { "id": "s10", "title": "Sherlock",                   "year": 2010, "genres": ["Crime","Mystery","Drama"],     "likes": 5600, "cover": "IMG/feed/sherlock.jpg",       "type": "Series" },
-    { "id": "s11", "title": "House M.D.",                 "year": 2004, "genres": ["Drama","Medical"],             "likes": 5500, "cover": "IMG/feed/housemd.jpg",        "type": "Series" },
-    { "id": "s12", "title": "Lost",                       "year": 2004, "genres": ["Drama","Mystery","Sci-Fi"],    "likes": 5400, "cover": "IMG/feed/lost.jpg",           "type": "Series" },
-    { "id": "s13", "title": "Westworld",                  "year": 2016, "genres": ["Sci-Fi","Drama","Western"],    "likes": 4800, "cover": "IMG/feed/westworld.jpg",      "type": "Series" },
-    { "id": "s14", "title": "True Detective",             "year": 2014, "genres": ["Crime","Drama","Mystery"],     "likes": 5200, "cover": "IMG/feed/truedetective.jpg",  "type": "Series" },
-    { "id": "s15", "title": "Chernobyl",                  "year": 2019, "genres": ["Drama","History","Mini-Series"], "likes": 5100, "cover": "IMG/feed/chernobyl.jpg",    "type": "Series" },
-    { "id": "s16", "title": "The Crown",                  "year": 2016, "genres": ["Drama","History"],             "likes": 4700, "cover": "IMG/feed/thecrown.jpg",       "type": "Series" },
-    { "id": "s17", "title": "Mad Men",                    "year": 2007, "genres": ["Drama"],                       "likes": 5000, "cover": "IMG/feed/madmen.jpg",         "type": "Series" },
-    { "id": "s18", "title": "How I Met Your Mother",      "year": 2005, "genres": ["Comedy","Romance"],            "likes": 5300, "cover": "IMG/feed/himym.webp",          "type": "Series" },
-    { "id": "s19", "title": "The Big Bang Theory",        "year": 2007, "genres": ["Comedy"],                      "likes": 5600, "cover": "IMG/feed/bigbangtheory.jpg",  "type": "Series" },
-    { "id": "s20", "title": "Avatar: The Last Airbender", "year": 2005, "genres": ["Animation","Action","Fantasy"],"likes": 5800, "cover": "IMG/feed/avatar.jpg",         "type": "Series" },
-    { "id": "s21", "title": "Rick and Morty",             "year": 2013, "genres": ["Animation","Sci-Fi","Comedy"], "likes": 6000, "cover": "IMG/feed/rickandmorty.jpg",  "type": "Series" }
-  ]
-  
+  {
+    "id": "m7",
+    "title": "The Godfather",
+    "year": 1972,
+    "genres": [
+      "Crime",
+      "Drama"
+    ],
+    "likes": 5401,
+    "cover": "IMG/feed/godfather.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m8",
+    "title": "The Godfather Part II",
+    "year": 1974,
+    "genres": [
+      "Crime",
+      "Drama"
+    ],
+    "likes": 4600,
+    "cover": "IMG/feed/godfather2.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m9",
+    "title": "The Shawshank Redemption",
+    "year": 1994,
+    "genres": [
+      "Drama"
+    ],
+    "likes": 6200,
+    "cover": "IMG/feed/shawshank.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m10",
+    "title": "Pulp Fiction",
+    "year": 1994,
+    "genres": [
+      "Crime",
+      "Drama"
+    ],
+    "likes": 5100,
+    "cover": "IMG/feed/pulpfiction.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m11",
+    "title": "The Dark Knight",
+    "year": 2008,
+    "genres": [
+      "Action",
+      "Crime"
+    ],
+    "likes": 7000,
+    "cover": "IMG/feed/thedarlknight.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m12",
+    "title": "Schindler's List",
+    "year": 1993,
+    "genres": [
+      "Biography",
+      "Drama",
+      "History"
+    ],
+    "likes": 4300,
+    "cover": "IMG/feed/schindlerlist.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m13",
+    "title": "Fight Club",
+    "year": 1999,
+    "genres": [
+      "Drama",
+      "Thriller"
+    ],
+    "likes": 3900,
+    "cover": "IMG/feed/fightclub.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m14",
+    "title": "Forrest Gump",
+    "year": 1994,
+    "genres": [
+      "Drama",
+      "Romance"
+    ],
+    "likes": 4800,
+    "cover": "IMG/feed/forrestgump.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m15",
+    "title": "The Matrix",
+    "year": 1999,
+    "genres": [
+      "Sci-Fi",
+      "Action"
+    ],
+    "likes": 5200,
+    "cover": "IMG/feed/thematrix.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m16",
+    "title": "Star Wars: A New Hope",
+    "year": 1977,
+    "genres": [
+      "Sci-Fi",
+      "Adventure"
+    ],
+    "likes": 5600,
+    "cover": "IMG/feed/starwars.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m17",
+    "title": "The Empire Strikes Back",
+    "year": 1980,
+    "genres": [
+      "Sci-Fi",
+      "Adventure"
+    ],
+    "likes": 5300,
+    "cover": "IMG/feed/starwars5.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m18",
+    "title": "Back to the Future",
+    "year": 1985,
+    "genres": [
+      "Adventure",
+      "Sci-Fi"
+    ],
+    "likes": 3600,
+    "cover": "IMG/feed/backtothefuture.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m19",
+    "title": "Titanic",
+    "year": 1997,
+    "genres": [
+      "Romance",
+      "Drama"
+    ],
+    "likes": 4700,
+    "cover": "IMG/feed/titanic.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m20",
+    "title": "Jurassic Park",
+    "year": 1993,
+    "genres": [
+      "Adventure",
+      "Sci-Fi"
+    ],
+    "likes": 3900,
+    "cover": "IMG/feed/jurassicpark.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m21",
+    "title": "Casablanca",
+    "year": 1942,
+    "genres": [
+      "Romance",
+      "Drama"
+    ],
+    "likes": 3200,
+    "cover": "IMG/feed/casablanca.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m22",
+    "title": "Citizen Kane",
+    "year": 1941,
+    "genres": [
+      "Drama",
+      "Mystery"
+    ],
+    "likes": 2800,
+    "cover": "IMG/feed/citizenkane.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m23",
+    "title": "Psycho",
+    "year": 1960,
+    "genres": [
+      "Horror",
+      "Thriller"
+    ],
+    "likes": 3000,
+    "cover": "IMG/feed/psycho.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m24",
+    "title": "The Wizard of Oz",
+    "year": 1939,
+    "genres": [
+      "Fantasy",
+      "Family"
+    ],
+    "likes": 3100,
+    "cover": "IMG/feed/wizardofoz.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m25",
+    "title": "LOTR: The Fellowship of the Ring",
+    "year": 2001,
+    "genres": [
+      "Adventure",
+      "Fantasy"
+    ],
+    "likes": 5200,
+    "cover": "IMG/feed/lotr1.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m26",
+    "title": "Goodfellas",
+    "year": 1990,
+    "genres": [
+      "Crime",
+      "Drama"
+    ],
+    "likes": 3500,
+    "cover": "IMG/feed/goodfellas.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m27",
+    "title": "Seven Samurai",
+    "year": 1954,
+    "genres": [
+      "Action",
+      "Adventure",
+      "Drama"
+    ],
+    "likes": 2600,
+    "cover": "IMG/feed/sevensamurai.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m28",
+    "title": "Spirited Away",
+    "year": 2001,
+    "genres": [
+      "Animation",
+      "Fantasy",
+      "Adventure"
+    ],
+    "likes": 3400,
+    "cover": "IMG/feed/spiritedaway.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m29",
+    "title": "The Lion King",
+    "year": 1994,
+    "genres": [
+      "Animation",
+      "Family"
+    ],
+    "likes": 4500,
+    "cover": "IMG/feed/lionking.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m30",
+    "title": "Apocalypse Now",
+    "year": 1979,
+    "genres": [
+      "Drama",
+      "War"
+    ],
+    "likes": 2900,
+    "cover": "IMG/feed/apocalypsenow.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "m31",
+    "title": "The Silence of the Lambs",
+    "year": 1991,
+    "genres": [
+      "Thriller",
+      "Crime",
+      "Horror"
+    ],
+    "likes": 3800,
+    "cover": "IMG/feed/silenceofthelambs.jpg",
+    "type": "Movie"
+  },
+  {
+    "id": "s1",
+    "title": "Friends",
+    "year": 1994,
+    "genres": [
+      "Comedy",
+      "Romance"
+    ],
+    "likes": 7200,
+    "cover": "IMG/feed/friends.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s2",
+    "title": "The Office (US)",
+    "year": 2005,
+    "genres": [
+      "Comedy"
+    ],
+    "likes": 6900,
+    "cover": "IMG/feed/theofficeus.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s3",
+    "title": "Seinfeld",
+    "year": 1989,
+    "genres": [
+      "Comedy"
+    ],
+    "likes": 6100,
+    "cover": "IMG/feed/seinfeld.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s4",
+    "title": "The Simpsons",
+    "year": 1989,
+    "genres": [
+      "Animation",
+      "Comedy",
+      "Family"
+    ],
+    "likes": 6400,
+    "cover": "IMG/feed/simpsons.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s5",
+    "title": "Breaking Bad",
+    "year": 2008,
+    "genres": [
+      "Crime",
+      "Drama",
+      "Thriller"
+    ],
+    "likes": 7800,
+    "cover": "IMG/feed/breakingbad.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s6",
+    "title": "Game of Thrones",
+    "year": 2011,
+    "genres": [
+      "Fantasy",
+      "Drama",
+      "Adventure"
+    ],
+    "likes": 7600,
+    "cover": "IMG/feed/gameofthrones.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s7",
+    "title": "Stranger Things",
+    "year": 2016,
+    "genres": [
+      "Sci-Fi",
+      "Horror",
+      "Drama"
+    ],
+    "likes": 7300,
+    "cover": "IMG/feed/strangerthings.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s8",
+    "title": "The Sopranos",
+    "year": 1999,
+    "genres": [
+      "Crime",
+      "Drama"
+    ],
+    "likes": 6200,
+    "cover": "IMG/feed/sopranos.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s9",
+    "title": "The Wire",
+    "year": 2002,
+    "genres": [
+      "Crime",
+      "Drama"
+    ],
+    "likes": 5900,
+    "cover": "IMG/feed/thewire.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s10",
+    "title": "Sherlock",
+    "year": 2010,
+    "genres": [
+      "Crime",
+      "Mystery",
+      "Drama"
+    ],
+    "likes": 5600,
+    "cover": "IMG/feed/sherlock.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s11",
+    "title": "House M.D.",
+    "year": 2004,
+    "genres": [
+      "Drama",
+      "Medical"
+    ],
+    "likes": 5500,
+    "cover": "IMG/feed/housemd.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s12",
+    "title": "Lost",
+    "year": 2004,
+    "genres": [
+      "Drama",
+      "Mystery",
+      "Sci-Fi"
+    ],
+    "likes": 5400,
+    "cover": "IMG/feed/lost.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s13",
+    "title": "Westworld",
+    "year": 2016,
+    "genres": [
+      "Sci-Fi",
+      "Drama",
+      "Western"
+    ],
+    "likes": 4800,
+    "cover": "IMG/feed/westworld.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s14",
+    "title": "True Detective",
+    "year": 2014,
+    "genres": [
+      "Crime",
+      "Drama",
+      "Mystery"
+    ],
+    "likes": 5200,
+    "cover": "IMG/feed/truedetective.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s15",
+    "title": "Chernobyl",
+    "year": 2019,
+    "genres": [
+      "Drama",
+      "History",
+      "Mini-Series"
+    ],
+    "likes": 5100,
+    "cover": "IMG/feed/chernobyl.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s16",
+    "title": "The Crown",
+    "year": 2016,
+    "genres": [
+      "Drama",
+      "History"
+    ],
+    "likes": 4700,
+    "cover": "IMG/feed/thecrown.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s17",
+    "title": "Mad Men",
+    "year": 2007,
+    "genres": [
+      "Drama"
+    ],
+    "likes": 5000,
+    "cover": "IMG/feed/madmen.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s18",
+    "title": "How I Met Your Mother",
+    "year": 2005,
+    "genres": [
+      "Comedy",
+      "Romance"
+    ],
+    "likes": 5300,
+    "cover": "IMG/feed/himym.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s19",
+    "title": "The Big Bang Theory",
+    "year": 2007,
+    "genres": [
+      "Comedy"
+    ],
+    "likes": 5600,
+    "cover": "IMG/feed/bigbangtheory.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s20",
+    "title": "Avatar: The Last Airbender",
+    "year": 2005,
+    "genres": [
+      "Animation",
+      "Action",
+      "Fantasy"
+    ],
+    "likes": 5800,
+    "cover": "IMG/feed/avatar.jpg",
+    "type": "Series"
+  },
+  {
+    "id": "s21",
+    "title": "Rick and Morty",
+    "year": 2013,
+    "genres": [
+      "Animation",
+      "Sci-Fi",
+      "Comedy"
+    ],
+    "likes": 6000,
+    "cover": "IMG/feed/rickandmorty.jpg",
+    "type": "Series"
+  }
+]

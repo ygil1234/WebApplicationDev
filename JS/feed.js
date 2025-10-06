@@ -35,44 +35,36 @@ document.addEventListener("DOMContentLoaded", () => {
     avatarEl.alt = `${current.name} - Profile`;
   }
 
-  // Logout
-  const logoutLink = document.getElementById("logoutLink");
-  if (logoutLink) {
-    logoutLink.addEventListener("click", (e) => {
-      e.preventDefault();
-      localStorage.removeItem("selectedProfileId");
-      window.location.href = "index.html";
-    });
-  }
+// ----- Logout -----
+const logoutLink = document.getElementById("logoutLink");
+if (logoutLink) {
+  logoutLink.addEventListener("click", async (e) => {
+    e.preventDefault();
+
+    try {
+      await fetch("http://localhost:3000/api/logout", { method: "POST" });
+    } catch (_) {}
+
+    try { localStorage.clear(); } catch {}
+    window.location.href = "login.html";
+  });
+}
+
 
   // =========================
-  // 2) Local state (fallbacks)
+  // 2) Local state
   // =========================
-  let CATALOG = []; // יתמלא מהשרת; משמש גם fallback אם ה-API נופל
+  let CATALOG = [];           // יאוכלס מתוצאות /api/search (כרגיל)
+  let likedIds = new Set();   // ייטען מהשרת לפי פרופיל
 
-  // Likes per profile
-  const likesKey = `likes_by_${selectedId}`;
-  const likesState = JSON.parse(localStorage.getItem(likesKey) || "{}");
-  function getLikeEntry(item) {
-    const key = String(item.id);
-    const entry = likesState[key];
-    if (entry && typeof entry.count === "number") return entry;
-    return { liked: false, count: item.likes ?? 0 };
-  }
-  function saveLikes() {
-    localStorage.setItem(likesKey, JSON.stringify(likesState));
-  }
-  function currentCount(item) {
-    return getLikeEntry(item).count;
-  }
-
-  // Progress per profile
+  // Progress per profile (קיים אצלך; נשאר)
   const progressKey = `progress_by_${selectedId}`;
   const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
 
   // =========================
-  // 3) API helpers (Search)
+  // 3) API helpers
   // =========================
+  // חיפוש/שליפות שורות (נשאר מול /api/search)
   async function fetchContent(params = {}) {
     try {
       const queryParams = new URLSearchParams();
@@ -86,35 +78,44 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const url = `${API_BASE}/search?${queryParams.toString()}`;
       const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       return Array.isArray(data.results) ? data.results : [];
     } catch (err) {
       console.error("Error fetching content:", err);
-      // Fallback: אם השרת לא זמין, נחזיר את מה שכבר נטען/מקומי
+      // fallback: מה שכבר נטען לזיכרון
       return CATALOG;
     }
   }
 
-  async function loadInitialContent() {
+  // שליפה חד־פעמית של מצב לייקים לכל הקטלוג ע"מ לדעת מה מסומן
+  async function loadLikedState() {
     try {
-      // טוען תוכן כללי לברירת־מחדל
-      const content = await fetchContent({ limit: 200, sort: "popular" });
-      CATALOG = content;
-
-      // אתחול progress אם ריק (דמו)
-      if (!Object.keys(progress).length && CATALOG.length) {
-        CATALOG.slice(0, 8).forEach(i => (progress[String(i.id)] = Math.floor(Math.random() * 80) + 10));
-        localStorage.setItem(progressKey, JSON.stringify(progress));
-      }
-
-      displayFeatured();
-      await displayDefaultRows();
-    } catch (err) {
-      console.error("Error loading initial content:", err);
+      const params = new URLSearchParams();
+      params.set("profileId", String(selectedId));
+      const res = await fetch(`${API_BASE}/content?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const all = await res.json();
+      likedIds = new Set(all.filter(x => x.liked).map(x => String(x.id)));
+    } catch (e) {
+      console.warn("Failed to load liked state; defaulting to none.", e);
+      likedIds = new Set();
     }
+  }
+
+  // קריאה לשרת לצורך טוגל לייק (עם איחוי מול התגובה)
+  async function toggleLike(contentId, like) {
+    const res = await fetch(`${API_BASE}/likes/toggle`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ profileId: selectedId, contentId, like }),
+    });
+    if (!res.ok) {
+      let msg = "Failed to update like";
+      try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
+      throw new Error(msg);
+    }
+    return res.json(); // { liked, likes }
   }
 
   // =========================
@@ -123,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function mostLiked(items) {
     if (!items.length) return null;
     return items.reduce((best, cur) =>
-      currentCount(cur) > currentCount(best) ? cur : best, items[0]
+      (Number(cur.likes || 0) > Number(best.likes || 0)) ? cur : best, items[0]
     );
   }
 
@@ -152,10 +153,16 @@ document.addEventListener("DOMContentLoaded", () => {
     `;
   }
 
+  function likeEntryFor(item) {
+    const liked = likedIds.has(String(item.id));
+    const count = Number(item.likes || 0);
+    return { liked, count };
+  }
+
   function createCard(item, withProgress = false) {
     const pid = String(item.id);
     const p = progress[pid] || 0;
-    const entry = getLikeEntry(item);
+    const entry = likeEntryFor(item);
 
     const card = document.createElement("article");
     card.className = "nf-card";
@@ -172,7 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="nf-card__title" title="${item.title}">${item.title}</div>
         <div class="nf-card__sub">${item.year} • ${item.type}</div>
         <button class="btn btn-sm rounded-pill like-btn ${entry.liked ? "liked" : ""}"
-                type="button" aria-pressed="${entry.liked}" aria-label="Like ${item.title}">
+                type="button" aria-pressed="${entry.liked}" aria-label="${entry.liked ? "Unlike" : "Like"} ${item.title}">
           <span class="heart" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" role="img">
               <path d="M12 21s-6.716-4.555-9.193-7.032C.977 12.139.5 10.96.5 9.708.5 6.817 2.817 4.5 5.708 4.5c1.522 0 2.974.62 4.042 1.688L12 8.439l2.25-2.25A5.726 5.726 0 0 1 18.292 4.5c2.891 0 5.208 2.317 5.208 5.208 0 1.252-.477 2.431-2.307 4.26C18.716 16.445 12 21 12 21z"></path>
@@ -190,7 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.setAttribute("aria-disabled", String(isDisabled));
     if (isDisabled) {
       btn.classList.add("is-disabled");
-      btn.tabIndex = -1; // מוציא מה-tab order
+      btn.tabIndex = -1;
     } else {
       btn.classList.remove("is-disabled");
       btn.removeAttribute("tabindex");
@@ -322,11 +329,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // =========================
-  // 6) Likes (delegation)
+  // 6) Likes (delegation + server)
   // =========================
   const rowsRoot = document.getElementById("rows");
   if (rowsRoot) {
-    rowsRoot.addEventListener("click", (e) => {
+    rowsRoot.addEventListener("click", async (e) => {
       const btn = e.target.closest(".like-btn");
       if (!btn) return;
       const card = btn.closest(".nf-card");
@@ -336,22 +343,38 @@ document.addEventListener("DOMContentLoaded", () => {
       const item = CATALOG.find(i => String(i.id) === pid);
       if (!item) return;
 
-      const entry = getLikeEntry(item);
-      const goingLiked = !entry.liked;
-      entry.liked = goingLiked;
-      entry.count = Math.max(0, (entry.count ?? 0) + (goingLiked ? 1 : -1));
-      likesState[pid] = entry;
-      saveLikes();
+      const isLiked = likedIds.has(pid);
+      const goingLiked = !isLiked;
 
-      btn.classList.toggle("liked", entry.liked);
-      btn.setAttribute("aria-pressed", String(entry.liked));
+      // UI אופטימי
+      btn.classList.toggle("liked", goingLiked);
+      btn.setAttribute("aria-pressed", String(goingLiked));
       const countEl = btn.querySelector(".like-count");
-      if (countEl) countEl.textContent = entry.count;
+      const prevCount = Number(countEl?.textContent || "0") || 0;
+      const optimistic = Math.max(0, prevCount + (goingLiked ? 1 : -1));
+      if (countEl) countEl.textContent = optimistic;
 
-      // burst animation reset
-      btn.classList.remove("burst");
-      void btn.offsetWidth;
-      btn.classList.add("burst");
+      btn.classList.remove("burst"); void btn.offsetWidth; btn.classList.add("burst");
+
+      try {
+        const resp = await toggleLike(pid, goingLiked); // { liked, likes }
+        // איחוי מול השרת
+        if (resp?.liked) likedIds.add(pid); else likedIds.delete(pid);
+        if (typeof resp?.likes === "number") {
+          if (countEl) countEl.textContent = String(Math.max(0, resp.likes));
+          // עדכן גם את העותק ב-CATALOG כדי שה־hero/rows הבאים יהיו עקביים
+          const idx = CATALOG.findIndex(i => String(i.id) === pid);
+          if (idx !== -1) CATALOG[idx].likes = resp.likes;
+        }
+      } catch (err) {
+        // החזרה לאחור במקרה כשל
+        console.error(err);
+        // החזרה למצב המקורי
+        btn.classList.toggle("liked", isLiked);
+        btn.setAttribute("aria-pressed", String(isLiked));
+        if (countEl) countEl.textContent = String(prevCount);
+        alert(err.message || "Error while updating like");
+      }
     }, false);
   }
 
@@ -410,7 +433,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         console.error("Search error:", err);
       }
-    }, 300); // debounce
+    }, 300);
   }
 
   if (searchInput) {
@@ -499,6 +522,19 @@ document.addEventListener("DOMContentLoaded", () => {
   // =========================
   window.addEventListener("resize", refreshAllArrows);
 
-  // Init
-  loadInitialContent();
+  // Init: טען סט לייקים ואז תוכן
+  (async () => {
+    await loadLikedState();
+    const content = await fetchContent({ limit: 200, sort: "popular" });
+    CATALOG = content;
+
+    // אתחול progress דמו אם ריק
+    if (!Object.keys(progress).length && CATALOG.length) {
+      CATALOG.slice(0, 8).forEach(i => (progress[String(i.id)] = Math.floor(Math.random() * 80) + 10));
+      localStorage.setItem(progressKey, JSON.stringify(progress));
+    }
+
+    displayFeatured();
+    await displayDefaultRows();
+  })();
 });
