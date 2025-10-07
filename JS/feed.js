@@ -1,4 +1,4 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   // Get profile info from localStorage
   const selectedIdStr = localStorage.getItem("selectedProfileId");
   const selectedId = selectedIdStr ? Number(selectedIdStr) : NaN;
@@ -13,7 +13,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Greet + avatar in navbar
   const greetEl = document.getElementById("greet");
   if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
-  
   const avatarEl = document.getElementById("navAvatar");
   if (avatarEl) {
     avatarEl.src = profileAvatar;
@@ -30,56 +29,176 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Catalog
-  const CATALOG = [
-    { id: "m7",  title: "The Godfather",               year: 1972, genres: ["Crime","Drama"],         likes: 5400, cover: "IMG/feed/godfather.jpg",          type: "Movie" },
-    { id: "m8",  title: "The Godfather Part II",       year: 1974, genres: ["Crime","Drama"],         likes: 4600, cover: "IMG/feed/godfather2.jpg",         type: "Movie" },
-    { id: "m9",  title: "The Shawshank Redemption",    year: 1994, genres: ["Drama"],                 likes: 6200, cover: "IMG/feed/shawshank.jpg",          type: "Movie" },
-    { id: "m10", title: "Pulp Fiction",                year: 1994, genres: ["Crime","Drama"],         likes: 5100, cover: "IMG/feed/pulpfiction.jpg",        type: "Movie" },
-    { id: "m11", title: "The Dark Knight",             year: 2008, genres: ["Action","Crime"],        likes: 7000, cover: "IMG/feed/thedarlknight.jpg",      type: "Movie" },
-    { id: "m12", title: "Schindler's List",            year: 1993, genres: ["Biography","Drama","History"], likes: 4300, cover: "IMG/feed/schindlerlist.jpg", type: "Movie" },
-    { id: "m13", title: "Fight Club",                  year: 1999, genres: ["Drama","Thriller"],      likes: 3900, cover: "IMG/feed/fightclub.jpg",          type: "Movie" },
-    { id: "m14", title: "Forrest Gump",                year: 1994, genres: ["Drama","Romance"],       likes: 4800, cover: "IMG/feed/forrestgump.jpg",        type: "Movie" },
-    { id: "m15", title: "The Matrix",                  year: 1999, genres: ["Sci-Fi","Action"],       likes: 5200, cover: "IMG/feed/thematrix.jpg",          type: "Movie" },
-    { id: "m16", title: "Star Wars: A New Hope",       year: 1977, genres: ["Sci-Fi","Adventure"],    likes: 5600, cover: "IMG/feed/starwars.jpg",           type: "Movie" },
-    { id: "m17", title: "The Empire Strikes Back",     year: 1980, genres: ["Sci-Fi","Adventure"],    likes: 5300, cover: "IMG/feed/starwars5.jpg",          type: "Movie" },
-    { id: "m18", title: "Back to the Future",          year: 1985, genres: ["Adventure","Sci-Fi"],    likes: 3600, cover: "IMG/feed/backtothefuture.jpg",    type: "Movie" },
-    { id: "m19", title: "Titanic",                     year: 1997, genres: ["Romance","Drama"],       likes: 4700, cover: "IMG/feed/titanic.jpg",            type: "Movie" },
-    { id: "m20", title: "Jurassic Park",               year: 1993, genres: ["Adventure","Sci-Fi"],    likes: 3900, cover: "IMG/feed/jurassicpark.jpg",       type: "Movie" },
-    { id: "m21", title: "Casablanca",                  year: 1942, genres: ["Romance","Drama"],       likes: 3200, cover: "IMG/feed/casablanca.jpg",         type: "Movie" },
-    { id: "m22", title: "Citizen Kane",                year: 1941, genres: ["Drama","Mystery"],       likes: 2800, cover: "IMG/feed/citizenkane.jpg",        type: "Movie" },
-    { id: "m23", title: "Psycho",                      year: 1960, genres: ["Horror","Thriller"],     likes: 3000, cover: "IMG/feed/psycho.jpg",             type: "Movie" },
-    { id: "m24", title: "The Wizard of Oz",            year: 1939, genres: ["Fantasy","Family"],      likes: 3100, cover: "IMG/feed/wizardofoz.jpg",         type: "Movie" },
-    { id: "m25", title: "LOTR: The Fellowship of the Ring", year: 2001, genres: ["Adventure","Fantasy"], likes: 5200, cover: "IMG/feed/lotr1.jpg",          type: "Movie" },
-    { id: "m26", title: "Goodfellas",                  year: 1990, genres: ["Crime","Drama"],         likes: 3500, cover: "IMG/feed/goodfellas.jpg",         type: "Movie" },
-    { id: "m27", title: "Seven Samurai",               year: 1954, genres: ["Action","Adventure","Drama"], likes: 2600, cover: "IMG/feed/sevensamurai.jpg", type: "Movie" },
-    { id: "m28", title: "Spirited Away",               year: 2001, genres: ["Animation","Fantasy","Adventure"], likes: 3400, cover: "IMG/feed/spiritedaway.jpg", type: "Movie" },
-    { id: "m29", title: "The Lion King",               year: 1994, genres: ["Animation","Family"],    likes: 4500, cover: "IMG/feed/lionking.jpg",           type: "Movie" },
-    { id: "m30", title: "Apocalypse Now",              year: 1979, genres: ["Drama","War"],           likes: 2900, cover: "IMG/feed/apocalypsenow.jpg",      type: "Movie" },
-    { id: "m31", title: "The Silence of the Lambs",    year: 1991, genres: ["Thriller","Crime"],      likes: 3800, cover: "IMG/feed/silenceofthelambs.jpg",  type: "Movie" },
+  // Alert helpers
+  function ensureAlertRoot() {
+    let root = document.getElementById('nf-alert-root');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'nf-alert-root';
+      root.className = 'nf-alert-root';
+      document.body.appendChild(root);
+    }
+    return root;
+  }
 
-    { id: "s1",  title: "Friends",                    year: 1994, genres: ["Comedy","Romance"],            likes: 7200, cover: "IMG/feed/friends.jpg",        type: "Series" },
-    { id: "s2",  title: "The Office (US)",            year: 2005, genres: ["Comedy"],                      likes: 6900, cover: "IMG/feed/theofficeus.jpg",    type: "Series" },
-    { id: "s3",  title: "Seinfeld",                   year: 1989, genres: ["Comedy"],                      likes: 6100, cover: "IMG/feed/seinfeld.jpg",       type: "Series" },
-    { id: "s4",  title: "The Simpsons",               year: 1989, genres: ["Animation","Comedy","Family"], likes: 6400, cover: "IMG/feed/simpsons.jpg",       type: "Series" },
-    { id: "s5",  title: "Breaking Bad",               year: 2008, genres: ["Crime","Drama","Thriller"],    likes: 7800, cover: "IMG/feed/breakingbad.jpg",    type: "Series" },
-    { id: "s6",  title: "Game of Thrones",            year: 2011, genres: ["Fantasy","Drama","Adventure"], likes: 7600, cover: "IMG/feed/gameofthrones.jpg",  type: "Series" },
-    { id: "s7",  title: "Stranger Things",            year: 2016, genres: ["Sci-Fi","Horror","Drama"],     likes: 7300, cover: "IMG/feed/strangerthings.jpg", type: "Series" },
-    { id: "s8",  title: "The Sopranos",               year: 1999, genres: ["Crime","Drama"],               likes: 6200, cover: "IMG/feed/sopranos.jpg",       type: "Series" },
-    { id: "s9",  title: "The Wire",                   year: 2002, genres: ["Crime","Drama"],               likes: 5900, cover: "IMG/feed/thewire.jpg",        type: "Series" },
-    { id: "s10", title: "Sherlock",                   year: 2010, genres: ["Crime","Mystery","Drama"],     likes: 5600, cover: "IMG/feed/sherlock.jpg",       type: "Series" },
-    { id: "s11", title: "House M.D.",                 year: 2004, genres: ["Drama","Medical"],             likes: 5500, cover: "IMG/feed/housemd.jpg",        type: "Series" },
-    { id: "s12", title: "Lost",                       year: 2004, genres: ["Drama","Mystery","Sci-Fi"],    likes: 5400, cover: "IMG/feed/lost.jpg",           type: "Series" },
-    { id: "s13", title: "Westworld",                  year: 2016, genres: ["Sci-Fi","Drama","Western"],    likes: 4800, cover: "IMG/feed/westworld.jpg",      type: "Series" },
-    { id: "s14", title: "True Detective",             year: 2014, genres: ["Crime","Drama","Mystery"],     likes: 5200, cover: "IMG/feed/truedetective.jpg",  type: "Series" },
-    { id: "s15", title: "Chernobyl",                  year: 2019, genres: ["Drama","History","Mini-Series"], likes: 5100, cover: "IMG/feed/chernobyl.jpg",    type: "Series" },
-    { id: "s16", title: "The Crown",                  year: 2016, genres: ["Drama","History"],             likes: 4700, cover: "IMG/feed/thecrown.jpg",       type: "Series" },
-    { id: "s17", title: "Mad Men",                    year: 2007, genres: ["Drama"],                       likes: 5000, cover: "IMG/feed/madmen.jpg",         type: "Series" },
-    { id: "s18", title: "How I Met Your Mother",      year: 2005, genres: ["Comedy","Romance"],            likes: 5300, cover: "IMG/feed/himym.jpg",          type: "Series" },
-    { id: "s19", title: "The Big Bang Theory",        year: 2007, genres: ["Comedy"],                      likes: 5600, cover: "IMG/feed/bigbangtheory.jpg",  type: "Series" },
-    { id: "s20", title: "Avatar: The Last Airbender", year: 2005, genres: ["Animation","Action","Fantasy"],likes: 5800, cover: "IMG/feed/avatar.jpg",         type: "Series" },
-    { id: "s21", title: "Rick and Morty",             year: 2013, genres: ["Animation","Sci-Fi","Comedy"], likes: 6000, cover: "IMG/feed/rickandmorty.jpg",  type: "Series" }
-  ];
+  function showAlert({ type = 'error', title = 'Something went wrong', message = '', details = '', actions = [] } = {}) {
+    const root = ensureAlertRoot();
+    const el = document.createElement('div');
+    el.className = `nf-alert nf-alert--${type}`;
+    el.innerHTML = `
+      ${title ? `<div class="nf-alert__title">${title}</div>` : ""}
+      ${message ? `<div class="nf-alert__message">${message}</div>` : ""}
+      ${details ? `<pre class="nf-alert__details"></pre>` : ""}
+      <div class="nf-alert__actions"></div>
+    `;
+    if (details) el.querySelector('.nf-alert__details').textContent = details;
+
+    const actionsBox = el.querySelector('.nf-alert__actions');
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'nf-alert__btn';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', () => el.remove());
+    actionsBox.appendChild(closeBtn);
+
+    (actions || []).forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'nf-alert__btn';
+      b.textContent = a?.label || 'OK';
+      b.addEventListener('click', () => {
+        try { a?.handler && a.handler(); } finally { el.remove(); }
+      });
+      actionsBox.appendChild(b);
+    });
+
+    root.appendChild(el);
+    setTimeout(() => el.classList.add('is-shown'), 10);
+    // Auto-dismiss for non-errors; keep errors until closed
+    if (type !== 'error') setTimeout(() => el.remove(), 12000);
+  }
+
+  function showFetchError(context, errSummary, raw) {
+    showAlert({
+      type: 'error',
+      title: "Can't load content",
+      message: context || "We couldn't load the catalog from the server.",
+      details: (errSummary ? errSummary + '\n\n' : '') + (raw || ''),
+      actions: [{ label: 'Retry', handler: () => window.location.reload() }]
+    });
+  }
+
+  //  Fetch catalog from server 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 8000, ...opts } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(resource, { ...opts, signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
+  // API-only, with polished error UX
+  async function fetchCatalog() {
+    const errors = [];
+
+    try {
+      const res = await fetchWithTimeout('/api/content', {
+        headers: { 'Accept': 'application/json' },
+        timeout: 8000
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        showAlert({
+          type: 'error',
+          title: 'Session expired',
+          message: 'Please sign in again to see your catalog.',
+          actions: [{ label: 'Go to login', handler: () => (window.location.href = 'login.html') }]
+        });
+        return [];
+      }
+      if (res.status >= 500) {
+        showFetchError(
+          'The server is temporarily unavailable.',
+          'Try again in a minute or contact support.',
+          `HTTP ${res.status}`
+        );
+        return [];
+      }
+      if (!res.ok) {
+        showFetchError(
+          "We couldn't load the catalog from the server.",
+          'Check that /api/content exists and returns valid JSON.',
+          `HTTP ${res.status}`
+        );
+        return [];
+      }
+
+      // Parse + normalize
+      const data = await res.json();
+      const norm =
+        Array.isArray(data) ? data :
+        (data && typeof data === 'object' && Array.isArray(data.items)) ? data.items :
+        (data && typeof data === 'object' && Array.isArray(data.catalog)) ? data.catalog :
+        (data && typeof data === 'object' && Array.isArray(data.data)) ? data.data :
+        (data && typeof data === 'object' ? Object.values(data).filter(Array.isArray).flat() : []);
+
+      if (!Array.isArray(norm) || norm.length === 0) {
+        showFetchError(
+          'No titles are available right now.',
+          'Ensure content.json exists next to server.js and contains items.',
+          'API returned an empty array'
+        );
+        return [];
+      }
+
+      return norm.map(it => {
+        const title = it.title || it.name || 'Untitled';
+        const genres =
+          Array.isArray(it.genres) ? it.genres :
+          Array.isArray(it.genre) ? it.genre :
+          (typeof it.genre === 'string' ? it.genre.split(',').map(s=>s.trim()).filter(Boolean) : []);
+        const type = it.type || (it.seasons ? 'Series' : 'Movie');
+
+        return {
+          id: String(it.id ?? title),
+          title,
+          year: it.year ?? it.releaseYear ?? '',
+          genres,
+          likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
+          cover: it.cover || it.poster || it.image || it.img || '',
+          backdrop: it.backdrop || it.background || '',
+          type
+        };
+      });
+    } catch (e) {
+      const msg = (e?.name === 'AbortError') ? 'The request took too long and was canceled.' : (e?.message || String(e));
+      showFetchError(
+        "We couldn't load the catalog.",
+        'Troubleshooting tips:\n• Check your internet\n• Ensure the server is running\n• Verify /api/content returns valid JSON',
+        msg
+      );
+      return [];
+    }
+  }
+
+  const CATALOG = await fetchCatalog();
+
+  // If catalog is empty, show an empty state and stop further rendering
+  if (!Array.isArray(CATALOG) || CATALOG.length === 0) {
+    const rows = document.getElementById('rows');
+    if (rows) {
+      rows.innerHTML = `
+        <div class="nf-empty">
+          <div class="nf-empty__icon">🌀</div>
+          <h2 class="nf-empty__title">No titles (yet)</h2>
+          <p class="nf-empty__text">We couldn't load the catalog. Try again in a moment.</p>
+          <button class="btn nf-empty__btn" type="button" onclick="location.reload()">Retry</button>
+        </div>`;
+    }
+    return;
+  }
 
   // Likes state (per profile)
   const likesKey = `likes_by_${selectedId}`;
@@ -87,32 +206,27 @@ document.addEventListener("DOMContentLoaded", () => {
   function getLikeEntry(item) {
     const entry = likesState[item.id];
     if (entry && typeof entry.count === "number") return entry;
-    return { liked: false, count: item.likes };
+    return { liked: false, count: Number.isFinite(item.likes) ? item.likes : 0 };
   }
-  function saveLikes() {
-    localStorage.setItem(likesKey, JSON.stringify(likesState));
-  }
-  function currentCount(item) {
-    return getLikeEntry(item).count;
-  }
+  function saveLikes() { localStorage.setItem(likesKey, JSON.stringify(likesState)); }
+  function currentCount(item) { return getLikeEntry(item).count; }
 
   // Featured = single pass (no full sort)
   function mostLiked(items) {
-    return items.reduce(
-      (best, cur) => (currentCount(cur) > currentCount(best) ? cur : best),
-      items[0]
-    );
+    if (!items.length) return null;
+    return items.reduce((best, cur) => (currentCount(cur) > currentCount(best) ? cur : best), items[0]);
   }
 
   // Billboard
   const hero = document.getElementById("hero");
   const featured = mostLiked(CATALOG);
   if (hero && featured) {
+    const heroImg = featured.backdrop || featured.cover || "";
     hero.innerHTML = `
-      <div class="nf-hero__bg" style="background-image:url('${featured.cover}')"></div>
+      <div class="nf-hero__bg" style="background-image:url('${heroImg}')"></div>
       <div class="nf-hero__meta" dir="rtl">
         <h1 class="nf-hero__title">${featured.title}</h1>
-        <div class="nf-hero__sub">${featured.year} • ${featured.genres.join(" • ")} • ${featured.type}</div>
+        <div class="nf-hero__sub">${[featured.year, (featured.genres||[]).join(" • "), featured.type].filter(Boolean).join(" • ")}</div>
         <div class="nf-hero__actions">
           <button class="nf-cta nf-cta--play" id="btnPlay">
             <svg viewBox="0 0 24 24" class="nf-cta__icon" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>
@@ -140,8 +254,8 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem(progressKey, JSON.stringify(progress));
   }
 
-  const byGenre = (g) => CATALOG.filter((i) => i.genres.includes(g));
-  const classics = CATALOG.filter((i) => i.year <= 1999).slice(0, 12);
+  const byGenre = (g) => CATALOG.filter((i) => Array.isArray(i.genres) && i.genres.includes(g));
+  const classics = CATALOG.filter((i) => Number(i.year) && Number(i.year) <= 1999).slice(0, 12);
   const popular  = CATALOG.slice().sort((a, b) => currentCount(b) - currentCount(a)).slice(0, 14);
   const continueWatching = CATALOG.filter((i) => progress[i.id] > 0).slice(0, 12);
 
@@ -158,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function sortRowItems(model, alpha) {
     const copy = JSON.parse(JSON.stringify(model));
     if (!alpha) return copy;
-    copy.forEach((r) => r.items.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" })));
+    copy.forEach((r) => r.items.sort((a, b) => (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" })));
     return copy;
   }
 
@@ -166,18 +280,21 @@ document.addEventListener("DOMContentLoaded", () => {
   function createCard(item, withProgress = false) {
     const p = progress[item.id] || 0;
     const entry = getLikeEntry(item);
+    const sub = [item.year ? String(item.year) : "", item.type || ""].filter(Boolean).join(" • ");
+    const imgSrc = item.cover || item.backdrop || "";
+
     const card = document.createElement("article");
     card.className = "nf-card";
-    card.dataset.title = item.title.toLowerCase();
+    card.dataset.title = (item.title || "").toLowerCase();
     card.dataset.itemId = item.id;
     card.innerHTML = `
       <div class="nf-card__cover">
-        <img src="${item.cover}" alt="${item.title}" loading="lazy" onerror="this.onerror=null;this.style.display='none';" />
+        ${imgSrc ? `<img src="${imgSrc}" alt="${item.title}" loading="lazy" onerror="this.onerror=null;this.style.display='none';" />` : `<div class="nf-card__placeholder">No image</div>`}
         ${withProgress ? `<div class="nf-progress"><div class="nf-progress__bar" style="width:${p}%"></div></div>` : ``}
       </div>
       <div class="nf-card__meta">
         <div class="nf-card__title" title="${item.title}">${item.title}</div>
-        <div class="nf-card__sub">${item.year} • ${item.type}</div>
+        <div class="nf-card__sub">${sub}</div>
         <button class="btn btn-sm rounded-pill like-btn ${entry.liked ? "liked" : ""}" type="button" aria-pressed="${entry.liked}" aria-label="Like ${item.title}">
           <span class="heart" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" role="img">
