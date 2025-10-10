@@ -2,20 +2,31 @@
   "name": "webapplicationdev",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "server/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git@github.com-personal:ygil1234/WebApplicationDev.git"
+    "url": "git+https://github.com/ygil1234/WebApplicationDev.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ygil1234/WebApplicationDev/issues"
+  },
+  "homepage": "https://github.com/ygil1234/WebApplicationDev#readme",
   "dependencies": {
+    "cors": "^2.8.5",
     "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
