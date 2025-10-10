@@ -1,21 +1,28 @@
-// feed.js
+// feed.js (fixed & polished)
+// Notes:
+// - Removes accidental immediate logout/redirect on load
+// - Fixes duplicate CATALOG declarations & missing braces
+// - Uses profileName instead of undefined `current`
+// - Consistently uses API_BASE for network calls
+// - Hardens arrow-disable logic to prevent refresh on click
+// - Adds safe hero image fallback (backdrop/cover)
+
 document.addEventListener("DOMContentLoaded", async () => {
-  // API base for JSON server
+  // =========================
+  // 1) Session / Navbar
+  // =========================
   const API_BASE = "http://localhost:3000/api";
 
-  // Get profile info from localStorage
   const selectedIdStr = localStorage.getItem("selectedProfileId");
   const selectedId = selectedIdStr ? Number(selectedIdStr) : NaN;
   const profileName = localStorage.getItem("selectedProfileName");
   const profileAvatar = localStorage.getItem("selectedProfileAvatar");
 
-  // Redirect to profiles.html if not valid
   if (!selectedId || Number.isNaN(selectedId) || !profileName || !profileAvatar) {
     window.location.href = "profiles.html";
     return;
   }
 
-  // Navbar greet & avatar
   const greetEl = document.getElementById("greet");
   if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
 
@@ -25,40 +32,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     avatarEl.alt = `${profileName} - Profile`;
   }
 
-  // ------ Logout ------
   const logoutLink = document.getElementById("logoutLink");
   if (logoutLink) {
-    logoutLink.addEventListener("click", () => {
-      localStorage.removeItem("selectedProfileId");
-      localStorage.removeItem("selectedProfileName");
-      localStorage.removeItem("selectedProfileAvatar");
-      window.location.href = "profiles.html";
+    logoutLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try { await fetch(`${API_BASE}/logout`, { method: "POST" }); } catch {}
+      try {
+        localStorage.removeItem("selectedProfileId");
+        localStorage.removeItem("selectedProfileName");
+        localStorage.removeItem("selectedProfileAvatar");
+      } catch {}
+      window.location.href = "login.html";
     });
   }
-
-    try {
-      await fetch("http://localhost:3000/api/logout", { method: "POST" });
-    } catch (_) {}
-
-    try { localStorage.clear(); } catch {}
-    window.location.href = "login.html";
-  });
-
 
   // =========================
   // 2) Local state
   // =========================
-  let CATALOG = [];           // יאוכלס מתוצאות /api/search (כרגיל)
-  let likedIds = new Set();   // ייטען מהשרת לפי פרופיל
+  let CATALOG = [];
+  let likedIds = new Set();
 
-  // Progress per profile (קיים אצלך; נשאר)
   const progressKey = `progress_by_${selectedId}`;
   const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
 
   // =========================
   // 3) API helpers
   // =========================
-  // חיפוש/שליפות שורות (נשאר מול /api/search)
   async function fetchContent(params = {}) {
     try {
       const queryParams = new URLSearchParams();
@@ -77,12 +76,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       return Array.isArray(data.results) ? data.results : [];
     } catch (err) {
       console.error("Error fetching content:", err);
-      // fallback: מה שכבר נטען לזיכרון
       return CATALOG;
     }
   }
 
-  // שליפה חד־פעמית של מצב לייקים לכל הקטלוג ע"מ לדעת מה מסומן
   async function loadLikedState() {
     try {
       const params = new URLSearchParams();
@@ -97,7 +94,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  // קריאה לשרת לצורך טוגל לייק (עם איחוי מול התגובה)
   async function toggleLike(contentId, like) {
     const res = await fetch(`${API_BASE}/likes/toggle`, {
       method: "POST",
@@ -110,7 +106,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       throw new Error(msg);
     }
     return res.json(); // { liked, likes }
-  // Alert helpers
+  }
+
+  // =========================
+  // 3b) UI Alerts (non-blocking)
+  // =========================
   function ensureAlertRoot() {
     let root = document.getElementById('nf-alert-root');
     if (!root) {
@@ -153,7 +153,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     root.appendChild(el);
     setTimeout(() => el.classList.add('is-shown'), 10);
-    // Auto-dismiss for non-errors; keep errors until closed
     if (type !== 'error') setTimeout(() => el.remove(), 12000);
   }
 
@@ -167,7 +166,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  //  Fetch catalog from server 
+  // =========================
+  // 3c) Catalog bootstrap with timeout & normalization
+  // =========================
   async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 8000, ...opts } = options;
     const controller = new AbortController();
@@ -175,17 +176,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const res = await fetch(resource, { ...opts, signal: controller.signal });
       return res;
-    } finally {
-      clearTimeout(id);
-    }
+    } finally { clearTimeout(id); }
   }
 
-  // API-only, with polished error UX
   async function fetchCatalog() {
-    const errors = [];
-
     try {
-      const res = await fetchWithTimeout('/api/content', {
+      const res = await fetchWithTimeout(`${API_BASE}/content`, {
         headers: { 'Accept': 'application/json' },
         timeout: 8000
       });
@@ -200,23 +196,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         return [];
       }
       if (res.status >= 500) {
-        showFetchError(
-          'The server is temporarily unavailable.',
-          'Try again in a minute or contact support.',
-          `HTTP ${res.status}`
-        );
+        showFetchError('The server is temporarily unavailable.', 'Try again in a minute or contact support.', `HTTP ${res.status}`);
         return [];
       }
       if (!res.ok) {
-        showFetchError(
-          "We couldn't load the catalog from the server.",
-          'Check that /api/content exists and returns valid JSON.',
-          `HTTP ${res.status}`
-        );
+        showFetchError("We couldn't load the catalog from the server.", 'Check that /api/content exists and returns valid JSON.', `HTTP ${res.status}`);
         return [];
       }
 
-      // Parse + normalize
       const data = await res.json();
       const norm =
         Array.isArray(data) ? data :
@@ -226,22 +213,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         (data && typeof data === 'object' ? Object.values(data).filter(Array.isArray).flat() : []);
 
       if (!Array.isArray(norm) || norm.length === 0) {
-        showFetchError(
-          'No titles are available right now.',
-          'Ensure content.json exists next to server.js and contains items.',
-          'API returned an empty array'
-        );
+        showFetchError('No titles are available right now.', 'Ensure content.json exists next to server.js and contains items.', 'API returned an empty array');
         return [];
       }
 
       return norm.map(it => {
         const title = it.title || it.name || 'Untitled';
-        const genres =
-          Array.isArray(it.genres) ? it.genres :
-          Array.isArray(it.genre) ? it.genre :
-          (typeof it.genre === 'string' ? it.genre.split(',').map(s=>s.trim()).filter(Boolean) : []);
+        const genres = Array.isArray(it.genres) ? it.genres :
+                       Array.isArray(it.genre) ? it.genre :
+                       (typeof it.genre === 'string' ? it.genre.split(',').map(s => s.trim()).filter(Boolean) : []);
         const type = it.type || (it.seasons ? 'Series' : 'Movie');
-
         return {
           id: String(it.id ?? title),
           title,
@@ -255,18 +236,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     } catch (e) {
       const msg = (e?.name === 'AbortError') ? 'The request took too long and was canceled.' : (e?.message || String(e));
-      showFetchError(
-        "We couldn't load the catalog.",
-        'Troubleshooting tips:\n• Check your internet\n• Ensure the server is running\n• Verify /api/content returns valid JSON',
-        msg
-      );
+      showFetchError("We couldn't load the catalog.", 'Troubleshooting tips:\n• Check your internet\n• Ensure the server is running\n• Verify /api/content returns valid JSON', msg);
       return [];
     }
   }
 
-  const CATALOG = await fetchCatalog();
+  // Bootstrap catalog early for empty-state
+  CATALOG = await fetchCatalog();
 
-  // If catalog is empty, show an empty state and stop further rendering
   if (!Array.isArray(CATALOG) || CATALOG.length === 0) {
     const rows = document.getElementById('rows');
     if (rows) {
@@ -281,52 +258,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  // Likes state (per profile)
-  const likesKey = `likes_by_${selectedId}`;
-  const likesState = JSON.parse(localStorage.getItem(likesKey) || "{}");
-  function getLikeEntry(item) {
-    const entry = likesState[item.id];
-    if (entry && typeof entry.count === "number") return entry;
-    return { liked: false, count: Number.isFinite(item.likes) ? item.likes : 0 };
-  }
-  function saveLikes() { localStorage.setItem(likesKey, JSON.stringify(likesState)); }
-  function currentCount(item) { return getLikeEntry(item).count; }
-
   // =========================
   // 4) Rendering helpers
   // =========================
-  function mostLiked(items) {
-    if (!items.length) return null;
-    return items.reduce((best, cur) =>
-      (Number(cur.likes || 0) > Number(best.likes || 0)) ? cur : best, items[0]
-    );
-  }
-
-  function displayFeatured() {
-    const hero = document.getElementById("hero");
-    if (!hero || !CATALOG.length) return;
-    const featured = mostLiked(CATALOG) || CATALOG[0];
-    hero.innerHTML = `
-      <div class="nf-hero__bg" style="background-image:url('${heroImg}')"></div>
-      <div class="nf-hero__meta" dir="rtl">
-        <h1 class="nf-hero__title">${featured.title}</h1>
-        <div class="nf-hero__sub">${[featured.year, (featured.genres||[]).join(" • "), featured.type].filter(Boolean).join(" • ")}</div>
-        <div class="nf-hero__actions">
-          <button class="nf-cta nf-cta--play" id="btnPlay" type="button" aria-label="Play">
-            <svg viewBox="0 0 24 24" class="nf-cta__icon" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>
-            <span>Play</span>
-          </button>
-          <button class="nf-cta nf-cta--info" id="btnInfo" type="button" aria-haspopup="dialog" aria-controls="infoDialog" aria-label="More Info">
-            <svg viewBox="0 0 24 24" width="24" height="24" class="nf-cta__icon" aria-hidden="true" fill="none" role="img">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 8v8h-2v-8h2Zm-1-1.5A1.5 1.5 0 1 0 12 6a1.5 1.5 0 0 0 0 3Z" fill="currentColor"></path>
-            </svg>
-            <span>More Info</span>
-          </button>
-        </div>
-      </div>
-    `;
-  }
-
   function likeEntryFor(item) {
     const liked = likedIds.has(String(item.id));
     const count = Number(item.likes || 0);
@@ -446,6 +380,37 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  function mostLiked(items) {
+    if (!items.length) return null;
+    return items.reduce((best, cur) => (Number(cur.likes || 0) > Number(best.likes || 0)) ? cur : best, items[0]);
+  }
+
+  function displayFeatured() {
+    const hero = document.getElementById("hero");
+    if (!hero || !CATALOG.length) return;
+    const featured = mostLiked(CATALOG) || CATALOG[0];
+    const heroImg = featured.backdrop || featured.cover || '';
+    hero.innerHTML = `
+      <div class="nf-hero__bg" style="background-image:url('${heroImg}')"></div>
+      <div class="nf-hero__meta" dir="rtl">
+        <h1 class="nf-hero__title">${featured.title}</h1>
+        <div class="nf-hero__sub">${[featured.year, (featured.genres||[]).join(" • "), featured.type].filter(Boolean).join(" • ")}</div>
+        <div class="nf-hero__actions">
+          <button class="nf-cta nf-cta--play" id="btnPlay" type="button" aria-label="Play">
+            <svg viewBox="0 0 24 24" class="nf-cta__icon" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>
+            <span>Play</span>
+          </button>
+          <button class="nf-cta nf-cta--info" id="btnInfo" type="button" aria-haspopup="dialog" aria-controls="infoDialog" aria-label="More Info">
+            <svg viewBox="0 0 24 24" width="24" height="24" class="nf-cta__icon" aria-hidden="true" fill="none" role="img">
+              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 8v8h-2v-8h2Zm-1-1.5A1.5 1.5 0 1 0 12 6a1.5 1.5 0 0 0 0 3Z" fill="currentColor"></path>
+            </svg>
+            <span>More Info</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   // =========================
   // 5) Rows (Default + Search)
   // =========================
@@ -466,17 +431,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const rows = [
       { id: "row-popular",   title: "Popular on Netflix", items: popular },
-      { id: "row-continue",  title: `Continue Watching for ${current.name}`, items: continueWatching, withProgress: true },
+      { id: "row-continue",  title: `Continue Watching for ${profileName}`, items: continueWatching, withProgress: true },
       { id: "row-sci",       title: "Sci-Fi & Fantasy", items: sciFi },
       { id: "row-drama",     title: "Critically-acclaimed Drama", items: drama },
       { id: "row-classic",   title: "Classics", items: classics },
     ];
 
-    rows.forEach(r => {
-      if (r.items && r.items.length) {
-        rowsRoot.appendChild(makeRow(r));
-      }
-    });
+    rows.forEach(r => { if (r.items && r.items.length) rowsRoot.appendChild(makeRow(r)); });
 
     refreshAllArrows();
   }
@@ -492,12 +453,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    const searchRow = {
-      id: "row-search",
-      title: `Search Results for "${query}" (${results.length})`,
-      items: results
-    };
-
+    const searchRow = { id: "row-search", title: `Search Results for "${query}" (${results.length})`, items: results };
     rowsRoot.appendChild(makeRow(searchRow));
     refreshAllArrows();
   }
@@ -520,7 +476,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const isLiked = likedIds.has(pid);
       const goingLiked = !isLiked;
 
-      // UI אופטימי
+      // optimistic UI
       btn.classList.toggle("liked", goingLiked);
       btn.setAttribute("aria-pressed", String(goingLiked));
       const countEl = btn.querySelector(".like-count");
@@ -532,22 +488,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       try {
         const resp = await toggleLike(pid, goingLiked); // { liked, likes }
-        // איחוי מול השרת
         if (resp?.liked) likedIds.add(pid); else likedIds.delete(pid);
         if (typeof resp?.likes === "number") {
           if (countEl) countEl.textContent = String(Math.max(0, resp.likes));
-          // עדכן גם את העותק ב-CATALOG כדי שה־hero/rows הבאים יהיו עקביים
           const idx = CATALOG.findIndex(i => String(i.id) === pid);
           if (idx !== -1) CATALOG[idx].likes = resp.likes;
         }
       } catch (err) {
-        // החזרה לאחור במקרה כשל
         console.error(err);
-        // החזרה למצב המקורי
+        // rollback
         btn.classList.toggle("liked", isLiked);
         btn.setAttribute("aria-pressed", String(isLiked));
         if (countEl) countEl.textContent = String(prevCount);
-        alert(err.message || "Error while updating like");
+        showAlert({ type: 'error', title: 'Like failed', message: err?.message || 'Error while updating like' });
       }
     }, false);
   }
@@ -597,16 +550,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(async () => {
       const q = (query || "").trim();
-      if (!q) {
-        await displayDefaultRows();
-        return;
-      }
+      if (!q) { await displayDefaultRows(); return; }
       try {
         const results = await fetchContent({ q, sort: lastSort, limit: 50 });
         displaySearchResults(results, q);
-      } catch (err) {
-        console.error("Search error:", err);
-      }
+      } catch (err) { console.error("Search error:", err); }
     }, 300);
   }
 
@@ -696,13 +644,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   // =========================
   window.addEventListener("resize", refreshAllArrows);
 
-  // Init: טען סט לייקים ואז תוכן
+  // Init
   (async () => {
     await loadLikedState();
     const content = await fetchContent({ limit: 200, sort: "popular" });
-    CATALOG = content;
+    if (Array.isArray(content) && content.length) CATALOG = content;
 
-    // אתחול progress דמו אם ריק
     if (!Object.keys(progress).length && CATALOG.length) {
       CATALOG.slice(0, 8).forEach(i => (progress[String(i.id)] = Math.floor(Math.random() * 80) + 10));
       localStorage.setItem(progressKey, JSON.stringify(progress));
