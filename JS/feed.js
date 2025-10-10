@@ -1,13 +1,22 @@
-// feed.js (fixed & polished)
-// Notes:
-// - Removes accidental immediate logout/redirect on load
-// - Fixes duplicate CATALOG declarations & missing braces
-// - Uses profileName instead of undefined `current`
-// - Consistently uses API_BASE for network calls
-// - Hardens arrow-disable logic to prevent refresh on click
-// - Adds safe hero image fallback (backdrop/cover)
-
+// JS/feed.js
 document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener('click', (e) => {
+  const allow = e.target.closest('#alphaToggle, label[for="alphaToggle"], .sort-toggle, [data-allow-default], .allow-default, button, input, select, textarea');
+  if (allow) return;
+
+  const a = e.target.closest('a');
+  if (!a) return;
+  if (a.id === 'logoutLink') return;
+
+  const href = (a.getAttribute('href') || '').trim().toLowerCase();
+  const isDead = href === '' || href === '#' || href === 'javascript:void(0)';
+
+  if (isDead) {
+    e.preventDefault();
+  }
+}, true);
+
+
   // =========================
   // 1) Session / Navbar
   // =========================
@@ -66,7 +75,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (params.type) queryParams.append("type", params.type);
       if (params.year_from) queryParams.append("year_from", params.year_from);
       if (params.year_to) queryParams.append("year_to", params.year_to);
-      if (params.sort) queryParams.append("sort", params.sort);
+      // אם השרת לא תומך ב-sort=alpha, לא חובה לשלוח אותו; נשאיר רק כדי שלא ישבור במידה וכן.
+      if (params.sort && params.sort !== "alpha") queryParams.append("sort", params.sort);
       if (params.limit) queryParams.append("limit", params.limit);
 
       const url = `${API_BASE}/search?${queryParams.toString()}`;
@@ -259,12 +269,25 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // =========================
-  // 4) Rendering helpers
+  // 4) Rendering & Sorting helpers
   // =========================
   function likeEntryFor(item) {
     const liked = likedIds.has(String(item.id));
     const count = Number(item.likes || 0);
     return { liked, count };
+  }
+
+  function normalizeTitle(t) {
+    return String(t || "").trim().toLocaleLowerCase();
+  }
+
+  function applySort(items, mode) {
+    if (!Array.isArray(items)) return [];
+    if (mode !== "alpha") return items;
+    // מיון אלפביתי בצד הלקוח — גם אם השרת מתעלם
+    return [...items].sort((a, b) =>
+      normalizeTitle(a.title).localeCompare(normalizeTitle(b.title), undefined, { sensitivity: "base" })
+    );
   }
 
   function createCard(item, withProgress = false) {
@@ -414,46 +437,56 @@ document.addEventListener("DOMContentLoaded", async () => {
   // =========================
   // 5) Rows (Default + Search)
   // =========================
-  async function displayDefaultRows() {
+  async function displayDefaultRows(sortMode = "popular") {
     const rowsRoot = document.getElementById("rows");
     if (!rowsRoot) return;
 
     rowsRoot.innerHTML = "";
 
-    const [popular, sciFi, drama, classics] = await Promise.all([
-      fetchContent({ sort: "popular", limit: 14 }),
-      fetchContent({ genre: "sci-fi", limit: 14 }),
-      fetchContent({ genre: "drama", limit: 14 }),
-      fetchContent({ year_to: 1999, limit: 12 }),
+    const [list1, sciFi, drama, classics] = await Promise.all([
+      fetchContent({ sort: sortMode, limit: 14 }),
+      fetchContent({ genre: "sci-fi", sort: sortMode, limit: 14 }),
+      fetchContent({ genre: "drama",  sort: sortMode, limit: 14 }),
+      fetchContent({ year_to: 1999,   sort: sortMode, limit: 12 }),
     ]);
 
-    const continueWatching = CATALOG.filter(i => (progress[String(i.id)] ?? 0) > 0).slice(0, 12);
+    // ✅ תמיד מוודאים מיון לקוחותי כשצריך
+    const r1 = applySort(list1,   sortMode);
+    const r2 = applySort(sciFi,   sortMode);
+    const r3 = applySort(drama,   sortMode);
+    const r4 = applySort(classics,sortMode);
+
+    const continueWatching = applySort(
+      CATALOG.filter(i => (progress[String(i.id)] ?? 0) > 0).slice(0, 12),
+      sortMode
+    );
 
     const rows = [
-      { id: "row-popular",   title: "Popular on Netflix", items: popular },
+      { id: "row-popular",   title: sortMode === "alpha" ? "A-Z Catalog" : "Popular on Netflix", items: r1 },
       { id: "row-continue",  title: `Continue Watching for ${profileName}`, items: continueWatching, withProgress: true },
-      { id: "row-sci",       title: "Sci-Fi & Fantasy", items: sciFi },
-      { id: "row-drama",     title: "Critically-acclaimed Drama", items: drama },
-      { id: "row-classic",   title: "Classics", items: classics },
+      { id: "row-sci",       title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A-Z)" : "Sci-Fi & Fantasy", items: r2 },
+      { id: "row-drama",     title: sortMode === "alpha" ? "Drama (A-Z)" : "Critically-acclaimed Drama", items: r3 },
+      { id: "row-classic",   title: sortMode === "alpha" ? "Classics (A-Z)" : "Classics", items: r4 },
     ];
 
     rows.forEach(r => { if (r.items && r.items.length) rowsRoot.appendChild(makeRow(r)); });
-
     refreshAllArrows();
   }
 
-  function displaySearchResults(results, query) {
+  function displaySearchResults(results, query, sortMode) {
     const rowsRoot = document.getElementById("rows");
     if (!rowsRoot) return;
 
     rowsRoot.innerHTML = "";
 
-    if (!results.length) {
+    const sorted = applySort(results, sortMode);
+
+    if (!sorted.length) {
       rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results found for "${query}"</div>`;
       return;
     }
 
-    const searchRow = { id: "row-search", title: `Search Results for "${query}" (${results.length})`, items: results };
+    const searchRow = { id: "row-search", title: `Search Results for "${query}" (${sorted.length})`, items: sorted };
     rowsRoot.appendChild(makeRow(searchRow));
     refreshAllArrows();
   }
@@ -466,6 +499,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     rowsRoot.addEventListener("click", async (e) => {
       const btn = e.target.closest(".like-btn");
       if (!btn) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (btn.dataset.busy === "1") return;
+
       const card = btn.closest(".nf-card");
       if (!card) return;
 
@@ -484,15 +523,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       const optimistic = Math.max(0, prevCount + (goingLiked ? 1 : -1));
       if (countEl) countEl.textContent = optimistic;
 
-      btn.classList.remove("burst"); void btn.offsetWidth; btn.classList.add("burst");
+      btn.classList.remove("anim-like", "anim-unlike");
+      void btn.offsetWidth; // reset animation
+      btn.classList.add(goingLiked ? "anim-like" : "anim-unlike");
+
+      const cleanOnce = (ev) => {
+        if (ev.target !== btn && !btn.contains(ev.target)) return;
+        btn.classList.remove("anim-like", "anim-unlike");
+        btn.removeEventListener("animationend", cleanOnce);
+      };
+      btn.addEventListener("animationend", cleanOnce, { once: true });
+
+      btn.dataset.busy = "1";
+      btn.setAttribute("aria-busy", "true");
 
       try {
         const resp = await toggleLike(pid, goingLiked); // { liked, likes }
-        if (resp?.liked) likedIds.add(pid); else likedIds.delete(pid);
+
+        const serverLiked = !!resp?.liked;
+        btn.classList.toggle("liked", serverLiked);
+        btn.setAttribute("aria-pressed", String(serverLiked));
+        if (serverLiked) likedIds.add(pid); else likedIds.delete(pid);
+
         if (typeof resp?.likes === "number") {
           if (countEl) countEl.textContent = String(Math.max(0, resp.likes));
           const idx = CATALOG.findIndex(i => String(i.id) === pid);
           if (idx !== -1) CATALOG[idx].likes = resp.likes;
+        } else if (countEl) {
+          const base = Number(countEl.textContent || "0") || 0;
+          const delta = (serverLiked === goingLiked) ? 0 : (serverLiked ? +1 : -1);
+          countEl.textContent = String(Math.max(0, base + delta));
         }
       } catch (err) {
         console.error(err);
@@ -500,97 +560,134 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.classList.toggle("liked", isLiked);
         btn.setAttribute("aria-pressed", String(isLiked));
         if (countEl) countEl.textContent = String(prevCount);
+
+        btn.classList.remove("anim-like", "anim-unlike");
+        void btn.offsetWidth;
+        btn.classList.add(isLiked ? "anim-like" : "anim-unlike");
+
         showAlert({ type: 'error', title: 'Like failed', message: err?.message || 'Error while updating like' });
+      } finally {
+        delete btn.dataset.busy;
+        btn.removeAttribute("aria-busy");
       }
     }, false);
   }
 
   // =========================
-  // 7) Search UI + behavior
-  // =========================
-  const searchInput   = document.getElementById("searchInput");
-  const searchBox     = document.getElementById("searchBox");
-  const searchBtn     = document.getElementById("searchBtn");
-  const alphaToggle   = document.getElementById("alphaToggle");
-  let searchTimeout;
-  let lastSort = "popular";
+// 7) Search UI + behavior
+// =========================
+const searchInput   = document.getElementById("searchInput");
+const searchBox     = document.getElementById("searchBox");
+const searchBtn     = document.getElementById("searchBtn");
+const alphaToggle   = document.getElementById("alphaToggle");
+let searchTimeout;
 
-  function openSearch() {
-    if (!searchBox) return;
-    searchBox.classList.add("is-open");
-    searchBox.setAttribute("aria-expanded", "true");
-    if (searchInput) {
-      searchInput.focus();
-      const val = searchInput.value;
-      searchInput.value = "";
-      searchInput.value = val;
-    }
+const SORT_KEY = "nf_sort_mode";
+let lastSort = (localStorage.getItem(SORT_KEY) === "alpha") ? "alpha" : "popular";
+
+function setSort(mode, { rerender = true } = {}) {
+  lastSort = mode;
+  localStorage.setItem(SORT_KEY, lastSort);
+
+  if (alphaToggle && alphaToggle.checked !== (lastSort === "alpha")) {
+    alphaToggle.checked = (lastSort === "alpha");
   }
 
-  function closeSearch(force = false) {
-    if (!searchBox) return;
-    if (force || !searchInput || !searchInput.value.trim()) {
-      searchBox.classList.remove("is-open");
-      searchBox.setAttribute("aria-expanded", "false");
-      if (!searchInput.value.trim()) {
-        displayDefaultRows();
-      }
-    }
-  }
+  if (!rerender) return;
 
-  if (searchBtn) {
-    searchBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (searchBox.classList.contains("is-open")) closeSearch();
-      else openSearch();
-    });
+  const q = (searchInput?.value || "").trim();
+  if (q) {
+    fetchContent({ q, sort: lastSort, limit: 50 })
+      .then(results => displaySearchResults(results, q, lastSort))
+      .catch(console.error);
+  } else {
+    displayDefaultRows(lastSort);
   }
+}
 
-  async function performSearch(query) {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => {
-      const q = (query || "").trim();
-      if (!q) { await displayDefaultRows(); return; }
-      try {
-        const results = await fetchContent({ q, sort: lastSort, limit: 50 });
-        displaySearchResults(results, q);
-      } catch (err) { console.error("Search error:", err); }
-    }, 300);
-  }
+if (alphaToggle) alphaToggle.checked = (lastSort === "alpha");
 
+function openSearch() {
+  if (!searchBox) return;
+  searchBox.classList.add("is-open");
+  searchBox.setAttribute("aria-expanded", "true");
   if (searchInput) {
-    searchInput.addEventListener("input", (e) => performSearch(e.target.value));
+    searchInput.focus();
+    const val = searchInput.value;
+    searchInput.value = "";
+    searchInput.value = val;
   }
+}
 
-  if (alphaToggle) {
-    alphaToggle.addEventListener("change", async () => {
-      lastSort = alphaToggle.checked ? "alpha" : "popular";
-      const q = searchInput ? searchInput.value.trim() : "";
-      if (q) {
-        const results = await fetchContent({ q, sort: lastSort, limit: 50 });
-        displaySearchResults(results, q);
-      } else {
-        await displayDefaultRows();
-      }
-    });
-  }
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      closeSearch(true);
-      if (searchInput) {
-        searchInput.value = "";
-        searchInput.blur();
-        displayDefaultRows();
-      }
+function closeSearch(force = false) {
+  if (!searchBox) return;
+  if (force || !searchInput || !searchInput.value.trim()) {
+    searchBox.classList.remove("is-open");
+    searchBox.setAttribute("aria-expanded", "false");
+    if (!searchInput.value.trim()) {
+      displayDefaultRows(lastSort);
     }
-  });
+  }
+}
 
-  document.addEventListener("click", (e) => {
-    if (!searchBox) return;
-    const within = searchBox.contains(e.target);
-    if (!within) closeSearch();
+if (searchBtn) {
+  searchBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (searchBox.classList.contains("is-open")) closeSearch();
+    else openSearch();
   });
+}
+
+async function performSearch(query) {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(async () => {
+    const q = (query || "").trim();
+    if (!q) { await displayDefaultRows(lastSort); return; }
+    try {
+      const results = await fetchContent({ q, sort: lastSort, limit: 50 });
+      displaySearchResults(results, q, lastSort);
+    } catch (err) { console.error("Search error:", err); }
+  }, 300);
+}
+
+if (searchInput) {
+  searchInput.addEventListener("input", (e) => performSearch(e.target.value));
+}
+
+if (alphaToggle) {
+  const onAlpha = (e) => {
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+
+    const mode = alphaToggle.checked ? "alpha" : "popular";
+    setSort(mode, { rerender: true });
+  };
+
+  alphaToggle.addEventListener("input", onAlpha, true);
+  alphaToggle.addEventListener("change", onAlpha, true);
+
+  alphaToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+  }, true);
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeSearch(true);
+    if (searchInput) {
+      searchInput.value = "";
+      searchInput.blur();
+      displayDefaultRows(lastSort);
+    }
+  }
+});
+
+document.addEventListener("click", (e) => {
+  if (!searchBox) return;
+  const within = searchBox.contains(e.target);
+  if (!within) closeSearch();
+});
 
   // =========================
   // 8) Disabled arrows hardening (no refresh!)
@@ -615,8 +712,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function blockIfInsideDisabledArrow(e) {
-    const x = e.clientX ?? (e.touches && e.touches[0]?.clientX);
-    const y = e.clientY ?? (e.touches && e.touches[0]?.clientY);
+    const x = e.clientX ?? e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX;
+    const y = e.clientY ?? e.touches?.[0]?.clientY ?? e.changedTouches?.[0]?.clientY;
     if (x == null || y == null) return;
     if (isPointInsideDisabledArrow(x, y)) {
       e.preventDefault();
@@ -625,13 +722,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  document.addEventListener("click", blockIfInsideDisabledArrow, true);
+  document.addEventListener("click",       blockIfInsideDisabledArrow, true);
   document.addEventListener("pointerdown", blockIfInsideDisabledArrow, true);
-  document.addEventListener("touchstart", blockIfInsideDisabledArrow, { capture: true, passive: false });
+  document.addEventListener("touchstart",  blockIfInsideDisabledArrow, { capture: true, passive: false });
 
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
-    const btn = e.target && e.target.closest && e.target.closest(".nf-row__arrow");
+    const btn = e.target?.closest?.(".nf-row__arrow");
     if (btn && isArrowDisabled(btn)) {
       e.preventDefault();
       e.stopPropagation();
@@ -647,8 +744,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Init
   (async () => {
     await loadLikedState();
-    const content = await fetchContent({ limit: 200, sort: "popular" });
-    if (Array.isArray(content) && content.length) CATALOG = content;
+
+    const content = await fetchContent({ limit: 200, sort: lastSort });
+    if (Array.isArray(content) && content.length) CATALOG = applySort(content, lastSort);
 
     if (!Object.keys(progress).length && CATALOG.length) {
       CATALOG.slice(0, 8).forEach(i => (progress[String(i.id)] = Math.floor(Math.random() * 80) + 10));
@@ -656,6 +754,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     displayFeatured();
-    await displayDefaultRows();
+    await displayDefaultRows(lastSort);
   })();
 });

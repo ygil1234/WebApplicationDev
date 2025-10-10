@@ -1141,73 +1141,95 @@ body.modal-open {
   margin-top: -2px;
 }
 
-/* ===== LIKE BUTTON ===== */
-
+/* ===== LIKE BUTTON (Synced Animations) ===== */
 .like-btn {
+  --like: #e50914;
+  --like-bg: rgba(229, 9, 20, .12);
+  --like-brd: rgba(229, 9, 20, .35);
+  --neutral-bg: rgba(255,255,255,.08);
+  --neutral-brd: rgba(255,255,255,.15);
+  --neutral-fg: rgba(255,255,255,.92);
+
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: .35rem;
   padding: 4px 10px !important;
   border-radius: 999px !important;
-  background: rgba(255,255,255,.08) !important;
-  border: 1px solid rgba(255,255,255,.15) !important;
-  color: #fff !important;
+  background: var(--neutral-bg) !important;
+  border: 1px solid var(--neutral-brd) !important;
+  color: var(--neutral-fg) !important;
   font-weight: 600 !important;
   font-size: 12px !important;
   cursor: pointer;
-  transition: background .2s ease, transform .1s ease, border-color .2s ease;
   margin-top: auto;
+
+  transition:
+    background .18s ease,
+    border-color .18s ease,
+    color .18s ease,
+    transform .10s ease;
 }
 
-.like-btn.btn {
-  box-shadow: none !important;
-  outline: none !important;
+.like-btn .heart svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+
+  fill: currentColor;
+  transition: transform .24s ease;
 }
 
-.like-btn.btn:focus,
-.like-btn.btn:active {
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-.like-btn:hover {
-  background: rgba(255,255,255,.16) !important;
-}
-
-.like-btn:active {
-  transform: scale(.98);
-}
+.like-btn:hover { background: rgba(255,255,255,.16) !important; }
+.like-btn:active { transform: scale(.98); }
 
 .like-btn.liked {
-  background: var(--nf-red) !important;
-  border-color: var(--nf-red) !important;
+  background: var(--like-bg) !important;
+  border-color: var(--like-brd) !important;
+  color: var(--like) !important; 
 }
 
-.like-btn .heart {
-  display: inline-flex;
-  line-height: 0;
+
+.like-btn::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  pointer-events: none;
+  box-shadow: 0 0 0 0 rgba(229, 9, 20, 0);
+  opacity: 0;
 }
 
+.like-btn.anim-like .heart svg { animation: like-pop .28s ease; }
+.like-btn.anim-like::after { animation: like-burst .45s ease; }
+
+.like-btn.anim-unlike .heart svg { animation: unlike-pop .22s ease; }
+
+/* Keyframes */
 @keyframes like-pop {
-  0% { transform: scale(.8); }
+  0% { transform: scale(.82); }
   60% { transform: scale(1.18); }
   100% { transform: scale(1); }
 }
 
-.like-btn.liked .heart {
-  animation: like-pop .28s ease;
+@keyframes unlike-pop {
+  0% { transform: scale(1.08); }
+  100% { transform: scale(1); }
 }
 
 @keyframes like-burst {
-  0% { box-shadow: 0 0 0 0 rgba(229,9,20, .6); }
-  100% { box-shadow: 0 0 0 12px rgba(229,9,20, 0); }
+  0%   { box-shadow: 0 0 0 0 rgba(229, 9, 20, .55); opacity: 1; }
+  100% { box-shadow: 0 0 0 14px rgba(229, 9, 20, 0); opacity: 0; }
 }
 
-.like-btn.burst {
-  animation: like-burst .35s ease;
+@media (prefers-reduced-motion: reduce) {
+  .like-btn,
+  .like-btn .heart svg {
+    transition: none !important;
+    animation: none !important;
+  }
+  .like-btn::after { display: none; }
 }
-
 
 /* ===== SETTINGS PAGE ===== */
 

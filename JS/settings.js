@@ -1,3 +1,5 @@
+// JS/settings.js
+
 document.addEventListener("DOMContentLoaded", () => {
     // Authentication check - only logged-in users can access
     const loggedInUser = sessionStorage.getItem('loggedInUser') || localStorage.getItem('loggedInUser');

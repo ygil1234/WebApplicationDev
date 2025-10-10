@@ -1,4 +1,4 @@
-// server/index.js
+// path: server/index.js
 const express = require('express');
 const path = require('path');
 const fs = require('fs/promises');
@@ -15,31 +15,62 @@ app.use(cors({
   }
 }));
 
+app.options(/.*/, cors());
+
 app.use(express.json());
 
-// Serve the project root statically
 app.use(express.static(path.join(__dirname, '..')));
 
 // ---------- Paths ----------
-const CONTENT_PATH = path.resolve(__dirname, 'content.json');
-const LIKES_PATH   = path.resolve(__dirname, 'likes.json');
-
-// ---------- In-memory cache ----------
-let CATALOG = [];
-let LIKES_MAP = {}; // { [profileId]: string[] of contentId }
+const CONTENT_PATH  = path.resolve(__dirname, 'content.json');   // server/content.json
+const LIKES_PATH    = path.resolve(__dirname, 'likes.json');     // server/likes.json
+const USERS_PATH    = path.resolve(__dirname, 'users.json');     // server/users.json
+const PROFILES_PATH = path.resolve(__dirname, 'profiles.json');  // server/profiles.json
 
 // ---------- Helpers ----------
 async function writeJsonAtomic(filePath, obj) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
   const tmp = filePath + '.tmp';
   await fs.writeFile(tmp, JSON.stringify(obj, null, 2), 'utf8');
   await fs.rename(tmp, filePath);
 }
+async function readJSON(filePath, fallback = null) {
+  try {
+    const raw = await fs.readFile(filePath, 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+async function ensureFileJSON(filePath, fallbackValue) {
+  try {
+    await fs.access(filePath);
+  } catch {
+    await writeJsonAtomic(filePath, fallbackValue);
+  }
+}
+function stripPriv(it) {
+  const { _title, _genres, _type, _year, _likes, ...pub } = it;
+  return { ...pub, likes: typeof pub.likes === 'number' ? pub.likes : (_likes || 0) };
+}
 
+// ---------- In-memory cache ----------
+let CATALOG = [];
+let LIKES_MAP = {}; // { [profileId]: string[] }
+
+// ---------- Init loaders ----------
 async function loadCatalog() {
-  const raw = await fs.readFile(CONTENT_PATH, 'utf8');
-  const data = JSON.parse(raw);
+  const exists = await readJSON(CONTENT_PATH, null);
+  const data = exists ?? [];
+  const arr = Array.isArray(data) ? data
+            : Array.isArray(data?.items) ? data.items
+            : Array.isArray(data?.catalog) ? data.catalog
+            : Array.isArray(data?.data) ? data.data
+            : Array.isArray(Object.values(data || {}).filter(Array.isArray).flat())
+              ? Object.values(data || {}).filter(Array.isArray).flat()
+              : [];
 
-  CATALOG = data.map(it => ({
+  CATALOG = arr.map(it => ({
     ...it,
     _title: (it.title || '').toLowerCase(),
     _genres: (Array.isArray(it.genres) ? it.genres : []).map(g => (g || '').toLowerCase()),
@@ -50,24 +81,40 @@ async function loadCatalog() {
 }
 
 async function loadLikes() {
-  try {
-    const raw = await fs.readFile(LIKES_PATH, 'utf8');
-    const data = JSON.parse(raw);
-    // normalize to arrays of strings
-    Object.keys(data || {}).forEach(pid => {
-      const arr = Array.isArray(data[pid]) ? data[pid] : [];
-      data[pid] = [...new Set(arr.map(String))];
-    });
-    LIKES_MAP = data || {};
-  } catch (e) {
-    // create empty likes file if missing
-    LIKES_MAP = {};
-    await writeJsonAtomic(LIKES_PATH, LIKES_MAP);
+  const data = await readJSON(LIKES_PATH, {});
+  for (const pid of Object.keys(data || {})) {
+    const arr = Array.isArray(data[pid]) ? data[pid] : [];
+    data[pid] = [...new Set(arr.map(String))];
   }
+  LIKES_MAP = data || {};
 }
 
-// Initial load
-Promise.all([loadCatalog(), loadLikes()]).catch(err => {
+// ---------- Users/Profiles store helpers ----------
+async function readUsers() { return await readJSON(USERS_PATH, []); }
+async function writeUsers(arr) { await writeJsonAtomic(USERS_PATH, arr); }
+async function readProfiles() { return await readJSON(PROFILES_PATH, []); }
+async function writeProfiles(arr) { await writeJsonAtomic(PROFILES_PATH, arr); }
+
+function validEmail(v) {
+  const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  return re.test(String(v || '').trim());
+}
+function validPassword(pw) { return typeof pw === 'string' && pw.trim().length >= 6; }
+function validUsername(name) {
+  const usernameRegex = /^[a-zA-Z0-9_]{3,15}$/;
+  return usernameRegex.test(String(name || '').trim());
+}
+
+// ---------- Bootstrap files ----------
+(async () => {
+  await Promise.all([
+    ensureFileJSON(USERS_PATH, []),
+    ensureFileJSON(PROFILES_PATH, []),
+    ensureFileJSON(LIKES_PATH, {}),
+    ensureFileJSON(CONTENT_PATH, []) 
+  ]);
+  await Promise.all([loadCatalog(), loadLikes()]);
+})().catch(err => {
   console.error('Failed to initialize server files', err);
   process.exit(1);
 });
@@ -75,15 +122,101 @@ Promise.all([loadCatalog(), loadLikes()]).catch(err => {
 // ---------- Health ----------
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
+// ---------- Auth ----------
+app.post('/api/signup', async (req, res) => {
+  const email = String(req.body?.email || '').trim();
+  const username = String(req.body?.username || '').trim();
+  const password = String(req.body?.password || '');
+
+  if (!validEmail(email)) return res.status(400).json({ error: 'Invalid email.' });
+  if (!validUsername(username)) return res.status(400).json({ error: 'Username must be 3-15 characters, letters/numbers/underscores only.' });
+  if (!validPassword(password)) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+  const users = await readUsers();
+  if (users.some(u => String(u.email).toLowerCase() === email.toLowerCase()))
+    return res.status(409).json({ error: 'Email already registered.' });
+  if (users.some(u => String(u.username).toLowerCase() === username.toLowerCase()))
+    return res.status(409).json({ error: 'Username already taken.' });
+
+  const newUser = { email, username, password }; 
+  users.push(newUser);
+  await writeUsers(users);
+  console.log(`User ${username} created successfully`);
+  res.status(201).json({ message: 'User created.', user: { email, username } });
+});
+
+app.post('/api/login', async (req, res) => {
+  const email = String(req.body?.email || '').trim();
+  const password = String(req.body?.password || '');
+  if (!validEmail(email)) return res.status(400).json({ error: 'Invalid email.' });
+  if (!validPassword(password)) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+  const users = await readUsers();
+  const user = users.find(u => String(u.email).toLowerCase() === email.toLowerCase());
+  if (!user) return res.status(401).json({ error: 'Email not found.' });
+  if (String(user.password) !== password) return res.status(401).json({ error: 'Incorrect password.' });
+
+  console.log(`User ${user.username} logged in successfully`);
+  res.json({ message: 'Login successful.', user: { email: user.email, username: user.username } });
+});
+
+// ---------- Profiles ----------
+app.get('/api/profiles', async (req, res) => {
+  const userId = req.query.userId;
+  if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+
+  try {
+    const allProfiles = await readProfiles();
+    const userProfiles = allProfiles.filter(p => p.userId === userId);
+    console.log(`Retrieved ${userProfiles.length} profiles for user: ${userId}`);
+    res.json(userProfiles);
+  } catch (e) {
+    console.error('Error reading profiles:', e);
+    res.status(500).json({ error: 'Failed to load profiles.' });
+  }
+});
+
+app.post('/api/profiles', async (req, res) => {
+  const { userId, name, avatar } = req.body;
+  if (!userId || !name || !avatar) return res.status(400).json({ error: 'User ID, name, and avatar are required.' });
+  if (typeof name !== 'string' || name.trim().length < 2) return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+  if (name.trim().length > 20) return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
+
+  try {
+    const allProfiles = await readProfiles();
+    const userProfiles = allProfiles.filter(p => p.userId === userId);
+    if (userProfiles.length >= 5) return res.status(400).json({ error: 'Maximum of 5 profiles per user.' });
+    if (userProfiles.some(p => p.name.toLowerCase() === name.trim().toLowerCase()))
+      return res.status(409).json({ error: 'Profile name already exists.' });
+
+    const maxId = allProfiles.length > 0 ? Math.max(...allProfiles.map(p => p.id || 0)) : 0;
+    const newProfile = {
+      id: maxId + 1,
+      userId,
+      name: name.trim(),
+      avatar,
+      createdAt: new Date().toISOString(),
+      likedContent: []
+    };
+    allProfiles.push(newProfile);
+    await writeProfiles(allProfiles);
+    console.log(`Profile "${newProfile.name}" created for user: ${userId}`);
+    res.status(201).json({ message: 'Profile created successfully.', profile: newProfile });
+  } catch (e) {
+    console.error('Error creating profile:', e);
+    res.status(500).json({ error: 'Failed to create profile.' });
+  }
+});
+
 // ---------- Search ----------
-app.get('/api/search', (req, res) => {
-  const q        = (req.query.q || '').trim().toLowerCase();
-  const genre    = (req.query.genre || '').trim().toLowerCase();
-  const type     = (req.query.type || '').trim().toLowerCase();
-  const yFromStr = (req.query.year_from || '').trim();
-  const yToStr   = (req.query.year_to || '').trim();
-  const sort     = (req.query.sort || '').trim().toLowerCase();
-  const limit    = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
+app.get('/api/search', (_req, res) => {
+  const q        = (_req.query.q || '').trim().toLowerCase();
+  const genre    = (_req.query.genre || '').trim().toLowerCase();
+  const type     = (_req.query.type || '').trim().toLowerCase();
+  const yFromStr = (_req.query.year_from || '').trim();
+  const yToStr   = (_req.query.year_to || '').trim();
+  const sort     = (_req.query.sort || '').trim().toLowerCase();
+  const limit    = Math.min(Math.max(parseInt(_req.query.limit || '30', 10) || 30, 1), 200);
 
   const yFrom = yFromStr ? Number(yFromStr) : null;
   const yTo   = yToStr   ? Number(yToStr)   : null;
@@ -123,7 +256,7 @@ app.get('/api/search', (req, res) => {
 });
 
 // ---------- Content ----------
-app.get('/api/content', (req, res) => {
+app.get('/api/content', async (req, res) => {
   const profileId = (req.query.profileId || '').trim();
   const term      = (req.query.search || '').trim().toLowerCase();
   const alpha     = (req.query.alpha || '') === '1';
@@ -165,7 +298,6 @@ app.post('/api/likes/toggle', async (req, res) => {
     if (idx === -1) return res.status(404).json({ error: 'Content not found' });
 
     const set = new Set(Array.isArray(LIKES_MAP[profileId]) ? LIKES_MAP[profileId].map(String) : []);
-
     const already = set.has(String(contentId));
     let changed = false;
 
@@ -200,12 +332,6 @@ app.post('/api/likes/toggle', async (req, res) => {
     return res.status(500).json({ error: 'Failed to update like' });
   }
 });
-
-// ---------- Utils ----------
-function stripPriv(it) {
-  const { _title, _genres, _type, _year, _likes, ...pub } = it;
-  return { ...pub, likes: typeof pub.likes === 'number' ? pub.likes : (_likes || 0) };
-}
 
 // ---------- Start ----------
 app.listen(PORT, () => {
