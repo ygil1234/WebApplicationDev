@@ -3,53 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Netflix</title>
+    <title>Netflix - Profiles</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="profiles-body">
     <div class="profiles-container">
         <h1 class="profiles-title">Who's watching?</h1>
         
-        <div class="profiles-grid">
-            <div class="profile-item">
-                <div class="profile-avatar">
-                    <img src="IMG/profile1.jpg" alt="Chucha's Profile">
-                </div>
-                <input type="text" class="profile-name" value="Chucha">
-            </div>
-            
-            <div class="profile-item">
-                <div class="profile-avatar">
-                    <img src="IMG/profile2.jpg" alt="Schnizel's Profile">
-                </div>
-                <input type="text" class="profile-name" value="Schnizel">
-            </div>
-            
-            <div class="profile-item">
-                <div class="profile-avatar">
-                    <img src="IMG/profile3.jpg" alt="Pilpel's Profile">
-                </div>
-                <input type="text" class="profile-name" value="Pilpel">
-            </div>
-            
-            <div class="profile-item">
-                <div class="profile-avatar">
-                    <img src="IMG/profile4.jpg" alt="Alex's Profile">
-                </div>
-                <input type="text" class="profile-name" value="Alex">
-            </div>
-            
-            <div class="profile-item">
-                <div class="profile-avatar">
-                    <img src="IMG/profile5.jpg" alt="Sasha's Profile">
-                </div>
-                <input type="text" class="profile-name" value="Sasha">
-            </div>
+        <div class="profiles-grid" id="profilesGrid">
+            <div class="loading">Loading profiles...</div>
         </div>
         
-        <button class="manage-profiles-btn">Manage Profiles</button>
+        <div class="error-message" id="errorMessage"></div>
+        
+        <button class="manage-profiles-btn" id="manageProfilesBtn" style="display: none;">Manage Profiles</button>
     </div>
-    <script src="JS/profiles.js"></script>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="JS/profiles.js"></script>
 </body>
 </html>

@@ -1,45 +1,40 @@
 // feed.js
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // API base for JSON server
   const API_BASE = "http://localhost:3000/api";
 
-  // =========================
-  // 1) Profile & Auth
-  // =========================
-  const PROFILES = [
-    { id: 1, name: "Chucha",   avatar: "IMG/profile1.jpg" },
-    { id: 2, name: "Schnizel", avatar: "IMG/profile2.jpg" },
-    { id: 3, name: "Pilpel",   avatar: "IMG/profile3.jpg" },
-    { id: 4, name: "Alex",     avatar: "IMG/profile4.jpg" },
-    { id: 5, name: "Sasha",    avatar: "IMG/profile5.jpg" },
-  ];
-
+  // Get profile info from localStorage
   const selectedIdStr = localStorage.getItem("selectedProfileId");
   const selectedId = selectedIdStr ? Number(selectedIdStr) : NaN;
-  if (!selectedId || Number.isNaN(selectedId)) {
-    window.location.href = "profiles.html";
-    return;
-  }
-  const current = PROFILES.find(p => p.id === selectedId);
-  if (!current) {
-    localStorage.removeItem("selectedProfileId");
+  const profileName = localStorage.getItem("selectedProfileName");
+  const profileAvatar = localStorage.getItem("selectedProfileAvatar");
+
+  // Redirect to profiles.html if not valid
+  if (!selectedId || Number.isNaN(selectedId) || !profileName || !profileAvatar) {
     window.location.href = "profiles.html";
     return;
   }
 
   // Navbar greet & avatar
   const greetEl = document.getElementById("greet");
-  if (greetEl) greetEl.textContent = `Hello, ${current.name}`;
+  if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
+
   const avatarEl = document.getElementById("navAvatar");
   if (avatarEl) {
-    avatarEl.src = current.avatar;
-    avatarEl.alt = `${current.name} - Profile`;
+    avatarEl.src = profileAvatar;
+    avatarEl.alt = `${profileName} - Profile`;
   }
 
-// ----- Logout -----
-const logoutLink = document.getElementById("logoutLink");
-if (logoutLink) {
-  logoutLink.addEventListener("click", async (e) => {
-    e.preventDefault();
+  // ------ Logout ------
+  const logoutLink = document.getElementById("logoutLink");
+  if (logoutLink) {
+    logoutLink.addEventListener("click", () => {
+      localStorage.removeItem("selectedProfileId");
+      localStorage.removeItem("selectedProfileName");
+      localStorage.removeItem("selectedProfileAvatar");
+      window.location.href = "profiles.html";
+    });
+  }
 
     try {
       await fetch("http://localhost:3000/api/logout", { method: "POST" });
@@ -116,7 +111,187 @@ if (logoutLink) {
       throw new Error(msg);
     }
     return res.json(); // { liked, likes }
+  // Alert helpers
+  function ensureAlertRoot() {
+    let root = document.getElementById('nf-alert-root');
+    if (!root) {
+      root = document.createElement('div');
+      root.id = 'nf-alert-root';
+      root.className = 'nf-alert-root';
+      document.body.appendChild(root);
+    }
+    return root;
   }
+
+  function showAlert({ type = 'error', title = 'Something went wrong', message = '', details = '', actions = [] } = {}) {
+    const root = ensureAlertRoot();
+    const el = document.createElement('div');
+    el.className = `nf-alert nf-alert--${type}`;
+    el.innerHTML = `
+      ${title ? `<div class="nf-alert__title">${title}</div>` : ""}
+      ${message ? `<div class="nf-alert__message">${message}</div>` : ""}
+      ${details ? `<pre class="nf-alert__details"></pre>` : ""}
+      <div class="nf-alert__actions"></div>
+    `;
+    if (details) el.querySelector('.nf-alert__details').textContent = details;
+
+    const actionsBox = el.querySelector('.nf-alert__actions');
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'nf-alert__btn';
+    closeBtn.textContent = 'Close';
+    closeBtn.addEventListener('click', () => el.remove());
+    actionsBox.appendChild(closeBtn);
+
+    (actions || []).forEach(a => {
+      const b = document.createElement('button');
+      b.className = 'nf-alert__btn';
+      b.textContent = a?.label || 'OK';
+      b.addEventListener('click', () => {
+        try { a?.handler && a.handler(); } finally { el.remove(); }
+      });
+      actionsBox.appendChild(b);
+    });
+
+    root.appendChild(el);
+    setTimeout(() => el.classList.add('is-shown'), 10);
+    // Auto-dismiss for non-errors; keep errors until closed
+    if (type !== 'error') setTimeout(() => el.remove(), 12000);
+  }
+
+  function showFetchError(context, errSummary, raw) {
+    showAlert({
+      type: 'error',
+      title: "Can't load content",
+      message: context || "We couldn't load the catalog from the server.",
+      details: (errSummary ? errSummary + '\n\n' : '') + (raw || ''),
+      actions: [{ label: 'Retry', handler: () => window.location.reload() }]
+    });
+  }
+
+  //  Fetch catalog from server 
+  async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 8000, ...opts } = options;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(resource, { ...opts, signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
+  // API-only, with polished error UX
+  async function fetchCatalog() {
+    const errors = [];
+
+    try {
+      const res = await fetchWithTimeout('/api/content', {
+        headers: { 'Accept': 'application/json' },
+        timeout: 8000
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        showAlert({
+          type: 'error',
+          title: 'Session expired',
+          message: 'Please sign in again to see your catalog.',
+          actions: [{ label: 'Go to login', handler: () => (window.location.href = 'login.html') }]
+        });
+        return [];
+      }
+      if (res.status >= 500) {
+        showFetchError(
+          'The server is temporarily unavailable.',
+          'Try again in a minute or contact support.',
+          `HTTP ${res.status}`
+        );
+        return [];
+      }
+      if (!res.ok) {
+        showFetchError(
+          "We couldn't load the catalog from the server.",
+          'Check that /api/content exists and returns valid JSON.',
+          `HTTP ${res.status}`
+        );
+        return [];
+      }
+
+      // Parse + normalize
+      const data = await res.json();
+      const norm =
+        Array.isArray(data) ? data :
+        (data && typeof data === 'object' && Array.isArray(data.items)) ? data.items :
+        (data && typeof data === 'object' && Array.isArray(data.catalog)) ? data.catalog :
+        (data && typeof data === 'object' && Array.isArray(data.data)) ? data.data :
+        (data && typeof data === 'object' ? Object.values(data).filter(Array.isArray).flat() : []);
+
+      if (!Array.isArray(norm) || norm.length === 0) {
+        showFetchError(
+          'No titles are available right now.',
+          'Ensure content.json exists next to server.js and contains items.',
+          'API returned an empty array'
+        );
+        return [];
+      }
+
+      return norm.map(it => {
+        const title = it.title || it.name || 'Untitled';
+        const genres =
+          Array.isArray(it.genres) ? it.genres :
+          Array.isArray(it.genre) ? it.genre :
+          (typeof it.genre === 'string' ? it.genre.split(',').map(s=>s.trim()).filter(Boolean) : []);
+        const type = it.type || (it.seasons ? 'Series' : 'Movie');
+
+        return {
+          id: String(it.id ?? title),
+          title,
+          year: it.year ?? it.releaseYear ?? '',
+          genres,
+          likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
+          cover: it.cover || it.poster || it.image || it.img || '',
+          backdrop: it.backdrop || it.background || '',
+          type
+        };
+      });
+    } catch (e) {
+      const msg = (e?.name === 'AbortError') ? 'The request took too long and was canceled.' : (e?.message || String(e));
+      showFetchError(
+        "We couldn't load the catalog.",
+        'Troubleshooting tips:\n• Check your internet\n• Ensure the server is running\n• Verify /api/content returns valid JSON',
+        msg
+      );
+      return [];
+    }
+  }
+
+  const CATALOG = await fetchCatalog();
+
+  // If catalog is empty, show an empty state and stop further rendering
+  if (!Array.isArray(CATALOG) || CATALOG.length === 0) {
+    const rows = document.getElementById('rows');
+    if (rows) {
+      rows.innerHTML = `
+        <div class="nf-empty">
+          <div class="nf-empty__icon">🌀</div>
+          <h2 class="nf-empty__title">No titles (yet)</h2>
+          <p class="nf-empty__text">We couldn't load the catalog. Try again in a moment.</p>
+          <button class="btn nf-empty__btn" type="button" onclick="location.reload()">Retry</button>
+        </div>`;
+    }
+    return;
+  }
+
+  // Likes state (per profile)
+  const likesKey = `likes_by_${selectedId}`;
+  const likesState = JSON.parse(localStorage.getItem(likesKey) || "{}");
+  function getLikeEntry(item) {
+    const entry = likesState[item.id];
+    if (entry && typeof entry.count === "number") return entry;
+    return { liked: false, count: Number.isFinite(item.likes) ? item.likes : 0 };
+  }
+  function saveLikes() { localStorage.setItem(likesKey, JSON.stringify(likesState)); }
+  function currentCount(item) { return getLikeEntry(item).count; }
 
   // =========================
   // 4) Rendering helpers
@@ -133,10 +308,10 @@ if (logoutLink) {
     if (!hero || !CATALOG.length) return;
     const featured = mostLiked(CATALOG) || CATALOG[0];
     hero.innerHTML = `
-      <div class="nf-hero__bg" style="background-image:url('${featured.cover}')"></div>
+      <div class="nf-hero__bg" style="background-image:url('${heroImg}')"></div>
       <div class="nf-hero__meta" dir="rtl">
         <h1 class="nf-hero__title">${featured.title}</h1>
-        <div class="nf-hero__sub">${featured.year} • ${featured.genres.join(" • ")} • ${featured.type}</div>
+        <div class="nf-hero__sub">${[featured.year, (featured.genres||[]).join(" • "), featured.type].filter(Boolean).join(" • ")}</div>
         <div class="nf-hero__actions">
           <button class="nf-cta nf-cta--play" id="btnPlay" type="button" aria-label="Play">
             <svg viewBox="0 0 24 24" class="nf-cta__icon" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>

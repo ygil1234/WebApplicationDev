@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netflix - Settings</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="settings-body">
+    <div class="settings-modal">
+        <button class="settings-close" onclick="window.location.href='profiles.html'">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </button>
+
+        <div class="settings-content">
+            <h1 class="settings-modal-title">Add a profile</h1>
+            <p class="settings-modal-subtitle">Add a profile for another person watching Netflix.</p>
+
+            <form id="addProfileForm" novalidate>
+                <div class="settings-input-group">
+                    <input 
+                        type="text" 
+                        class="settings-input" 
+                        id="profileName" 
+                        placeholder="Name">
+                    <div class="login-error-message d-none" id="profileNameError"></div>
+                </div>
+
+                <div class="settings-divider"></div>
+
+                <div class="settings-avatar-section">
+                    <div class="avatar-grid" id="avatarGrid">
+                        <div class="avatar-option" data-avatar="IMG/profile1.jpg">
+                            <img src="IMG/profile1.jpg" alt="Avatar 1">
+                            <div class="avatar-check">✓</div>
+                        </div>
+                        <div class="avatar-option" data-avatar="IMG/profile2.jpg">
+                            <img src="IMG/profile2.jpg" alt="Avatar 2">
+                            <div class="avatar-check">✓</div>
+                        </div>
+                        <div class="avatar-option" data-avatar="IMG/profile3.jpg">
+                            <img src="IMG/profile3.jpg" alt="Avatar 3">
+                            <div class="avatar-check">✓</div>
+                        </div>
+                        <div class="avatar-option" data-avatar="IMG/profile4.jpg">
+                            <img src="IMG/profile4.jpg" alt="Avatar 4">
+                            <div class="avatar-check">✓</div>
+                        </div>
+                        <div class="avatar-option" data-avatar="IMG/profile5.jpg">
+                            <img src="IMG/profile5.jpg" alt="Avatar 5">
+                            <div class="avatar-check">✓</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-success d-none" id="successMessage"></div>
+
+                <div class="settings-actions">
+                    <button type="submit" class="settings-btn-primary" id="saveProfileBtn">
+                        Save
+                    </button>
+                    <button type="button" class="settings-btn-secondary" onclick="window.location.href='profiles.html'">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="JS/settings.js"></script>
+</body>
+</html>
