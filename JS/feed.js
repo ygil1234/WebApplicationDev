@@ -43,7 +43,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     try { localStorage.clear(); } catch {}
     window.location.href = "login.html";
   });
-}
 
 
   // =========================
