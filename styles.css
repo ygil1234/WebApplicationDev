@@ -1537,7 +1537,6 @@ body.modal-open {
   font-weight:700;
   cursor:pointer;
 }
-/* לא מכבים pointer-events כדי למנוע קליק-דרוך */
 .nf-row__arrow.is-disabled,
 .nf-row__arrow[disabled] {
   opacity: 0.35;

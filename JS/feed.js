@@ -75,7 +75,6 @@ document.addEventListener('click', (e) => {
       if (params.type) queryParams.append("type", params.type);
       if (params.year_from) queryParams.append("year_from", params.year_from);
       if (params.year_to) queryParams.append("year_to", params.year_to);
-      // אם השרת לא תומך ב-sort=alpha, לא חובה לשלוח אותו; נשאיר רק כדי שלא ישבור במידה וכן.
       if (params.sort && params.sort !== "alpha") queryParams.append("sort", params.sort);
       if (params.limit) queryParams.append("limit", params.limit);
 
@@ -284,7 +283,6 @@ document.addEventListener('click', (e) => {
   function applySort(items, mode) {
     if (!Array.isArray(items)) return [];
     if (mode !== "alpha") return items;
-    // מיון אלפביתי בצד הלקוח — גם אם השרת מתעלם
     return [...items].sort((a, b) =>
       normalizeTitle(a.title).localeCompare(normalizeTitle(b.title), undefined, { sensitivity: "base" })
     );
@@ -450,7 +448,6 @@ document.addEventListener('click', (e) => {
       fetchContent({ year_to: 1999,   sort: sortMode, limit: 12 }),
     ]);
 
-    // ✅ תמיד מוודאים מיון לקוחותי כשצריך
     const r1 = applySort(list1,   sortMode);
     const r2 = applySort(sciFi,   sortMode);
     const r3 = applySort(drama,   sortMode);
