@@ -1,5 +1,4 @@
-// JS/feed.js – Matala 4 (Feed) 
-
+// JS/feed.js
 document.addEventListener("DOMContentLoaded", async () => {
   // ===== 0) Guard anchors (prevent default on dead links)
   document.addEventListener('click', (e) => {
@@ -67,7 +66,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return res.json();
   }
 
-  // FIX: Always pass profileId for proper like annotations
   async function loadFeed({ profileId, sort = "popular", limit = 30 } = {}) {
     const qs = new URLSearchParams({ 
       profileId: String(profileId || selectedId), 
@@ -78,7 +76,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return data.items || [];
   }
 
-  // FIX: Always pass profileId for proper like annotations
   async function searchContent({ profileId, query, type = "", genre = "", year_from = "", year_to = "", sort = "popular", limit = 50 }) {
     const qs = new URLSearchParams({
       profileId: String(profileId || selectedId),
@@ -419,7 +416,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, false);
   }
 
-  // ===== 7) Search UI + behavior
+  // ===== 7) Search UI + behavior (ENHANCED)
   const searchInput = document.getElementById("searchInput");
   const searchBox   = document.getElementById("searchBox");
   const searchBtn   = document.getElementById("searchBtn");
@@ -437,21 +434,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     const q = (searchInput?.value || "").trim();
     if (q) {
-      searchContent({ 
-        profileId: selectedId, 
-        query: q, 
-        sort: lastSort, 
-        limit: 50 
-      })
-        .then(results => displaySearchResults(results, q))
-        .catch(err => {
-          console.error('Search error:', err);
-          showAlert({ 
-            type: 'error', 
-            title: 'Search failed', 
-            message: err?.message || 'Error while searching' 
-          });
-        });
+      performSearchNow(q);
     } else {
       displayDefaultRows(lastSort);
     }
@@ -460,9 +443,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (alphaToggle) {
     const onAlpha = (e) => { 
       e.stopPropagation(); 
-      setSort(alphaToggle.checked ? "alpha" : "popular"); 
+      const newMode = alphaToggle.checked ? "alpha" : "popular";
+      setSort(newMode);
     };
-    alphaToggle.addEventListener("input", onAlpha, true);
     alphaToggle.addEventListener("change", onAlpha, true);
     alphaToggle.addEventListener("click", (e) => { e.stopPropagation(); }, true);
   }
@@ -485,31 +468,76 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   let searchTimeout;
-  async function performSearch(query) {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(async () => {
-      const q = (query || "").trim();
-      if (!q) { 
-        await displayDefaultRows(lastSort); 
-        return; 
-      }
-      try {
-        const results = await searchContent({ 
+  
+  // Enhanced search that searches by title, genre, and type
+  async function performSearchNow(query) {
+    const q = (query || "").trim().toLowerCase();
+    if (!q) { 
+      await displayDefaultRows(lastSort); 
+      return; 
+    }
+    
+    try {
+      // Search by title
+      const titleResults = await searchContent({ 
+        profileId: selectedId, 
+        query: q, 
+        sort: lastSort, 
+        limit: 50 
+      });
+      
+      // Search by genre
+      const genreResults = await searchContent({ 
+        profileId: selectedId, 
+        genre: q, 
+        sort: lastSort, 
+        limit: 50 
+      });
+      
+      // Search by type (movie/series)
+      let typeResults = [];
+      if (q.includes('movie') || q.includes('film')) {
+        typeResults = await searchContent({ 
           profileId: selectedId, 
-          query: q, 
+          type: 'movie', 
           sort: lastSort, 
           limit: 50 
         });
-        displaySearchResults(results, q);
-      } catch (err) { 
-        console.error("Search error:", err); 
-        showAlert({ 
-          type: 'error', 
-          title: 'Search failed', 
-          message: err?.message || 'Error while searching' 
+      } else if (q.includes('series') || q.includes('show') || q.includes('tv')) {
+        typeResults = await searchContent({ 
+          profileId: selectedId, 
+          type: 'series', 
+          sort: lastSort, 
+          limit: 50 
         });
       }
-    }, 300);
+      
+      // Combine and deduplicate results
+      const allResults = [...titleResults, ...genreResults, ...typeResults];
+      const uniqueMap = new Map();
+      
+      allResults.forEach(item => {
+        const key = item.extId || item.id;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, item);
+        }
+      });
+      
+      const results = Array.from(uniqueMap.values());
+      displaySearchResults(results, query);
+    } catch (err) { 
+      console.error("Search error:", err); 
+      showAlert({ 
+        type: 'error', 
+        title: 'Search failed', 
+        message: err?.message || 'Error while searching' 
+      });
+    }
+  }
+  
+  async function performSearch(query) {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => performSearchNow(query), 300);
   }
   
   if (searchInput) {
