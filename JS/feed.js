@@ -612,7 +612,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("resize", refreshAllArrows);
 
   // ===== 9) Init
-  // seed some "continue watching" progress locally (demo only)
   try {
     if (!Object.keys(progress).length) {
       const warm = await loadFeed({ profileId: selectedId, sort: "popular", limit: 8 });
