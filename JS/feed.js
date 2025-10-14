@@ -1,4 +1,5 @@
-// JS/feed.js
+// JS/feed.js 
+
 document.addEventListener("DOMContentLoaded", async () => {
   // ===== 0) Guard anchors (prevent default on dead links)
   document.addEventListener('click', (e) => {
@@ -434,20 +435,29 @@ document.addEventListener("DOMContentLoaded", async () => {
     
     const q = (searchInput?.value || "").trim();
     if (q) {
+      // If there's a search query, re-run the search with new sort
       performSearchNow(q);
     } else {
+      // No search query, reload default rows with new sort
       displayDefaultRows(lastSort);
     }
   }
 
   if (alphaToggle) {
-    const onAlpha = (e) => { 
-      e.stopPropagation(); 
+    const onAlpha = (e) => {
       const newMode = alphaToggle.checked ? "alpha" : "popular";
+      console.log('A-Z toggle changed to:', newMode); // Debug log
       setSort(newMode);
     };
-    alphaToggle.addEventListener("change", onAlpha, true);
-    alphaToggle.addEventListener("click", (e) => { e.stopPropagation(); }, true);
+    alphaToggle.addEventListener("change", onAlpha);
+    
+    // Prevent label click from bubbling
+    const label = alphaToggle.closest('label');
+    if (label) {
+      label.addEventListener("click", (e) => { 
+        e.stopPropagation(); 
+      });
+    }
   }
 
   if (searchBtn) {
