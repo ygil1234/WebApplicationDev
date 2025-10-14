@@ -6,7 +6,7 @@ const express    = require('express');
 const fs         = require('fs/promises');
 const cors       = require('cors');
 const mongoose   = require('mongoose');
-const session    = require('express-session');
+const sessionLib = require('express-session');
 const MongoStore = require('connect-mongo');
 
 const app = express();
@@ -33,10 +33,11 @@ app.use(
 app.options(/.*/, cors());
 app.use(express.json());
 
-// ====== Sessions backed by MongoDB ======
+// ====== Sessions (install early, with fallback) ======
 if (IS_PROD) app.set('trust proxy', 1);
-app.use(
-  session({
+
+function buildSessionMiddleware() {
+  const baseOptions = {
     name: 'sid',
     secret: SESSION_SECRET,
     resave: false,
@@ -47,9 +48,16 @@ app.use(
       secure: IS_PROD,
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     },
-    store: MongoStore.create({ mongoUrl: MONGODB_URI }),
-  })
-);
+  };
+  try {
+    const store = MongoStore.create({ mongoUrl: MONGODB_URI });
+    return sessionLib({ ...baseOptions, store });
+  } catch (e) {
+    console.warn('[session] Falling back to MemoryStore:', e.message);
+    return sessionLib(baseOptions);
+  }
+}
+app.use(buildSessionMiddleware());
 
 // ====== DB Connection ======
 mongoose.set('strictQuery', true);
@@ -58,8 +66,11 @@ mongoose
   .then(() => console.log('[mongo] connected'))
   .catch((err) => {
     console.error('[mongo] connection error:', err.message);
-    process.exit(1);
   });
+
+mongoose.connection.once('open', () => {
+  seedContentIfNeeded();
+});
 
 // ====== Schemas & Models ======
 const contentSchema = new mongoose.Schema(
@@ -90,7 +101,7 @@ likeSchema.index({ profileId: 1, contentExtId: 1 }, { unique: true });
 const logSchema = new mongoose.Schema(
   {
     level:     { type: String, enum: ['info','warn','error'], default: 'info' },
-    event:     { type: String, required: true }, // 'feed'|'search'|'like_toggle'|'recommendations'|'logout'|'signup'|'login'|'profile_create'
+    event:     { type: String, required: true },
     userId:    { type: String, default: null },
     profileId: { type: String, default: null },
     details:   { type: Object, default: {} },
@@ -114,6 +125,7 @@ app.get('/api/health', async (req, res) => {
     ok: true, 
     env: NODE_ENV, 
     mongo: mongoose.connection.readyState, 
+    hasSession: Boolean(req.session),
     sessionUser: req.session?.userId || null 
   });
 });
@@ -122,13 +134,9 @@ app.get('/api/health', async (req, res) => {
 function sanitizeRegex(input) {
   return String(input || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
-
 async function writeLog({ level = 'info', event, userId = null, profileId = null, details = {} }) {
-  try { 
-    await Log.create({ level, event, userId, profileId, details }); 
-  } catch (e) { 
-    console.warn('[log] skip:', e.message); 
-  }
+  try { await Log.create({ level, event, userId, profileId, details }); }
+  catch (e) { console.warn('[log] skip:', e.message); }
 }
 
 // ====== File-based Users/Profiles (helpers) ======
@@ -140,9 +148,7 @@ async function readJSON(p, fallback) {
   try {
     const raw = await fs.readFile(p, 'utf-8');
     return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
+  } catch { return fallback; }
 }
 async function writeJsonAtomic(p, data) {
   await fs.mkdir(path.dirname(p), { recursive: true });
@@ -151,14 +157,37 @@ async function writeJsonAtomic(p, data) {
   await fs.rename(tmp, p);
 }
 async function ensureFileJSON(p, initial) {
-  try { await fs.access(p); }
-  catch { await writeJsonAtomic(p, initial); }
+  try { await fs.access(p); } catch { await writeJsonAtomic(p, initial); }
 }
 
 async function readUsers()      { return await readJSON(USERS_PATH, []); }
 async function writeUsers(arr)  { await writeJsonAtomic(USERS_PATH, arr); }
 async function readProfiles()   { return await readJSON(PROFILES_PATH, []); }
 async function writeProfiles(a) { await writeJsonAtomic(PROFILES_PATH, a); }
+
+// ====== Resolve userId (accept id / username / email / session) ======
+async function resolveUserId(userIdOrName, session) {
+  let v = String(userIdOrName || '').trim();
+
+  if (!v) {
+    if (session?.userId) return String(session.userId);
+    if (session?.username) v = String(session.username);
+  }
+  if (!v) return '';
+
+  try {
+    const users = await readUsers();
+    const lower = v.toLowerCase();
+    const u = users.find(u =>
+      String(u.id || '') === v ||
+      String(u.username || '').toLowerCase() === lower ||
+      String(u.email || '').toLowerCase() === lower
+    );
+    return u ? String(u.id) : v;
+  } catch {
+    return v;
+  }
+}
 
 // ====== Server-side validators (signup/login) ======
 const EMAIL_RX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -183,15 +212,15 @@ app.post('/api/signup', async (req, res) => {
   const username = String(req.body?.username || '').trim();
   const password = String(req.body?.password || '');
 
-  if (!validEmail(email))       return res.status(400).json({ error: 'Invalid email.' });
-  if (!validUsername(username)) return res.status(400).json({ error: 'Username must be 3-15 characters (letters/numbers/underscores).' });
-  if (!validPassword(password)) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  if (!validEmail(email))       return res.status(400).json({ ok:false, error: 'Invalid email.' });
+  if (!validUsername(username)) return res.status(400).json({ ok:false, error: 'Username must be 3-15 characters (letters/numbers/underscores).' });
+  if (!validPassword(password)) return res.status(400).json({ ok:false, error: 'Password must be at least 6 characters.' });
 
   const users = await readUsers();
   if (users.some(u => String(u.email).toLowerCase() === email.toLowerCase()))
-    return res.status(409).json({ error: 'Email already registered.' });
+    return res.status(409).json({ ok:false, error: 'Email already registered.' });
   if (users.some(u => String(u.username).toLowerCase() === username.toLowerCase()))
-    return res.status(409).json({ error: 'Username already taken.' });
+    return res.status(409).json({ ok:false, error: 'Username already taken.' });
 
   const newUser = { id: cryptoRandomId(), email, username, password };
   users.push(newUser);
@@ -201,27 +230,27 @@ app.post('/api/signup', async (req, res) => {
   req.session.username = newUser.username;
 
   await writeLog({ event: 'signup', userId: newUser.id, details: { email } });
-  return res.status(201).json({ id: newUser.id, email, username });
+  return res.status(201).json({ ok:true, user: { id: newUser.id, email, username } });
 });
 
 app.post('/api/login', async (req, res) => {
   const email    = String(req.body?.email || '').trim();
   const password = String(req.body?.password || '');
 
-  if (!validEmail(email))       return res.status(400).json({ error: 'Invalid email.' });
-  if (!validPassword(password)) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+  if (!validEmail(email))       return res.status(400).json({ ok:false, error: 'Invalid email.' });
+  if (!validPassword(password)) return res.status(400).json({ ok:false, error: 'Password must be at least 6 characters.' });
 
   const users = await readUsers();
   const user  = users.find(u => String(u.email).toLowerCase() === email.toLowerCase());
-  if (!user)                     return res.status(401).json({ error: 'Email not found.' });
+  if (!user)                     return res.status(401).json({ ok:false, error: 'Email not found.' });
   if (String(user.password) !== password)
-                                return res.status(401).json({ error: 'Incorrect password.' });
+                                return res.status(401).json({ ok:false, error: 'Incorrect password.' });
 
   req.session.userId   = user.id;
   req.session.username = user.username;
 
   await writeLog({ event: 'login', userId: user.id, details: { email } });
-  return res.json({ id: user.id, email: user.email, username: user.username });
+  return res.json({ ok:true, user: { id: user.id, email: user.email, username: user.username } });
 });
 
 function cryptoRandomId() {
@@ -230,12 +259,12 @@ function cryptoRandomId() {
 
 // ====== Profiles ======
 app.get('/api/profiles', async (req, res) => {
-  const userId = String(req.query.userId || req.session?.userId || '').trim();
-  if (!userId) return res.status(400).json({ error: 'User ID is required.' });
-
   try {
+    const resolvedUserId = await resolveUserId(req.query.userId, req.session);
+    if (!resolvedUserId) return res.status(400).json({ error: 'User ID is required.' });
+
     const allProfiles  = await readProfiles();
-    const userProfiles = allProfiles.filter(p => p.userId === userId);
+    const userProfiles = allProfiles.filter(p => String(p.userId) === String(resolvedUserId));
     return res.json(userProfiles); 
   } catch (e) {
     console.error('Error reading profiles:', e);
@@ -244,20 +273,20 @@ app.get('/api/profiles', async (req, res) => {
 });
 
 app.post('/api/profiles', async (req, res) => {
-  const userId = String(req.body?.userId || req.session?.userId || '').trim();
-  const name   = String(req.body?.name || '').trim();
-  const avatar = String(req.body?.avatar || '').trim();
-
-  if (!userId || !name || !avatar)
-    return res.status(400).json({ error: 'User ID, name, and avatar are required.' });
-  if (name.length < 2)
-    return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
-  if (name.length > 20)
-    return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
-
   try {
+    const userIdResolved = await resolveUserId(req.body?.userId, req.session);
+    const name   = String(req.body?.name || '').trim();
+    const avatar = String(req.body?.avatar || '').trim();
+
+    if (!userIdResolved || !name || !avatar)
+      return res.status(400).json({ error: 'User ID, name, and avatar are required.' });
+    if (name.length < 2)
+      return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+    if (name.length > 20)
+      return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
+
     const allProfiles  = await readProfiles();
-    const userProfiles = allProfiles.filter(p => p.userId === userId);
+    const userProfiles = allProfiles.filter(p => String(p.userId) === String(userIdResolved));
 
     if (userProfiles.length >= 5)
       return res.status(400).json({ error: 'Maximum of 5 profiles per user.' });
@@ -267,7 +296,7 @@ app.post('/api/profiles', async (req, res) => {
     const maxId = allProfiles.length > 0 ? Math.max(...allProfiles.map(p => p.id || 0)) : 0;
     const newProfile = {
       id: maxId + 1,
-      userId,
+      userId: userIdResolved,   // always store the internal id
       name,
       avatar,
       createdAt: new Date().toISOString(),
@@ -277,7 +306,7 @@ app.post('/api/profiles', async (req, res) => {
     allProfiles.push(newProfile);
     await writeProfiles(allProfiles);
 
-    await writeLog({ event: 'profile_create', userId, details: { profileId: newProfile.id, name } });
+    await writeLog({ event: 'profile_create', userId: userIdResolved, details: { profileId: newProfile.id, name } });
     return res.status(201).json(newProfile); 
   } catch (e) {
     console.error('Error creating profile:', e);
@@ -300,32 +329,19 @@ app.get('/api/feed', async (req, res) => {
       return res.json({ ok: true, items });
     }
 
-    // Add liked field for authenticated profile
     const liked = await Like.find({ 
       profileId, 
       contentExtId: { $in: items.map(i => i.extId) } 
     }, 'contentExtId').lean();
     
     const likedSet = new Set(liked.map(l => l.contentExtId));
-    const annotated = items.map(i => ({ 
-      ...i, 
-      liked: likedSet.has(i.extId) 
-    }));
+    const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
 
-    await writeLog({ 
-      event: 'feed', 
-      profileId, 
-      details: { sort, limit, count: annotated.length } 
-    });
-    
+    await writeLog({ event: 'feed', profileId, details: { sort, limit, count: annotated.length } });
     res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/feed error:', err);
-    await writeLog({ 
-      level: 'error', 
-      event: 'feed', 
-      details: { error: err.message } 
-    });
+    await writeLog({ level: 'error', event: 'feed', details: { error: err.message } });
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
@@ -344,7 +360,6 @@ app.get('/api/search', async (req, res) => {
 
     const yFrom = yFromStr ? Number(yFromStr) : null;
     const yTo   = yToStr   ? Number(yToStr)   : null;
-    
     if ((yFromStr && Number.isNaN(yFrom)) || (yToStr && Number.isNaN(yTo))) {
       return res.status(400).json({ ok: false, error: 'Invalid year range' });
     }
@@ -366,47 +381,23 @@ app.get('/api/search', async (req, res) => {
     const items = await Content.find(filter).sort(sortSpec).limit(limit).lean();
 
     if (!profileId) {
-      await writeLog({ 
-        event: 'search', 
-        details: { q, type, genre, yFrom, yTo, sort, limit, count: items.length } 
-      });
-      return res.json({ 
-        ok: true, 
-        query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, 
-        items 
-      });
+      await writeLog({ event: 'search', details: { q, type, genre, yFrom, yTo, sort, limit, count: items.length } });
+      return res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, items });
     }
 
-    // Add liked field for authenticated profile
     const liked = await Like.find({ 
       profileId, 
       contentExtId: { $in: items.map(i => i.extId) } 
     }, 'contentExtId').lean();
     
     const likedSet = new Set(liked.map(l => l.contentExtId));
-    const annotated = items.map(i => ({ 
-      ...i, 
-      liked: likedSet.has(i.extId) 
-    }));
+    const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
 
-    await writeLog({ 
-      event: 'search', 
-      profileId, 
-      details: { q, type, genre, yFrom, yTo, sort, limit, count: annotated.length } 
-    });
-    
-    res.json({ 
-      ok: true, 
-      query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, 
-      items: annotated 
-    });
+    await writeLog({ event: 'search', profileId, details: { q, type, genre, yFrom, yTo, sort, limit, count: annotated.length } });
+    res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, items: annotated });
   } catch (err) {
     console.error('GET /api/search error:', err);
-    await writeLog({ 
-      level: 'error', 
-      event: 'search', 
-      details: { error: err.message } 
-    });
+    await writeLog({ level: 'error', event: 'search', details: { error: err.message } });
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
@@ -417,10 +408,7 @@ app.post('/api/likes/toggle', async (req, res) => {
     const { profileId, contentExtId, like } = req.body || {};
     
     if (!profileId || !contentExtId || typeof like !== 'boolean') {
-      return res.status(400).json({ 
-        ok: false, 
-        error: 'profileId, contentExtId and like are required' 
-      });
+      return res.status(400).json({ ok: false, error: 'profileId, contentExtId and like are required' });
     }
 
     const content = await Content.findOne({ extId: contentExtId });
@@ -429,49 +417,29 @@ app.post('/api/likes/toggle', async (req, res) => {
     }
 
     if (like) {
-      // Add like
       const created = await Like.updateOne(
         { profileId, contentExtId },
         { $setOnInsert: { profileId, contentExtId } },
         { upsert: true }
       );
-      
       if (created.upsertedCount === 1) {
         await Content.updateOne({ _id: content._id }, { $inc: { likes: 1 } });
       }
-      
       const updated = await Content.findById(content._id, 'likes').lean();
-      await writeLog({ 
-        event: 'like_toggle', 
-        profileId, 
-        details: { contentExtId, like: true } 
-      });
-      
+      await writeLog({ event: 'like_toggle', profileId, details: { contentExtId, like: true } });
       return res.json({ ok: true, liked: true, likes: updated.likes });
     } else {
-      // Remove like
       const removed = await Like.deleteOne({ profileId, contentExtId });
-      
       if (removed.deletedCount === 1) {
         await Content.updateOne({ _id: content._id }, { $inc: { likes: -1 } });
       }
-      
       const updated = await Content.findById(content._id, 'likes').lean();
-      await writeLog({ 
-        event: 'like_toggle', 
-        profileId, 
-        details: { contentExtId, like: false } 
-      });
-      
+      await writeLog({ event: 'like_toggle', profileId, details: { contentExtId, like: false } });
       return res.json({ ok: true, liked: false, likes: Math.max(0, updated.likes) });
     }
   } catch (err) {
     console.error('POST /api/likes/toggle error:', err);
-    await writeLog({ 
-      level: 'error', 
-      event: 'like_toggle', 
-      details: { error: err.message } 
-    });
+    await writeLog({ level: 'error', event: 'like_toggle', details: { error: err.message } });
     res.status(500).json({ ok: false, error: 'Failed to update like' });
   }
 });
@@ -486,74 +454,34 @@ app.get('/api/recommendations', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'profileId is required' });
     }
 
-    // Get liked content for this profile
     const likedDocs = await Like.find({ profileId }, 'contentExtId').lean();
     const likedIds  = likedDocs.map(l => l.contentExtId);
     
     if (likedIds.length === 0) {
-      // No likes yet, return popular content
-      const popular = await Content.find({})
-        .sort({ likes: -1, title: 1 })
-        .limit(limit)
-        .lean();
-      
+      const popular = await Content.find({}).sort({ likes: -1, title: 1 }).limit(limit).lean();
       const annotated = popular.map(i => ({ ...i, liked: false }));
-      await writeLog({ 
-        event: 'recommendations', 
-        profileId, 
-        details: { topGenres: [], out: annotated.length, note: 'no_likes_yet' } 
-      });
-      
+      await writeLog({ event: 'recommendations', profileId, details: { topGenres: [], out: annotated.length, note: 'no_likes_yet' } });
       return res.json({ ok: true, items: annotated });
     }
 
-    // Get content details for liked items
-    const likedContents = await Content.find({ 
-      extId: { $in: likedIds } 
-    }, 'genres').lean();
+    const likedContents = await Content.find({ extId: { $in: likedIds } }, 'genres').lean();
 
-    // Count genre frequency
     const freq = new Map();
-    for (const c of likedContents) {
-      for (const g of c.genres || []) {
-        freq.set(g, (freq.get(g) || 0) + 1);
-      }
-    }
-    
-    const topGenres = [...freq.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([g]) => g);
+    for (const c of likedContents) for (const g of c.genres || []) freq.set(g, (freq.get(g) || 0) + 1);
+    const topGenres = [...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([g])=>g);
 
-    // Find recommendations based on top genres, excluding already liked
-    const baseFilter = topGenres.length 
-      ? { genres: { $in: topGenres } } 
-      : {};
-      
-    const candidates = await Content.find({ 
-      ...baseFilter, 
-      extId: { $nin: likedIds } 
-    })
+    const baseFilter = topGenres.length ? { genres: { $in: topGenres } } : {};
+    const candidates = await Content.find({ ...baseFilter, extId: { $nin: likedIds } })
       .sort({ likes: -1, title: 1 })
       .limit(limit)
       .lean();
 
     const annotated = candidates.map(i => ({ ...i, liked: false }));
-    
-    await writeLog({ 
-      event: 'recommendations', 
-      profileId, 
-      details: { topGenres, out: annotated.length } 
-    });
-    
+    await writeLog({ event: 'recommendations', profileId, details: { topGenres, out: annotated.length } });
     res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/recommendations error:', err);
-    await writeLog({ 
-      level: 'error', 
-      event: 'recommendations', 
-      details: { error: err.message } 
-    });
+    await writeLog({ level: 'error', event: 'recommendations', details: { error: err.message } });
     res.status(500).json({ ok: false, error: 'Server error' });
   }
 });
@@ -561,7 +489,7 @@ app.get('/api/recommendations', async (req, res) => {
 // ====== Logout ======
 app.post('/api/logout', async (req, res) => {
   await writeLog({ event: 'logout', details: {} });
-  req.session.destroy(() => {
+  req.session?.destroy(() => {
     res.clearCookie('sid');
     res.json({ ok: true });
   });
@@ -570,26 +498,18 @@ app.post('/api/logout', async (req, res) => {
 // ====== Seed from content.json  ======
 async function seedContentIfNeeded() {
   if (!SEED_CONTENT) return;
-  
   try {
     const candidates = [
-      path.resolve(__dirname, 'content.json'),            // server/content.json
-      path.resolve(process.cwd(), 'server/content.json'), // fallback
-      path.resolve(process.cwd(), 'content.json'),        // project root fallback
+      path.resolve(__dirname, 'content.json'),
+      path.resolve(process.cwd(), 'server/content.json'),
+      path.resolve(process.cwd(), 'content.json'),
     ];
 
     let raw = null, usedPath = null;
     for (const p of candidates) {
-      try { 
-        raw = await fs.readFile(p, 'utf-8'); 
-        usedPath = p; 
-        break; 
-      } catch {}
+      try { raw = await fs.readFile(p, 'utf-8'); usedPath = p; break; } catch {}
     }
-    
-    if (!raw) {
-      throw new Error('content.json not found in server/ or project root');
-    }
+    if (!raw) throw new Error('content.json not found in server/ or project root');
 
     const data = JSON.parse(raw);
     let arr =
@@ -599,9 +519,7 @@ async function seedContentIfNeeded() {
       (data && typeof data === 'object' && Array.isArray(data.data))    ? data.data    :
       (data && typeof data === 'object' ? Object.values(data).find(Array.isArray) : null);
 
-    if (!Array.isArray(arr)) {
-      throw new Error('content.json must be/contain an array');
-    }
+    if (!Array.isArray(arr)) throw new Error('content.json must be/contain an array');
 
     const toDoc = (it) => {
       const title = it.title || it.name || 'Untitled';
@@ -623,15 +541,10 @@ async function seedContentIfNeeded() {
     };
 
     let inserted = 0, updated = 0, skipped = 0;
-    
     for (const it of arr) {
       const doc = toDoc(it);
-      if (!doc.extId || !doc.title) { 
-        skipped++; 
-        continue; 
-      }
+      if (!doc.extId || !doc.title) { skipped++; continue; }
 
-      // Phase 1: upsert new – only $setOnInsert (to avoid conflicts with $set)
       const upsertRes = await Content.updateOne(
         { extId: doc.extId },
         { $setOnInsert: doc },
@@ -641,19 +554,11 @@ async function seedContentIfNeeded() {
       if (upsertRes.upsertedCount === 1) {
         inserted++;
       } else {
-        // Phase 2: update main fields – $set only (without likes, to not overwrite existing likes)
         const updRes = await Content.updateOne(
           { extId: doc.extId },
-          { 
-            $set: { 
-              title: doc.title, 
-              year: doc.year, 
-              genres: doc.genres, 
-              cover: doc.cover, 
-              type: doc.type 
-            } 
-          }
+          { $set: { title: doc.title, year: doc.year, genres: doc.genres, cover: doc.cover, type: doc.type } }
         );
+        inserted += 0;
         updated += (updRes.modifiedCount || 0);
       }
     }
@@ -664,24 +569,6 @@ async function seedContentIfNeeded() {
     console.warn('[seed] skip:', err.message);
   }
 }
-
-mongoose.connection.once('open', () => {
-  seedContentIfNeeded();
-});
-
-app.post('/api/admin/seed', async (req, res) => {
-  try {
-    if ((req.body?.secret || '') !== SESSION_SECRET) {
-      return res.status(401).json({ ok: false, error: 'unauthorized' });
-    }
-    await seedContentIfNeeded();
-    const count = await Content.countDocuments();
-    res.json({ ok: true, count });
-  } catch (e) {
-    console.error('POST /api/admin/seed error:', e);
-    res.status(500).json({ ok: false, error: 'seed failed' });
-  }
-});
 
 // ====== Root ======
 app.get('/', (_req, res) => {
