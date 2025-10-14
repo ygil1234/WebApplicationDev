@@ -1,6 +1,4 @@
-// server/index.js - COMPLETE FIXED VERSION
-// Matala 4 – Feed backend over MongoDB (Mongoose)
-
+// server/index.js 
 const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 
@@ -92,7 +90,7 @@ likeSchema.index({ profileId: 1, contentExtId: 1 }, { unique: true });
 const logSchema = new mongoose.Schema(
   {
     level:     { type: String, enum: ['info','warn','error'], default: 'info' },
-    event:     { type: String, required: true }, // 'feed'|'search'|'like_toggle'|'recommendations'|'logout'
+    event:     { type: String, required: true }, // 'feed'|'search'|'like_toggle'|'recommendations'|'logout'|'signup'|'login'|'profile_create'
     userId:    { type: String, default: null },
     profileId: { type: String, default: null },
     details:   { type: Object, default: {} },
@@ -132,6 +130,160 @@ async function writeLog({ level = 'info', event, userId = null, profileId = null
     console.warn('[log] skip:', e.message); 
   }
 }
+
+// ====== File-based Users/Profiles (helpers) ======
+const DATA_DIR      = path.resolve(__dirname);
+const USERS_PATH    = path.join(DATA_DIR, 'users.json');
+const PROFILES_PATH = path.join(DATA_DIR, 'profiles.json');
+
+async function readJSON(p, fallback) {
+  try {
+    const raw = await fs.readFile(p, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+async function writeJsonAtomic(p, data) {
+  await fs.mkdir(path.dirname(p), { recursive: true });
+  const tmp = p + '.tmp';
+  await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf-8');
+  await fs.rename(tmp, p);
+}
+async function ensureFileJSON(p, initial) {
+  try { await fs.access(p); }
+  catch { await writeJsonAtomic(p, initial); }
+}
+
+async function readUsers()      { return await readJSON(USERS_PATH, []); }
+async function writeUsers(arr)  { await writeJsonAtomic(USERS_PATH, arr); }
+async function readProfiles()   { return await readJSON(PROFILES_PATH, []); }
+async function writeProfiles(a) { await writeJsonAtomic(PROFILES_PATH, a); }
+
+// ====== Server-side validators (signup/login) ======
+const EMAIL_RX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+function validEmail(v)    { return EMAIL_RX.test(String(v || '').trim()); }
+function validPassword(p) { return typeof p === 'string' && p.trim().length >= 6; }
+function validUsername(n) { return /^[A-Za-z0-9_]{3,15}$/.test(String(n || '').trim()); }
+
+// ====== Bootstrap JSON stores for users/profiles ======
+(async () => {
+  try {
+    await ensureFileJSON(USERS_PATH, []);
+    await ensureFileJSON(PROFILES_PATH, []);
+  } catch (err) {
+    console.error('Failed to initialize users/profiles stores', err);
+    process.exit(1);
+  }
+})();
+
+// ====== Auth ======
+app.post('/api/signup', async (req, res) => {
+  const email    = String(req.body?.email || '').trim();
+  const username = String(req.body?.username || '').trim();
+  const password = String(req.body?.password || '');
+
+  if (!validEmail(email))       return res.status(400).json({ error: 'Invalid email.' });
+  if (!validUsername(username)) return res.status(400).json({ error: 'Username must be 3-15 characters (letters/numbers/underscores).' });
+  if (!validPassword(password)) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+  const users = await readUsers();
+  if (users.some(u => String(u.email).toLowerCase() === email.toLowerCase()))
+    return res.status(409).json({ error: 'Email already registered.' });
+  if (users.some(u => String(u.username).toLowerCase() === username.toLowerCase()))
+    return res.status(409).json({ error: 'Username already taken.' });
+
+  const newUser = { id: cryptoRandomId(), email, username, password };
+  users.push(newUser);
+  await writeUsers(users);
+
+  req.session.userId   = newUser.id;
+  req.session.username = newUser.username;
+
+  await writeLog({ event: 'signup', userId: newUser.id, details: { email } });
+  return res.status(201).json({ id: newUser.id, email, username });
+});
+
+app.post('/api/login', async (req, res) => {
+  const email    = String(req.body?.email || '').trim();
+  const password = String(req.body?.password || '');
+
+  if (!validEmail(email))       return res.status(400).json({ error: 'Invalid email.' });
+  if (!validPassword(password)) return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+  const users = await readUsers();
+  const user  = users.find(u => String(u.email).toLowerCase() === email.toLowerCase());
+  if (!user)                     return res.status(401).json({ error: 'Email not found.' });
+  if (String(user.password) !== password)
+                                return res.status(401).json({ error: 'Incorrect password.' });
+
+  req.session.userId   = user.id;
+  req.session.username = user.username;
+
+  await writeLog({ event: 'login', userId: user.id, details: { email } });
+  return res.json({ id: user.id, email: user.email, username: user.username });
+});
+
+function cryptoRandomId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
+// ====== Profiles ======
+app.get('/api/profiles', async (req, res) => {
+  const userId = String(req.query.userId || req.session?.userId || '').trim();
+  if (!userId) return res.status(400).json({ error: 'User ID is required.' });
+
+  try {
+    const allProfiles  = await readProfiles();
+    const userProfiles = allProfiles.filter(p => p.userId === userId);
+    return res.json(userProfiles); 
+  } catch (e) {
+    console.error('Error reading profiles:', e);
+    return res.status(500).json({ error: 'Failed to load profiles.' });
+  }
+});
+
+app.post('/api/profiles', async (req, res) => {
+  const userId = String(req.body?.userId || req.session?.userId || '').trim();
+  const name   = String(req.body?.name || '').trim();
+  const avatar = String(req.body?.avatar || '').trim();
+
+  if (!userId || !name || !avatar)
+    return res.status(400).json({ error: 'User ID, name, and avatar are required.' });
+  if (name.length < 2)
+    return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+  if (name.length > 20)
+    return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
+
+  try {
+    const allProfiles  = await readProfiles();
+    const userProfiles = allProfiles.filter(p => p.userId === userId);
+
+    if (userProfiles.length >= 5)
+      return res.status(400).json({ error: 'Maximum of 5 profiles per user.' });
+    if (userProfiles.some(p => p.name.toLowerCase() === name.toLowerCase()))
+      return res.status(409).json({ error: 'Profile name already exists.' });
+
+    const maxId = allProfiles.length > 0 ? Math.max(...allProfiles.map(p => p.id || 0)) : 0;
+    const newProfile = {
+      id: maxId + 1,
+      userId,
+      name,
+      avatar,
+      createdAt: new Date().toISOString(),
+      likedContent: []
+    };
+
+    allProfiles.push(newProfile);
+    await writeProfiles(allProfiles);
+
+    await writeLog({ event: 'profile_create', userId, details: { profileId: newProfile.id, name } });
+    return res.status(201).json(newProfile); 
+  } catch (e) {
+    console.error('Error creating profile:', e);
+    return res.status(500).json({ error: 'Failed to create profile.' });
+  }
+});
 
 // ====== Feed ======
 app.get('/api/feed', async (req, res) => {
