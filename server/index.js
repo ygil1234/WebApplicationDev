@@ -8,6 +8,7 @@ const cors       = require('cors');
 const mongoose   = require('mongoose');
 const sessionLib = require('express-session');
 const MongoStore = require('connect-mongo');
+const bcrypt     = require('bcryptjs');
 
 const app = express();
 const PORT      = process.env.PORT || 3000;
@@ -109,10 +110,37 @@ const logSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const userSchema = new mongoose.Schema(
+  {
+    email:    { type: String, required: true, unique: true, index: true },
+    username: { type: String, required: true, unique: true, index: true },
+    password: { type: String, required: true }, // will hold bcrypt hash
+  },
+  { timestamps: true }
+);
+
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Method to compare passwords
+userSchema.methods.comparePassword = async function (candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password);
+};
+
+const User = mongoose.models.User || mongoose.model('User', userSchema);
 const Content = mongoose.models.Content || mongoose.model('Content', contentSchema);
 const Like    = mongoose.models.Like    || mongoose.model('Like', likeSchema);
 const Log     = mongoose.models.Log     || mongoose.model('Log', logSchema);
 
+User.init().catch(e => console.warn('[mongo] User.init index warn:', e.message));
 Content.init().catch(e => console.warn('[mongo] Content.init index warn:', e.message));
 Like.init().catch(e => console.warn('[mongo] Like.init index warn:', e.message));
 
@@ -141,7 +169,6 @@ async function writeLog({ level = 'info', event, userId = null, profileId = null
 
 // ====== File-based Users/Profiles (helpers) ======
 const DATA_DIR      = path.resolve(__dirname);
-const USERS_PATH    = path.join(DATA_DIR, 'users.json');
 const PROFILES_PATH = path.join(DATA_DIR, 'profiles.json');
 
 async function readJSON(p, fallback) {
@@ -160,8 +187,6 @@ async function ensureFileJSON(p, initial) {
   try { await fs.access(p); } catch { await writeJsonAtomic(p, initial); }
 }
 
-async function readUsers()      { return await readJSON(USERS_PATH, []); }
-async function writeUsers(arr)  { await writeJsonAtomic(USERS_PATH, arr); }
 async function readProfiles()   { return await readJSON(PROFILES_PATH, []); }
 async function writeProfiles(a) { await writeJsonAtomic(PROFILES_PATH, a); }
 
@@ -175,18 +200,11 @@ async function resolveUserId(userIdOrName, session) {
   }
   if (!v) return '';
 
-  try {
-    const users = await readUsers();
-    const lower = v.toLowerCase();
-    const u = users.find(u =>
-      String(u.id || '') === v ||
-      String(u.username || '').toLowerCase() === lower ||
-      String(u.email || '').toLowerCase() === lower
-    );
-    return u ? String(u.id) : v;
-  } catch {
-    return v;
-  }
+  if (/^[0-9a-fA-F]{24}$/.test(v)) return v;
+
+  const re = new RegExp(`^${sanitizeRegex(v)}$`, 'i');
+  const u = await User.findOne({ $or: [{ email: re }, { username: re }] }, '_id').lean();
+  return u ? String(u._id) : '';
 }
 
 // ====== Server-side validators (signup/login) ======
@@ -198,7 +216,6 @@ function validUsername(n) { return /^[A-Za-z0-9_]{3,15}$/.test(String(n || '').t
 // ====== Bootstrap JSON stores for users/profiles ======
 (async () => {
   try {
-    await ensureFileJSON(USERS_PATH, []);
     await ensureFileJSON(PROFILES_PATH, []);
   } catch (err) {
     console.error('Failed to initialize users/profiles stores', err);
@@ -208,54 +225,87 @@ function validUsername(n) { return /^[A-Za-z0-9_]{3,15}$/.test(String(n || '').t
 
 // ====== Auth ======
 app.post('/api/signup', async (req, res) => {
-  const email    = String(req.body?.email || '').trim();
-  const username = String(req.body?.username || '').trim();
-  const password = String(req.body?.password || '');
+  try {
+    const email    = String(req.body?.email || '').trim();
+    const username = String(req.body?.username || '').trim();
+    const password = String(req.body?.password || '');
 
-  if (!validEmail(email))       return res.status(400).json({ ok:false, error: 'Invalid email.' });
-  if (!validUsername(username)) return res.status(400).json({ ok:false, error: 'Username must be 3-15 characters (letters/numbers/underscores).' });
-  if (!validPassword(password)) return res.status(400).json({ ok:false, error: 'Password must be at least 6 characters.' });
+    if (!validEmail(email))       return res.status(400).json({ ok:false, error: 'Invalid email.' });
+    if (!validUsername(username)) return res.status(400).json({ ok:false, error: 'Username must be 3-15 characters (letters/numbers/underscores).' });
+    if (!validPassword(password)) return res.status(400).json({ ok:false, error: 'Password must be at least 6 characters.' });
 
-  const users = await readUsers();
-  if (users.some(u => String(u.email).toLowerCase() === email.toLowerCase()))
-    return res.status(409).json({ ok:false, error: 'Email already registered.' });
-  if (users.some(u => String(u.username).toLowerCase() === username.toLowerCase()))
-    return res.status(409).json({ ok:false, error: 'Username already taken.' });
+    // Uniqueness checks (case-insensitive)
+    const emailExists = await User.exists({ email: new RegExp(`^${sanitizeRegex(email)}$`, 'i') });
+    if (emailExists) return res.status(409).json({ ok:false, error: 'Email already registered.' });
 
-  const newUser = { id: cryptoRandomId(), email, username, password };
-  users.push(newUser);
-  await writeUsers(users);
+    const usernameExists = await User.exists({ username: new RegExp(`^${sanitizeRegex(username)}$`, 'i') });
+    if (usernameExists) return res.status(409).json({ ok:false, error: 'Username already taken.' });
 
-  req.session.userId   = newUser.id;
-  req.session.username = newUser.username;
+    // Create & save — bcrypt happens in userSchema.pre('save')
+    const user = new User({ email, username, password });
+    await user.save();
 
-  await writeLog({ event: 'signup', userId: newUser.id, details: { email } });
-  return res.status(201).json({ ok:true, user: { id: newUser.id, email, username } });
+    // Session
+    req.session.userId   = String(user._id);
+    req.session.username = user.username;
+
+    await writeLog({ event: 'signup', userId: String(user._id), details: { email } });
+
+    return res.status(201).json({
+      ok: true,
+      user: { id: String(user._id), email: user.email, username: user.username }
+    });
+  } catch (err) {
+    // Handle duplicate key race conditions cleanly
+    if (err?.code === 11000) {
+      const field = Object.keys(err.keyPattern || {})[0] || 'field';
+      return res.status(409).json({ ok:false, error: `${field.charAt(0).toUpperCase() + field.slice(1)} already in use.` });
+    }
+    console.error('POST /api/signup error:', err);
+    await writeLog({ level: 'error', event: 'signup', details: { error: err.message } });
+    return res.status(500).json({ ok:false, error: 'Server error' });
+  }
 });
 
 app.post('/api/login', async (req, res) => {
-  const email    = String(req.body?.email || '').trim();
-  const password = String(req.body?.password || '');
+  try {
+    const email    = String(req.body?.email || '').trim();
+    const password = String(req.body?.password || '');
 
-  if (!validEmail(email))       return res.status(400).json({ ok:false, error: 'Invalid email.' });
-  if (!validPassword(password)) return res.status(400).json({ ok:false, error: 'Password must be at least 6 characters.' });
+    if (!validEmail(email)) {
+      await writeLog({ event: 'login', success: false, details: { email, reason: 'invalid email format' } });
+      return res.status(400).json({ ok: false, error: 'Invalid email format.' });
+    }
 
-  const users = await readUsers();
-  const user  = users.find(u => String(u.email).toLowerCase() === email.toLowerCase());
-  if (!user)                     return res.status(401).json({ ok:false, error: 'Email not found.' });
-  if (String(user.password) !== password)
-                                return res.status(401).json({ ok:false, error: 'Incorrect password.' });
+    const user = await User.findOne({ email: new RegExp(`^${sanitizeRegex(email)}$`, 'i') });
+    if (!user) {
+      await writeLog({ event: 'login', success: false, details: { email, reason: 'user not found' } });
+      return res.status(401).json({ ok: false, error: 'Email not found.' });
+    }
 
-  req.session.userId   = user.id;
-  req.session.username = user.username;
+    const passwordOk = await user.comparePassword(password);
+    if (!passwordOk) {
+      await writeLog({ event: 'login', success: false, userId: String(user._id), details: { email, reason: 'bad password' } });
+      return res.status(401).json({ ok: false, error: 'Incorrect password.' });
+    }
 
-  await writeLog({ event: 'login', userId: user.id, details: { email } });
-  return res.json({ ok:true, user: { id: user.id, email: user.email, username: user.username } });
+    req.session.userId   = String(user._id);
+    req.session.username = user.username;
+
+    await writeLog({ event: 'login', success: true, userId: String(user._id), details: { email } });
+
+    return res.json({
+      ok: true,
+      user: { id: String(user._id), email: user.email, username: user.username }
+    });
+
+  } catch (err) {
+    console.error('POST /api/login error:', err);
+    await writeLog({ event: 'login', success: false, details: { error: err.message } });
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
 });
 
-function cryptoRandomId() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-}
 
 // ====== Profiles ======
 app.get('/api/profiles', async (req, res) => {
