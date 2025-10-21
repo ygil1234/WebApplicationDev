@@ -298,63 +298,186 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===== 5) Build rows (default/search/recommend)
   const rowsRoot = document.getElementById("rows");
 
+  // ===== 5a) Infinite scroll state & helpers =====
+  async function loadHomeContent(sortMode = "popular") {
+    const [popular, sciFi, drama, classics, recs] = await Promise.all([
+      loadFeed({ profileId: selectedId, sort: sortMode, limit: 16 }),
+      searchContent({ profileId: selectedId, genre: "sci-fi", sort: sortMode, limit: 16 }),
+      searchContent({ profileId: selectedId, genre: "drama",  sort: sortMode, limit: 16 }),
+      searchContent({ profileId: selectedId, year_to: "1999", sort: sortMode, limit: 12 }),
+      loadRecommendations({ profileId: selectedId, limit: 16 }),
+    ]);
+
+    const rows = [
+      { id: "row-recs",    title: `Recommended for you`, items: recs || [] },
+      { id: "row-popular", title: sortMode === "alpha" ? "A–Z Catalog" : "Popular on Netflix", items: popular || [] },
+      { id: "row-sci",     title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A–Z)" : "Sci-Fi & Fantasy", items: sciFi || [] },
+      { id: "row-drama",   title: sortMode === "alpha" ? "Drama (A–Z)" : "Critically-acclaimed Drama", items: drama || [] },
+      { id: "row-classic", title: sortMode === "alpha" ? "Classics (A–Z)" : "Classics", items: classics || [] },
+    ];
+
+    return { popular, sciFi, drama, classics, recs, rows };
+  }
+
+  async function appendHomeCycle(sortMode = lastSort) {
+    try {
+      const { rows } = await loadHomeContent(sortMode);
+      // Append again (we do NOT de-dupe here so the loop visibly repeats)
+      rows
+        .map((r, idx) => ({
+          ...r,
+          id: `${r.id}-loop-${Date.now()}-${idx}`,
+        }))
+        .forEach(r => { if (r.items?.length) rowsRoot.appendChild(makeRow(r)); });
+    } catch (err) {
+      console.error("appendHomeCycle error:", err);
+    }
+  }
+
+  const GENRE_SEQ = [
+    "action","comedy","thriller","romance","documentary","animation",
+    "crime","family","horror","fantasy","adventure","history","war","music","mystery","western"
+  ];
+  let nextGenreIdx = 0;
+  let isLoadingMore = false;
+  let isInfiniteEnabled = false;
+  let loadedIds = new Set();
+
+  function collectIds(items=[]) {
+    items.forEach(i => loadedIds.add(String(i?.extId ?? i?.id ?? "")));
+  }
+  function filterNew(items=[]) {
+    return items.filter(i => !loadedIds.has(String(i?.extId ?? i?.id ?? "")));
+  }
+
+  let sentinel = null;
+  let io = null;
+
+  function ensureSentinel() {
+    if (sentinel) return sentinel;
+    sentinel = document.createElement("div");
+    sentinel.id = "infinite-sentinel";
+    sentinel.style.cssText = "height:1px;margin:0;opacity:0;";
+    // place after the rows section so it’s near the bottom of the page
+    rowsRoot.parentElement.appendChild(sentinel);
+    return sentinel;
+  }
+
+  async function appendRowsBatch() {
+    if (isLoadingMore || !isInfiniteEnabled) return;
+    isLoadingMore = true;
+    try {
+      const batch = [];
+
+      // If we still have genres, load a small batch of 3 rows
+      if (nextGenreIdx < GENRE_SEQ.length) {
+        for (let k = 0; k < 3 && nextGenreIdx < GENRE_SEQ.length; k++) {
+          const g = GENRE_SEQ[nextGenreIdx++];
+          const itemsRaw = await searchContent({
+            profileId: selectedId,
+            genre: g,
+            sort: lastSort,
+            limit: 16
+          });
+          const items = filterNew(itemsRaw);   // keep genre rows de-duped within this pass
+          if (items.length) {
+            batch.push({
+              id: `row-${g}-${Date.now()}-${k}`,
+              title: (lastSort === "alpha") ? `${g[0].toUpperCase()+g.slice(1)} (A–Z)` : (g[0].toUpperCase()+g.slice(1)),
+              items
+            });
+            collectIds(items);
+          }
+        }
+        batch.forEach(r => rowsRoot.appendChild(makeRow(r)));
+      }
+
+      // If we ran out of genres, append the home set again and restart the genre sequence
+      if (nextGenreIdx >= GENRE_SEQ.length) {
+        await appendHomeCycle(lastSort);
+        nextGenreIdx = 0;           // restart genre loop
+        loadedIds = new Set();      // reset de-dupe so new genre pass can show items again
+      }
+    } catch (err) {
+      console.error("Infinite scroll load error:", err);
+      showAlert({ type: "error", title: "Loading more failed", message: err?.message || "Couldn’t load more rows." });
+    } finally {
+      isLoadingMore = false;
+    }
+  }
+
+
+  function enableInfinite() {
+    if (isInfiniteEnabled) return;
+    isInfiniteEnabled = true;
+    const s = ensureSentinel();
+    io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) appendRowsBatch();
+    }, { root: null, rootMargin: "800px 0px", threshold: 0 });
+    io.observe(s);
+  }
+
+  function disableInfinite() {
+    isInfiniteEnabled = false;
+    if (io) { io.disconnect(); io = null; }
+    if (sentinel) { sentinel.remove(); sentinel = null; }
+  }
+
+
   async function displayDefaultRows(sortMode = "popular") {
     if (!rowsRoot) return;
     rowsRoot.innerHTML = "";
+    disableInfinite();
+
+    // reset paging state
+    nextGenreIdx = 0;
+    isLoadingMore = false;
+    loadedIds = new Set();
 
     try {
-      const [popular, sciFi, drama, classics, recs] = await Promise.all([
-        loadFeed({ profileId: selectedId, sort: sortMode, limit: 16 }),
-        searchContent({ profileId: selectedId, genre: "sci-fi", sort: sortMode, limit: 16 }),
-        searchContent({ profileId: selectedId, genre: "drama",  sort: sortMode, limit: 16 }),
-        searchContent({ profileId: selectedId, year_to: "1999", sort: sortMode, limit: 12 }),
-        loadRecommendations({ profileId: selectedId, limit: 16 }),
-      ]);
+      const { popular, sciFi, drama, classics, recs, rows } = await loadHomeContent(sortMode);
 
       CURRENT_ITEMS = popular.slice();
+      collectIds(popular);
+      collectIds(sciFi);
+      collectIds(drama);
+      collectIds(classics);
+      collectIds(recs);
+
       displayFeatured(CURRENT_ITEMS);
 
-      const rows = [
-        { id: "row-recs",     title: `Recommended for you`, items: recs || [] },
-        { id: "row-popular",  title: sortMode === "alpha" ? "A–Z Catalog" : "Popular on Netflix", items: popular || [] },
-        { id: "row-sci",      title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A–Z)" : "Sci-Fi & Fantasy", items: sciFi || [] },
-        { id: "row-drama",    title: sortMode === "alpha" ? "Drama (A–Z)" : "Critically-acclaimed Drama", items: drama || [] },
-        { id: "row-classic",  title: sortMode === "alpha" ? "Classics (A–Z)" : "Classics", items: classics || [] },
-      ];
-      
-      rows.forEach(r => { 
-        if (r.items?.length) rowsRoot.appendChild(makeRow(r)); 
-      });
-      
-      refreshAllArrows();
+      rows.forEach(r => { if (r.items?.length) rowsRoot.appendChild(makeRow(r)); });
+
+      // turn on infinite scroll after initial rows render
+      enableInfinite();
     } catch (err) {
       console.error('Error loading default rows:', err);
-      showAlert({ 
-        type: 'error', 
-        title: 'Loading Error', 
-        message: 'Failed to load content. Please refresh the page.' 
+      showAlert({
+        type: 'error',
+        title: 'Loading Error',
+        message: 'Failed to load content. Please refresh the page.'
       });
     }
   }
 
-  function displaySearchResults(results, query) {
-    if (!rowsRoot) return;
-    rowsRoot.innerHTML = "";
-    
-    if (!results?.length) {
-      rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results for "${query}"</div>`;
-      return;
+
+    function displaySearchResults(results, query) {
+      if (!rowsRoot) return;
+      rowsRoot.innerHTML = "";
+      
+      if (!results?.length) {
+        rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results for "${query}"</div>`;
+        return;
+      }
+      
+      CURRENT_ITEMS = results.slice();
+      const row = { 
+        id: "row-search", 
+        title: `Search Results for "${query}" (${results.length})`, 
+        items: results 
+      };
+      rowsRoot.appendChild(makeRow(row));
     }
-    
-    CURRENT_ITEMS = results.slice();
-    const row = { 
-      id: "row-search", 
-      title: `Search Results for "${query}" (${results.length})`, 
-      items: results 
-    };
-    rowsRoot.appendChild(makeRow(row));
-    refreshAllArrows();
-  }
 
   // ===== 6) Likes (delegation)
   if (rowsRoot) {
