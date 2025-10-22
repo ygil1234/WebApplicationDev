@@ -167,6 +167,14 @@ async function writeLog({ level = 'info', event, userId = null, profileId = null
   catch (e) { console.warn('[log] skip:', e.message); }
 }
 
+// ====== Authentication Middleware ======
+function requireAuth(req, res, next) {
+  if (!req.session || !req.session.userId) {
+    return res.status(401).json({ ok: false, error: 'Authentication required' });
+  }
+  next();
+}
+
 // ====== File-based Users/Profiles (helpers) ======
 const DATA_DIR      = path.resolve(__dirname);
 const PROFILES_PATH = path.join(DATA_DIR, 'profiles.json');
@@ -241,7 +249,7 @@ app.post('/api/signup', async (req, res) => {
     const usernameExists = await User.exists({ username: new RegExp(`^${sanitizeRegex(username)}$`, 'i') });
     if (usernameExists) return res.status(409).json({ ok:false, error: 'Username already taken.' });
 
-    // Create & save — bcrypt happens in userSchema.pre('save')
+    // Create & save – bcrypt happens in userSchema.pre('save')
     const user = new User({ email, username, password });
     await user.save();
 
@@ -308,21 +316,36 @@ app.post('/api/login', async (req, res) => {
 
 
 // ====== Profiles ======
-app.get('/api/profiles', async (req, res) => {
+app.get('/api/profiles', requireAuth, async (req, res) => {
   try {
     const resolvedUserId = await resolveUserId(req.query.userId, req.session);
     if (!resolvedUserId) return res.status(400).json({ error: 'User ID is required.' });
 
     const allProfiles  = await readProfiles();
     const userProfiles = allProfiles.filter(p => String(p.userId) === String(resolvedUserId));
+    
+    await writeLog({ 
+      event: 'profiles_load', 
+      userId: resolvedUserId, 
+      details: { 
+        profileCount: userProfiles.length,
+        profileNames: userProfiles.map(p => p.name)
+      } 
+    });
+    
     return res.json(userProfiles); 
   } catch (e) {
     console.error('Error reading profiles:', e);
+    await writeLog({ 
+      level: 'error', 
+      event: 'profiles_load', 
+      details: { error: e.message } 
+    });
     return res.status(500).json({ error: 'Failed to load profiles.' });
   }
 });
 
-app.post('/api/profiles', async (req, res) => {
+app.post('/api/profiles', requireAuth, async (req, res) => {
   try {
     const userIdResolved = await resolveUserId(req.body?.userId, req.session);
     const name   = String(req.body?.name || '').trim();
@@ -346,7 +369,7 @@ app.post('/api/profiles', async (req, res) => {
     const maxId = allProfiles.length > 0 ? Math.max(...allProfiles.map(p => p.id || 0)) : 0;
     const newProfile = {
       id: maxId + 1,
-      userId: userIdResolved,   // always store the internal id
+      userId: userIdResolved,
       name,
       avatar,
       createdAt: new Date().toISOString(),
@@ -356,11 +379,133 @@ app.post('/api/profiles', async (req, res) => {
     allProfiles.push(newProfile);
     await writeProfiles(allProfiles);
 
-    await writeLog({ event: 'profile_create', userId: userIdResolved, details: { profileId: newProfile.id, name } });
+    await writeLog({ 
+      event: 'profile_create', 
+      userId: userIdResolved, 
+      profileId: String(newProfile.id),
+      details: { profileId: newProfile.id, profileName: name, avatar } 
+    });
     return res.status(201).json(newProfile); 
   } catch (e) {
     console.error('Error creating profile:', e);
     return res.status(500).json({ error: 'Failed to create profile.' });
+  }
+});
+
+// ====== Update Profile (PUT) ======
+app.put('/api/profiles/:id', requireAuth, async (req, res) => {
+  try {
+    const profileId = parseInt(req.params.id, 10);
+    const userIdResolved = await resolveUserId(req.body?.userId, req.session);
+    const name = String(req.body?.name || '').trim();
+    const avatar = String(req.body?.avatar || '').trim();
+
+    if (!userIdResolved) {
+      return res.status(400).json({ error: 'User ID is required.' });
+    }
+
+    if (!name || !avatar) {
+      return res.status(400).json({ error: 'Name and avatar are required.' });
+    }
+
+    if (name.length < 2) {
+      return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+    }
+
+    if (name.length > 20) {
+      return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
+    }
+
+    const allProfiles = await readProfiles();
+    const profileIndex = allProfiles.findIndex(p => p.id === profileId);
+
+    if (profileIndex === -1) {
+      return res.status(404).json({ error: 'Profile not found.' });
+    }
+
+    const profile = allProfiles[profileIndex];
+
+    // Verify ownership
+    if (String(profile.userId) !== String(userIdResolved)) {
+      return res.status(403).json({ error: 'Not authorized to edit this profile.' });
+    }
+
+    // Check for duplicate name (excluding current profile)
+    const userProfiles = allProfiles.filter(p => String(p.userId) === String(userIdResolved));
+    const duplicateName = userProfiles.some(p => 
+      p.id !== profileId && p.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (duplicateName) {
+      return res.status(409).json({ error: 'Profile name already exists.' });
+    }
+
+    // Update profile
+    allProfiles[profileIndex] = {
+      ...profile,
+      name,
+      avatar,
+      updatedAt: new Date().toISOString()
+    };
+
+    await writeProfiles(allProfiles);
+
+    await writeLog({ 
+      event: 'profile_update', 
+      userId: userIdResolved, 
+      profileId: String(profileId),
+      details: { profileId, profileName: name, avatar } 
+    });
+
+    return res.json(allProfiles[profileIndex]);
+  } catch (e) {
+    console.error('Error updating profile:', e);
+    return res.status(500).json({ error: 'Failed to update profile.' });
+  }
+});
+
+// ====== Delete Profile (DELETE) ======
+app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
+  try {
+    const profileId = parseInt(req.params.id, 10);
+    const userIdResolved = req.session?.userId;
+
+    if (!userIdResolved) {
+      return res.status(401).json({ error: 'Authentication required.' });
+    }
+
+    const allProfiles = await readProfiles();
+    const profileIndex = allProfiles.findIndex(p => p.id === profileId);
+
+    if (profileIndex === -1) {
+      return res.status(404).json({ error: 'Profile not found.' });
+    }
+
+    const profile = allProfiles[profileIndex];
+
+    // Verify ownership
+    if (String(profile.userId) !== String(userIdResolved)) {
+      return res.status(403).json({ error: 'Not authorized to delete this profile.' });
+    }
+
+    // Delete all likes associated with this profile
+    await Like.deleteMany({ profileId: String(profileId) });
+
+    // Remove profile from array
+    allProfiles.splice(profileIndex, 1);
+    await writeProfiles(allProfiles);
+
+    await writeLog({ 
+      event: 'profile_delete', 
+      userId: userIdResolved, 
+      profileId: String(profileId),
+      details: { profileId, profileName: profile.name, avatar: profile.avatar } 
+    });
+
+    return res.json({ ok: true, message: 'Profile deleted successfully.' });
+  } catch (e) {
+    console.error('Error deleting profile:', e);
+    return res.status(500).json({ error: 'Failed to delete profile.' });
   }
 });
 
