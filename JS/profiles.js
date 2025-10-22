@@ -4,7 +4,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const manageProfilesBtn = document.getElementById('manageProfilesBtn');
 
     // Check if user is logged in
-    const loggedInUser = localStorage.getItem('loggedInUser');
+    const loggedInUser = sessionStorage.getItem('loggedInUser') || localStorage.getItem('loggedInUser');
     if (!loggedInUser) {
         window.location.href = 'login.html';
         return;
@@ -19,6 +19,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             const response = await fetch(`/api/profiles?userId=${encodeURIComponent(loggedInUser)}`);
             
             if (!response.ok) {
+                if (response.status === 401) {
+                    // Unauthorized - redirect to login
+                    window.location.href = 'login.html';
+                    return;
+                }
                 throw new Error('Failed to load profiles');
             }
 
@@ -81,6 +86,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         localStorage.setItem('selectedProfileAvatar', profile.avatar);
         window.location.href = 'feed.html';
     }
+
+    // Manage Profiles button click handler
+    manageProfilesBtn.addEventListener('click', () => {
+        window.location.href = '../settings.html';
+    });
 
     // Initial load
     await loadProfiles();
