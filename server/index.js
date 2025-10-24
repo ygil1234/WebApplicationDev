@@ -19,6 +19,10 @@ const IS_PROD   = NODE_ENV === 'production';
 const MONGODB_URI    = process.env.MONGODB_URI    || 'mongodb://127.0.0.1:27017/netflix_feed';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev_secret_change_me';
 const SEED_CONTENT   = process.env.SEED_CONTENT   === '1';
+const ROW_SCROLL_STEP_RAW = Number.parseInt(process.env.ROW_SCROLL_STEP ?? '5', 10);
+const ROW_SCROLL_STEP = Number.isFinite(ROW_SCROLL_STEP_RAW) && ROW_SCROLL_STEP_RAW > 0
+  ? ROW_SCROLL_STEP_RAW
+  : 5;
 
 // ====== CORS & JSON ======
 app.use(
@@ -158,9 +162,20 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
+app.get('/api/config', (req, res) => {
+  res.json({
+    ok: true,
+    scrollStep: ROW_SCROLL_STEP,
+  });
+});
+
 // ====== Helpers ======
 function sanitizeRegex(input) {
   return String(input || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function parsePositiveInt(value, fallback = 0) {
+  const n = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 async function writeLog({ level = 'info', event, userId = null, profileId = null, details = {} }) {
   try { await Log.create({ level, event, userId, profileId, details }); }
@@ -513,14 +528,19 @@ app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
 app.get('/api/feed', async (req, res) => {
   try {
     const profileId = String(req.query.profileId || '').trim();
-    const sort  = String(req.query.sort || 'popular').toLowerCase();
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
+    const sort   = String(req.query.sort || 'popular').toLowerCase();
+    const limit  = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
+    const offset = parsePositiveInt(req.query.offset, 0);
 
     const sortSpec = (sort === 'alpha') ? { title: 1 } : { likes: -1, title: 1 };
-    const items = await Content.find({}).sort(sortSpec).limit(limit).lean();
+    const items = await Content.find({})
+      .sort(sortSpec)
+      .skip(offset)
+      .limit(limit)
+      .lean();
 
     if (!profileId) {
-      await writeLog({ event: 'feed', details: { sort, limit, count: items.length } });
+      await writeLog({ event: 'feed', details: { sort, limit, offset, count: items.length } });
       return res.json({ ok: true, items });
     }
 
@@ -532,7 +552,7 @@ app.get('/api/feed', async (req, res) => {
     const likedSet = new Set(liked.map(l => l.contentExtId));
     const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
 
-    await writeLog({ event: 'feed', profileId, details: { sort, limit, count: annotated.length } });
+    await writeLog({ event: 'feed', profileId, details: { sort, limit, offset, count: annotated.length } });
     res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/feed error:', err);
@@ -551,6 +571,7 @@ app.get('/api/search', async (req, res) => {
     const yToStr    = String(req.query.year_to   || '').trim();
     const sort      = String(req.query.sort || 'popular').toLowerCase();
     const limit     = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
+    const offset    = parsePositiveInt(req.query.offset, 0);
     const profileId = String(req.query.profileId || '').trim();
 
     const yFrom = yFromStr ? Number(yFromStr) : null;
@@ -573,11 +594,15 @@ app.get('/api/search', async (req, res) => {
     }
 
     const sortSpec = (sort === 'alpha') ? { title: 1 } : { likes: -1, title: 1 };
-    const items = await Content.find(filter).sort(sortSpec).limit(limit).lean();
+    const items = await Content.find(filter)
+      .sort(sortSpec)
+      .skip(offset)
+      .limit(limit)
+      .lean();
 
     if (!profileId) {
-      await writeLog({ event: 'search', details: { q, type, genre, yFrom, yTo, sort, limit, count: items.length } });
-      return res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, items });
+      await writeLog({ event: 'search', details: { q, type, genre, yFrom, yTo, sort, limit, offset, count: items.length } });
+      return res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit, offset }, items });
     }
 
     const liked = await Like.find({ 
@@ -588,8 +613,8 @@ app.get('/api/search', async (req, res) => {
     const likedSet = new Set(liked.map(l => l.contentExtId));
     const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
 
-    await writeLog({ event: 'search', profileId, details: { q, type, genre, yFrom, yTo, sort, limit, count: annotated.length } });
-    res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, items: annotated });
+    await writeLog({ event: 'search', profileId, details: { q, type, genre, yFrom, yTo, sort, limit, offset, count: annotated.length } });
+    res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit, offset }, items: annotated });
   } catch (err) {
     console.error('GET /api/search error:', err);
     await writeLog({ level: 'error', event: 'search', details: { error: err.message } });
@@ -644,6 +669,7 @@ app.get('/api/recommendations', async (req, res) => {
   try {
     const profileId = String(req.query.profileId || '').trim();
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10) || 20, 1), 100);
+    const offset = parsePositiveInt(req.query.offset, 0);
     
     if (!profileId) {
       return res.status(400).json({ ok: false, error: 'profileId is required' });
@@ -653,9 +679,13 @@ app.get('/api/recommendations', async (req, res) => {
     const likedIds  = likedDocs.map(l => l.contentExtId);
     
     if (likedIds.length === 0) {
-      const popular = await Content.find({}).sort({ likes: -1, title: 1 }).limit(limit).lean();
+      const popular = await Content.find({})
+        .sort({ likes: -1, title: 1 })
+        .skip(offset)
+        .limit(limit)
+        .lean();
       const annotated = popular.map(i => ({ ...i, liked: false }));
-      await writeLog({ event: 'recommendations', profileId, details: { topGenres: [], out: annotated.length, note: 'no_likes_yet' } });
+      await writeLog({ event: 'recommendations', profileId, details: { topGenres: [], out: annotated.length, offset, note: 'no_likes_yet' } });
       return res.json({ ok: true, items: annotated });
     }
 
@@ -668,11 +698,12 @@ app.get('/api/recommendations', async (req, res) => {
     const baseFilter = topGenres.length ? { genres: { $in: topGenres } } : {};
     const candidates = await Content.find({ ...baseFilter, extId: { $nin: likedIds } })
       .sort({ likes: -1, title: 1 })
+      .skip(offset)
       .limit(limit)
       .lean();
 
     const annotated = candidates.map(i => ({ ...i, liked: false }));
-    await writeLog({ event: 'recommendations', profileId, details: { topGenres, out: annotated.length } });
+    await writeLog({ event: 'recommendations', profileId, details: { topGenres, out: annotated.length, offset } });
     res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/recommendations error:', err);
