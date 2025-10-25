@@ -140,6 +140,19 @@ const Content = mongoose.models.Content || mongoose.model('Content', contentSche
 const Like    = mongoose.models.Like    || mongoose.model('Like', likeSchema);
 const Log     = mongoose.models.Log     || mongoose.model('Log', logSchema);
 
+const profileSchema = new mongoose.Schema(
+  {
+    userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: true },
+    name:      { type: String, required: true },
+    avatar:    { type: String, required: true },
+    likedContent: { type: [String], default: [] },
+  },
+  { timestamps: true }
+);
+profileSchema.index({ userId: 1, name: 1 }, { unique: true });
+
+const Profile = mongoose.models.Profile || mongoose.model('Profile', profileSchema);
+
 User.init().catch(e => console.warn('[mongo] User.init index warn:', e.message));
 Content.init().catch(e => console.warn('[mongo] Content.init index warn:', e.message));
 Like.init().catch(e => console.warn('[mongo] Like.init index warn:', e.message));
@@ -321,26 +334,28 @@ app.get('/api/profiles', requireAuth, async (req, res) => {
     const resolvedUserId = await resolveUserId(req.query.userId, req.session);
     if (!resolvedUserId) return res.status(400).json({ error: 'User ID is required.' });
 
-    const allProfiles  = await readProfiles();
-    const userProfiles = allProfiles.filter(p => String(p.userId) === String(resolvedUserId));
-    
+    const profiles = await Profile.find({ userId: resolvedUserId }).sort({ createdAt: 1 }).lean();
+
+    const payload = profiles.map(p => ({
+      id: String(p._id),
+      userId: String(p.userId),
+      name: p.name,
+      avatar: p.avatar,
+      likedContent: p.likedContent || [],
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt
+    }));
+
     await writeLog({ 
       event: 'profiles_load', 
       userId: resolvedUserId, 
-      details: { 
-        profileCount: userProfiles.length,
-        profileNames: userProfiles.map(p => p.name)
-      } 
+      details: { profileCount: payload.length, profileNames: payload.map(p => p.name) } 
     });
-    
-    return res.json(userProfiles); 
+
+    return res.json(payload);
   } catch (e) {
     console.error('Error reading profiles:', e);
-    await writeLog({ 
-      level: 'error', 
-      event: 'profiles_load', 
-      details: { error: e.message } 
-    });
+    await writeLog({ level: 'error', event: 'profiles_load', details: { error: e.message } });
     return res.status(500).json({ error: 'Failed to load profiles.' });
   }
 });
@@ -353,153 +368,106 @@ app.post('/api/profiles', requireAuth, async (req, res) => {
 
     if (!userIdResolved || !name || !avatar)
       return res.status(400).json({ error: 'User ID, name, and avatar are required.' });
-    if (name.length < 2)
-      return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
-    if (name.length > 20)
-      return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
+    if (name.length < 2)  return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+    if (name.length > 20) return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
 
-    const allProfiles  = await readProfiles();
-    const userProfiles = allProfiles.filter(p => String(p.userId) === String(userIdResolved));
+    const count = await Profile.countDocuments({ userId: userIdResolved });
+    if (count >= 5) return res.status(400).json({ error: 'Maximum of 5 profiles per user.' });
 
-    if (userProfiles.length >= 5)
-      return res.status(400).json({ error: 'Maximum of 5 profiles per user.' });
-    if (userProfiles.some(p => p.name.toLowerCase() === name.toLowerCase()))
-      return res.status(409).json({ error: 'Profile name already exists.' });
+    const dup = await Profile.exists({ userId: userIdResolved, name: new RegExp(`^${sanitizeRegex(name)}$`, 'i') });
+    if (dup) return res.status(409).json({ error: 'Profile name already exists.' });
 
-    const maxId = allProfiles.length > 0 ? Math.max(...allProfiles.map(p => p.id || 0)) : 0;
-    const newProfile = {
-      id: maxId + 1,
-      userId: userIdResolved,
-      name,
-      avatar,
-      createdAt: new Date().toISOString(),
-      likedContent: []
-    };
-
-    allProfiles.push(newProfile);
-    await writeProfiles(allProfiles);
+    const doc = await Profile.create({ userId: userIdResolved, name, avatar });
 
     await writeLog({ 
       event: 'profile_create', 
       userId: userIdResolved, 
-      profileId: String(newProfile.id),
-      details: { profileId: newProfile.id, profileName: name, avatar } 
+      profileId: String(doc._id),
+      details: { profileId: String(doc._id), profileName: name, avatar } 
     });
-    return res.status(201).json(newProfile); 
+
+    return res.status(201).json({
+      id: String(doc._id),
+      userId: String(doc.userId),
+      name: doc.name,
+      avatar: doc.avatar,
+      likedContent: doc.likedContent || [],
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt
+    });
   } catch (e) {
     console.error('Error creating profile:', e);
     return res.status(500).json({ error: 'Failed to create profile.' });
   }
 });
 
-// ====== Update Profile (PUT) ======
 app.put('/api/profiles/:id', requireAuth, async (req, res) => {
   try {
-    const profileId = parseInt(req.params.id, 10);
+    const profileId = String(req.params.id);
     const userIdResolved = await resolveUserId(req.body?.userId, req.session);
     const name = String(req.body?.name || '').trim();
     const avatar = String(req.body?.avatar || '').trim();
 
-    if (!userIdResolved) {
-      return res.status(400).json({ error: 'User ID is required.' });
-    }
+    if (!userIdResolved) return res.status(400).json({ error: 'User ID is required.' });
+    if (!name || !avatar) return res.status(400).json({ error: 'Name and avatar are required.' });
+    if (name.length < 2)  return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+    if (name.length > 20) return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
 
-    if (!name || !avatar) {
-      return res.status(400).json({ error: 'Name and avatar are required.' });
-    }
+    const profile = await Profile.findById(profileId);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+    if (String(profile.userId) != String(userIdResolved)) return res.status(403).json({ error: 'Not authorized to edit this profile.' });
 
-    if (name.length < 2) {
-      return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
-    }
+    const dup = await Profile.exists({
+      _id: { $ne: profile._id },
+      userId: userIdResolved,
+      name: new RegExp(`^${sanitizeRegex(name)}$`, 'i')
+    });
+    if (dup) return res.status(409).json({ error: 'Profile name already exists.' });
 
-    if (name.length > 20) {
-      return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
-    }
-
-    const allProfiles = await readProfiles();
-    const profileIndex = allProfiles.findIndex(p => p.id === profileId);
-
-    if (profileIndex === -1) {
-      return res.status(404).json({ error: 'Profile not found.' });
-    }
-
-    const profile = allProfiles[profileIndex];
-
-    // Verify ownership
-    if (String(profile.userId) !== String(userIdResolved)) {
-      return res.status(403).json({ error: 'Not authorized to edit this profile.' });
-    }
-
-    // Check for duplicate name (excluding current profile)
-    const userProfiles = allProfiles.filter(p => String(p.userId) === String(userIdResolved));
-    const duplicateName = userProfiles.some(p => 
-      p.id !== profileId && p.name.toLowerCase() === name.toLowerCase()
-    );
-
-    if (duplicateName) {
-      return res.status(409).json({ error: 'Profile name already exists.' });
-    }
-
-    // Update profile
-    allProfiles[profileIndex] = {
-      ...profile,
-      name,
-      avatar,
-      updatedAt: new Date().toISOString()
-    };
-
-    await writeProfiles(allProfiles);
+    profile.name = name;
+    profile.avatar = avatar;
+    await profile.save();
 
     await writeLog({ 
       event: 'profile_update', 
       userId: userIdResolved, 
       profileId: String(profileId),
-      details: { profileId, profileName: name, avatar } 
+      details: { profileId: String(profileId), profileName: name, avatar } 
     });
 
-    return res.json(allProfiles[profileIndex]);
+    return res.json({
+      id: String(profile._id),
+      userId: String(profile.userId),
+      name: profile.name,
+      avatar: profile.avatar,
+      likedContent: profile.likedContent || [],
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt
+    });
   } catch (e) {
     console.error('Error updating profile:', e);
     return res.status(500).json({ error: 'Failed to update profile.' });
   }
 });
 
-// ====== Delete Profile (DELETE) ======
 app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
   try {
-    const profileId = parseInt(req.params.id, 10);
+    const profileId = String(req.params.id);
     const userIdResolved = req.session?.userId;
+    if (!userIdResolved) return res.status(401).json({ error: 'Authentication required.' });
 
-    if (!userIdResolved) {
-      return res.status(401).json({ error: 'Authentication required.' });
-    }
+    const profile = await Profile.findById(profileId);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+    if (String(profile.userId) != String(userIdResolved)) return res.status(403).json({ error: 'Not authorized to delete this profile.' });
 
-    const allProfiles = await readProfiles();
-    const profileIndex = allProfiles.findIndex(p => p.id === profileId);
-
-    if (profileIndex === -1) {
-      return res.status(404).json({ error: 'Profile not found.' });
-    }
-
-    const profile = allProfiles[profileIndex];
-
-    // Verify ownership
-    if (String(profile.userId) !== String(userIdResolved)) {
-      return res.status(403).json({ error: 'Not authorized to delete this profile.' });
-    }
-
-    // Delete all likes associated with this profile
     await Like.deleteMany({ profileId: String(profileId) });
-
-    // Remove profile from array
-    allProfiles.splice(profileIndex, 1);
-    await writeProfiles(allProfiles);
+    await Profile.deleteOne({ _id: profileId });
 
     await writeLog({ 
       event: 'profile_delete', 
       userId: userIdResolved, 
       profileId: String(profileId),
-      details: { profileId, profileName: profile.name, avatar: profile.avatar } 
+      details: { profileId: String(profileId), profileName: profile.name, avatar: profile.avatar } 
     });
 
     return res.json({ ok: true, message: 'Profile deleted successfully.' });
