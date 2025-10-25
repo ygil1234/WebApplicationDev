@@ -114,7 +114,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll('.profile-btn-edit').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const profileId = parseInt(btn.getAttribute('data-id'));
+                const profileId = btn.getAttribute('data-id');
                 const profile = profiles.find(p => p.id === profileId);
                 if (profile) openEditModal(profile);
             });
@@ -123,7 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll('.profile-btn-delete').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                const profileId = parseInt(btn.getAttribute('data-id'));
+                const profileId = btn.getAttribute('data-id');
                 await deleteProfile(profileId);
             });
         });
@@ -154,7 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Update profile
     updateProfileBtn.addEventListener('click', async () => {
-        const profileId = parseInt(editProfileIdInput.value);
+        const profileId = editProfileIdInput.value;
         const profileName = editProfileNameInput.value.trim();
 
         // Clear previous messages
