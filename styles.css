@@ -1622,3 +1622,49 @@ body.modal-open {
     height: 16px;
   }
 }
+
+/* ====== STATISTICS STYLES ====== */
+
+.settings-stats {
+  margin-top: 8px;
+  text-align: left;
+  /* Chart.js color variables */
+  --chart-text-color: #e5e5e5;
+  --chart-grid-color: rgba(255, 255, 255, 0.08);
+  --chart-legend-color: #e5e5e5;
+  --chart-border-opacity: 1;
+  --chart-bg-opacity: 0.65;
+}
+
+.chart-card {
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 14px;
+  margin: 14px 0 18px;
+}
+
+.chart-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 2px 0 10px;
+  color: #fff;
+}
+
+.chart-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 180px;
+}
+
+.chart-hint {
+  color: #bdbdbd;
+  font-size: 0.95rem;
+  margin-top: 8px;
+}
+
+@media (max-width: 480px) {
+  .chart-title {
+    font-size: 1rem;
+  }
+}

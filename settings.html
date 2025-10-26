@@ -4,46 +4,59 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Netflix - Settings</title>
+    <!-- Bootstrap CSS for styling and responsive design -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS file for additional styling -->
     <link rel="stylesheet" href="styles.css">
 </head>
 <body class="settings-body">
+    <!-- Main settings modal container -->
     <div class="settings-modal">
+        <!-- Close button that redirects back to profiles page -->
         <button class="settings-close" onclick="window.location.href='profiles.html'">
+            <!-- SVG icon for the X close button -->
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
         </button>
 
         <div class="settings-content">
-            <!-- Existing Profiles Section -->
+            <!-- Section for displaying existing profiles - hidden by default and shown when profiles exist -->
             <div class="existing-profiles-section" id="existingProfilesSection" style="display: none;">
                 <h2 class="settings-section-title">Manage Profiles</h2>
+                <!-- Container where profile cards will be dynamically inserted by JavaScript -->
                 <div class="profiles-list" id="profilesList">
                     <!-- Profiles will be loaded here dynamically -->
                 </div>
                 <div class="settings-divider"></div>
             </div>
 
+            <!-- Form title and description for adding a new profile -->
             <h1 class="settings-modal-title">Add a profile</h1>
             <p class="settings-modal-subtitle">Add a profile for another person watching Netflix.</p>
 
+            <!-- Form for creating a new profile - novalidate prevents default HTML5 validation -->
             <form id="addProfileForm" novalidate>
+                <!-- Input field for profile name with error message container -->
                 <div class="settings-input-group">
                     <input 
                         type="text" 
                         class="settings-input" 
                         id="profileName" 
                         placeholder="Name">
+                    <!-- Error message div that's hidden by default (d-none) -->
                     <div class="login-error-message d-none" id="profileNameError"></div>
                 </div>
 
                 <div class="settings-divider"></div>
 
+                <!-- Avatar selection section with a grid of available avatars -->
                 <div class="settings-avatar-section">
                     <div class="avatar-grid" id="avatarGrid">
+                        <!-- Each avatar option with a data attribute storing the image path -->
                         <div class="avatar-option" data-avatar="IMG/profile1.jpg">
                             <img src="IMG/profile1.jpg" alt="Avatar 1">
+                            <!-- Checkmark that appears when this avatar is selected -->
                             <div class="avatar-check">✓</div>
                         </div>
                         <div class="avatar-option" data-avatar="IMG/profile2.jpg">
@@ -65,8 +78,10 @@
                     </div>
                 </div>
 
+                <!-- Success message shown when profile is created successfully -->
                 <div class="alert alert-success d-none" id="successMessage"></div>
 
+                <!-- Action buttons for saving or canceling the profile creation -->
                 <div class="settings-actions">
                     <button type="submit" class="settings-btn-primary" id="saveProfileBtn">
                         Save
@@ -76,32 +91,67 @@
                     </button>
                 </div>
             </form>
+
+            <!-- Statistics Section showing charts for viewing analytics -->
+            <div class="settings-divider"></div>
+            <section id="statisticsSection" class="settings-stats" aria-labelledby="statsHeading">
+                <h2 id="statsHeading" class="settings-section-title mb-3">Statistics</h2>
+
+                <!-- Bar chart showing daily views per profile for the last 7 days -->
+                <div class="chart-card">
+                    <h3 class="chart-title">Daily views per profile (last 7 days)</h3>
+                    <div class="chart-wrap">
+                        <!-- Canvas element where Chart.js will render the bar chart -->
+                        <canvas id="dailyViewsChart" height="180"></canvas>
+                    </div>
+                    <!-- Hint message area for displaying status or errors -->
+                    <div class="chart-hint" id="dailyViewsHint" role="status" aria-live="polite"></div>
+                </div>
+
+                <!-- Pie chart showing content popularity by genre -->
+                <div class="chart-card">
+                    <h3 class="chart-title">Content popularity by genre</h3>
+                    <div class="chart-wrap">
+                        <!-- Canvas element where Chart.js will render the pie chart -->
+                        <canvas id="genrePieChart" height="180"></canvas>
+                    </div>
+                    <!-- Hint message area for displaying status or errors -->
+                    <div class="chart-hint" id="genrePieHint" role="status" aria-live="polite"></div>
+                </div>
+            </section>
         </div>
     </div>
 
-    <!-- Edit Profile Modal -->
+    <!-- Bootstrap modal for editing existing profiles -->
     <div class="modal fade" id="editProfileModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content bg-dark text-white">
+                <!-- Modal header with title and close button -->
                 <div class="modal-header border-secondary">
                     <h5 class="modal-title">Edit Profile</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
+                <!-- Modal body containing the edit form -->
                 <div class="modal-body">
                     <form id="editProfileForm" novalidate>
+                        <!-- Hidden input to store the profile ID being edited -->
                         <input type="hidden" id="editProfileId">
                         
+                        <!-- Input field for editing profile name -->
                         <div class="settings-input-group mb-3">
                             <input 
                                 type="text" 
                                 class="settings-input" 
                                 id="editProfileName" 
                                 placeholder="Name">
+                            <!-- Error message container for edit form -->
                             <div class="login-error-message d-none" id="editProfileNameError"></div>
                         </div>
 
+                        <!-- Avatar selection grid for edit modal -->
                         <div class="settings-avatar-section">
                             <div class="avatar-grid" id="editAvatarGrid">
+                                <!-- Same avatar options as add form, but for editing -->
                                 <div class="avatar-option" data-avatar="IMG/profile1.jpg">
                                     <img src="IMG/profile1.jpg" alt="Avatar 1">
                                     <div class="avatar-check">✓</div>
@@ -126,6 +176,7 @@
                         </div>
                     </form>
                 </div>
+                <!-- Modal footer with action buttons -->
                 <div class="modal-footer border-secondary">
                     <button type="button" class="settings-btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="settings-btn-primary" id="updateProfileBtn">Update</button>
@@ -134,7 +185,11 @@
         </div>
     </div>
 
+    <!-- Bootstrap JavaScript for modal functionality -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Chart.js library for rendering charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Our custom JavaScript file that handles all the logic -->
     <script src="JS/settings.js"></script>
 </body>
 </html>
