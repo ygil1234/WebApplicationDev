@@ -37,7 +37,7 @@
         const res = await fetch("/api/signup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: 'include', // <-- הוסף את השורה הזו
+          credentials: 'include', 
           body: JSON.stringify({
             email: emailEl.value.trim(),
             username: userEl.value.trim(),
