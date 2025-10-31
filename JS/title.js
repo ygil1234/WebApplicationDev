@@ -50,6 +50,43 @@
     return s.startsWith('/') ? s : ('/' + s);
   }
 
+  // Inject the shared header from feed.html and remove search/sort
+  async function ensureSharedHeaderWithoutSearch() {
+    try {
+      // If a header already exists, skip
+      if (document.querySelector('header.nf-nav')) return;
+      const res = await fetch('feed.html', { credentials: 'same-origin', cache: 'no-cache' });
+      if (!res.ok) return;
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const header = doc.querySelector('header.nf-nav');
+      if (!header) return;
+
+      // Clone and strip search + A-Z toggle
+      const clone = header.cloneNode(true);
+      // Ensure brand logo navigates to main feed
+      const brand = clone.querySelector('.nf-nav__brand');
+      if (brand) brand.setAttribute('href', 'feed.html');
+      // Remove toolbar (search + alpha)
+      const toolbar = clone.querySelector('.nf-toolbar');
+      if (toolbar) toolbar.remove();
+      // Fallback: remove individual bits if toolbar structure changes
+      clone.querySelectorAll('#searchBox, #searchBtn, #searchInput, .alpha-toggle').forEach(el => el.remove());
+
+      // Mount before main or into mount placeholder if present
+      const mount = document.getElementById('nav-mount');
+      if (mount) {
+        mount.replaceWith(clone);
+      } else {
+        const main = document.querySelector('main');
+        document.body.insertBefore(clone, main || document.body.firstChild);
+      }
+    } catch (err) {
+      // Fail silently; page still works without shared header
+      console.warn('Shared header injection failed:', err);
+    }
+  }
+
   function setNavbarProfile() {
     const { id, name, avatar } = getProfile();
     if (!id || !name || !avatar) {
@@ -215,6 +252,8 @@
   }
 
   document.addEventListener('DOMContentLoaded', async () => {
+    // Inject shared nav first so other scripts can wire it
+    await ensureSharedHeaderWithoutSearch();
     if (!setNavbarProfile()) return;
     const { id: profileId } = getProfile();
     const extId = qs('extId');

@@ -26,24 +26,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  const greetEl = document.getElementById("greet");
-  if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
-  const avatarEl = document.getElementById("navAvatar");
-  if (avatarEl) { avatarEl.src = profileAvatar; avatarEl.alt = `${profileName} - Profile`; }
-
-  const logoutLink = document.getElementById("logoutLink");
-  if (logoutLink) {
-    logoutLink.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try { await fetch(`${API_BASE}/logout`, { method: "POST" }); } catch {}
-      ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
-      window.location.href = "login.html";
-    });
-  }
-
-  const profileMenuToggle = document.getElementById("profileMenuToggle");
-  const profileMenu = document.getElementById("profileMenu");
-  const changeProfileBtn = document.getElementById("changeProfileBtn");
+  // Shared nav wiring (works even if header injected later)
+  let profileMenuToggle;
+  let profileMenu;
+  let changeProfileBtn;
+  let navWired = false;
 
   function setProfileMenu(open) {
     if (!profileMenu || !profileMenuToggle) return;
@@ -58,28 +45,70 @@ document.addEventListener("DOMContentLoaded", async () => {
     setProfileMenu(profileMenu.hidden);
   }
 
-  if (profileMenuToggle && profileMenu) {
-    profileMenuToggle.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleProfileMenu();
-    });
+  function wireNavOnce() {
+    if (navWired) return;
+    const header = document.querySelector('header.nf-nav');
+    if (!header) return;
+
+    // Greet + avatar
+    const greetEl = document.getElementById("greet");
+    if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
+    const avatarEl = document.getElementById("navAvatar");
+    if (avatarEl) { avatarEl.src = profileAvatar; avatarEl.alt = `${profileName} - Profile`; }
+
+    // Logout
+    const logoutLink = document.getElementById("logoutLink");
+    if (logoutLink && !logoutLink.dataset.wired) {
+      logoutLink.dataset.wired = '1';
+      logoutLink.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try { await fetch(`${API_BASE}/logout`, { method: "POST" }); } catch {}
+        ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
+        window.location.href = "login.html";
+      });
+    }
+
+    // Profile menu
+    profileMenuToggle = document.getElementById("profileMenuToggle");
+    profileMenu = document.getElementById("profileMenu");
+    changeProfileBtn = document.getElementById("changeProfileBtn");
+
+    if (profileMenuToggle && profileMenu && !profileMenuToggle.dataset.wired) {
+      profileMenuToggle.dataset.wired = '1';
+      profileMenuToggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleProfileMenu();
+      });
+    }
+
+    if (changeProfileBtn && !changeProfileBtn.dataset.wired) {
+      changeProfileBtn.dataset.wired = '1';
+      changeProfileBtn.addEventListener("click", () => {
+        setProfileMenu(false);
+        ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
+        window.location.href = "profiles.html";
+      });
+    }
+
+    if (!document.body.dataset.navCloseWired) {
+      document.body.dataset.navCloseWired = '1';
+      document.addEventListener("click", (e) => {
+        if (!profileMenu || !profileMenuToggle) return;
+        if (profileMenu.hidden) return;
+        const within = profileMenu.contains(e.target) || profileMenuToggle.contains(e.target);
+        if (!within) setProfileMenu(false);
+      });
+    }
+
+    navWired = true;
   }
 
-  if (changeProfileBtn) {
-    changeProfileBtn.addEventListener("click", () => {
-      setProfileMenu(false);
-      ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
-      window.location.href = "profiles.html";
-    });
-  }
-
-  document.addEventListener("click", (e) => {
-    if (!profileMenu || !profileMenuToggle) return;
-    if (profileMenu.hidden) return;
-    const within = profileMenu.contains(e.target) || profileMenuToggle.contains(e.target);
-    if (!within) setProfileMenu(false);
-  });
+  // Initial attempt
+  wireNavOnce();
+  // Watch for late-inserted header (e.g., title.html injects it)
+  const mo = new MutationObserver(() => { if (!navWired) wireNavOnce(); });
+  mo.observe(document.body, { childList: true, subtree: true });
 
   // ===== 2) Local state
   let CURRENT_ITEMS = []; // last loaded list (feed or search)
