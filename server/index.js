@@ -95,7 +95,8 @@ const contentSchema = new mongoose.Schema(
     plot:       { type: String },
     director:   { type: String },
     actors:     { type: [String], default: [] },
-    rating:     { type: String }, // "e.g. "8.8/10"
+    rating:     { type: String }, // e.g. "8.8/10"
+    ratingValue:{ type: Number, default: null },
     imagePath:  { type: String }, 
     videoPath:  { type: String }, 
   },
@@ -104,6 +105,7 @@ const contentSchema = new mongoose.Schema(
 contentSchema.index({ title: 'text' });
 contentSchema.index({ genres: 1 });
 contentSchema.index({ likes: -1, title: 1 });
+contentSchema.index({ ratingValue: -1, likes: -1 });
 
 const likeSchema = new mongoose.Schema(
   {
@@ -639,14 +641,20 @@ app.post(
         const url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}&y=${year}`;
         const response = await axios.get(url);
         
-        if (response.data && response.data.Response === "True") {
-          omdbData = {
-            plot: response.data.Plot,
-            director: response.data.Director,
-            actors: response.data.Actors ? response.data.Actors.split(',').map(s => s.trim()) : [],
-            rating: response.data.imdbRating ? `${response.data.imdbRating}/10 (IMDb)` : 'N/A',
-          };
-          console.log(`[OMDb] Fetched rating for ${title}: ${omdbData.rating}`);
+    if (response.data && response.data.Response === "True") {
+      const ratingRaw = Number.parseFloat(response.data.imdbRating);
+      const hasRating = Number.isFinite(ratingRaw);
+      omdbData = {
+        plot: response.data.Plot,
+        director: response.data.Director,
+        actors: response.data.Actors ? response.data.Actors.split(',').map(s => s.trim()) : [],
+        ...(hasRating ? { rating: `${response.data.imdbRating}/10 (IMDb)`, ratingValue: ratingRaw } : {}),
+      };
+      if (hasRating) {
+        console.log(`[OMDb] Fetched rating for ${title}: ${omdbData.rating}`);
+      } else {
+        console.warn(`[OMDb] Rating missing for ${title}`);
+      }
         } else {
           console.warn(`[OMDb] Could not find data for ${title} (${year})`);
         }
@@ -712,8 +720,22 @@ app.get('/api/feed', async (req, res) => {
     const limit  = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
     const offset = parsePositiveInt(req.query.offset, 0);
 
-    const sortSpec = (sort === 'alpha') ? { title: 1 } : { likes: -1, title: 1 };
-    const items = await Content.find({})
+    const baseFilter = {};
+    let sortSpec;
+    switch (sort) {
+      case 'alpha':
+        sortSpec = { title: 1 };
+        break;
+      case 'rating':
+        sortSpec = { ratingValue: -1, likes: -1, title: 1 };
+        baseFilter.ratingValue = { $ne: null };
+        break;
+      default:
+        sortSpec = { likes: -1, title: 1 };
+        break;
+    }
+
+    const items = await Content.find(baseFilter)
       .sort(sortSpec)
       .skip(offset)
       .limit(limit)
@@ -773,7 +795,20 @@ app.get('/api/search', async (req, res) => {
       if (yTo   != null) filter.year.$lte = yTo;
     }
 
-    const sortSpec = (sort === 'alpha') ? { title: 1 } : { likes: -1, title: 1 };
+    let sortSpec;
+    switch (sort) {
+      case 'alpha':
+        sortSpec = { title: 1 };
+        break;
+      case 'rating':
+        sortSpec = { ratingValue: -1, likes: -1, title: 1 };
+        filter.ratingValue = { $ne: null };
+        break;
+      default:
+        sortSpec = { likes: -1, title: 1 };
+        break;
+    }
+
     const items = await Content.find(filter)
       .sort(sortSpec)
       .skip(offset)
@@ -935,16 +970,36 @@ async function seedContentIfNeeded() {
                     : (typeof it.genre === 'string'
                         ? it.genre.split(',').map(s => s.trim()).filter(Boolean)
                         : []);
-      return {
+      const doc = {
         extId,
         title,
         year: Number(it.year ?? it.releaseYear ?? '') || undefined,
         genres,
         likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
-        cover: it.cover || it.poster || it.image || it.img || '', 
+        cover: it.cover || it.poster || it.image || it.img || '',
         imagePath: it.cover || it.poster || it.image || it.img || '',
         type: it.type || (it.seasons ? 'Series' : 'Movie'),
       };
+
+      if (it.plot) doc.plot = String(it.plot);
+      if (it.director) doc.director = String(it.director);
+      if (Array.isArray(it.actors) && it.actors.length) {
+        doc.actors = it.actors.map((a) => String(a).trim()).filter(Boolean);
+      } else if (typeof it.actors === 'string' && it.actors.trim()) {
+        doc.actors = it.actors.split(',').map((a) => a.trim()).filter(Boolean);
+      }
+      if (it.rating) {
+        const ratingStr = String(it.rating);
+        doc.rating = ratingStr;
+        const match = ratingStr.match(/[0-9]+(?:\.[0-9]+)?/);
+        if (match) {
+          const ratingNum = Number.parseFloat(match[0]);
+          if (Number.isFinite(ratingNum)) doc.ratingValue = ratingNum;
+        }
+      }
+      if (it.videoPath) doc.videoPath = String(it.videoPath);
+
+      return doc;
     };
 
     let inserted = 0, updated = 0, skipped = 0;
@@ -961,9 +1016,24 @@ async function seedContentIfNeeded() {
       if (upsertRes.upsertedCount === 1) {
         inserted++;
       } else {
+        const baseUpdate = {
+          title: doc.title,
+          year: doc.year,
+          genres: doc.genres,
+          imagePath: doc.imagePath,
+          cover: doc.cover,
+          type: doc.type,
+        };
+        if ('plot' in doc) baseUpdate.plot = doc.plot;
+        if ('director' in doc) baseUpdate.director = doc.director;
+        if ('actors' in doc) baseUpdate.actors = doc.actors;
+        if ('rating' in doc) baseUpdate.rating = doc.rating;
+        if ('ratingValue' in doc) baseUpdate.ratingValue = doc.ratingValue;
+        if ('videoPath' in doc) baseUpdate.videoPath = doc.videoPath;
+
         const updRes = await Content.updateOne(
           { extId: doc.extId },
-          { $set: { title: doc.title, year: doc.year, genres: doc.genres, imagePath: doc.imagePath, type: doc.type } }
+          { $set: baseUpdate }
         );
         inserted += 0;
         updated += (updRes.modifiedCount || 0);

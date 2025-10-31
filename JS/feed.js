@@ -523,12 +523,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const CLASSIC_LIMIT = 12;
     const REC_LIMIT = 16;
 
-    const [popular, sciFi, drama, classics, recs] = await Promise.all([
+    const ratedPromise = sortMode === "alpha"
+      ? Promise.resolve([])
+      : loadFeed({ profileId: selectedId, sort: "rating", limit: POP_LIMIT });
+
+    const [popular, sciFi, drama, classics, recs, rated] = await Promise.all([
       loadFeed({ profileId: selectedId, sort: sortMode, limit: POP_LIMIT }),
       searchContent({ profileId: selectedId, genre: "sci-fi", sort: sortMode, limit: GEN_LIMIT }),
       searchContent({ profileId: selectedId, genre: "drama",  sort: sortMode, limit: GEN_LIMIT }),
       searchContent({ profileId: selectedId, year_to: "1999", sort: sortMode, limit: CLASSIC_LIMIT }),
       loadRecommendations({ profileId: selectedId, limit: REC_LIMIT }),
+      ratedPromise,
     ]);
 
     const rows = [
@@ -548,9 +553,20 @@ document.addEventListener("DOMContentLoaded", async () => {
         loadMore: ({ offset = 0, limit = POP_LIMIT } = {}) =>
           loadFeed({ profileId: selectedId, sort: sortMode, limit, offset }),
       },
-      { 
-        id: "row-sci",     
-        title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A–Z)" : "Sci-Fi & Fantasy", 
+      ...(sortMode === "alpha"
+        ? []
+        : [{
+            id: "row-rated",
+            title: "Most Rated on IMDb",
+            items: rated || [],
+            pageSize: POP_LIMIT,
+            loadMore: ({ offset = 0, limit = POP_LIMIT } = {}) =>
+              loadFeed({ profileId: selectedId, sort: "rating", limit, offset }),
+          }]
+      ),
+    { 
+      id: "row-sci",     
+      title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A–Z)" : "Sci-Fi & Fantasy", 
         items: sciFi || [],
         pageSize: GEN_LIMIT,
         loadMore: ({ offset = 0, limit = GEN_LIMIT } = {}) =>
