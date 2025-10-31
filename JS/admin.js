@@ -102,3 +102,49 @@
       }
     );
   })();
+
+  // Episode uploader
+  (function(){
+    const loggedInUser = localStorage.getItem("loggedInUser");
+    if (loggedInUser !== "admin") return;
+    const form = document.getElementById('episodeForm');
+    if (!form) return;
+    const seriesExtIdEl = document.getElementById('seriesExtId');
+    const seasonEl = document.getElementById('seasonNum');
+    const episodeEl = document.getElementById('episodeNum');
+    const titleEl = document.getElementById('episodeTitle');
+    const videoEl = document.getElementById('episodeVideo');
+    const submitBtn = document.getElementById('episodeSubmitBtn');
+    const okBox = document.getElementById('episodeSuccess');
+    const errBox = document.getElementById('episodeError');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      okBox?.classList.add('d-none'); okBox.textContent = '';
+      errBox?.classList.add('d-none'); errBox.textContent = '';
+      if (!seriesExtIdEl.value.trim() || !seasonEl.value || !episodeEl.value || videoEl.files.length === 0) {
+        errBox?.classList.remove('d-none');
+        if (errBox) errBox.textContent = 'Please provide series ID, season, episode, and a video file.';
+        return;
+      }
+      const fd = new FormData();
+      fd.append('seriesExtId', seriesExtIdEl.value.trim());
+      fd.append('season', String(seasonEl.value));
+      fd.append('episode', String(episodeEl.value));
+      fd.append('title', titleEl.value.trim());
+      fd.append('videoFile', videoEl.files[0]);
+      const prev = submitBtn.textContent;
+      submitBtn.disabled = true; submitBtn.textContent = 'Uploading...';
+      try {
+        const res = await fetch('/api/admin/episodes', { method: 'POST', body: fd, credentials: 'include' });
+        const data = await res.json().catch(()=>({}));
+        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        okBox?.classList.remove('d-none'); if (okBox) okBox.textContent = `Episode uploaded: S${data.episode?.season}E${data.episode?.episode}`;
+        form.reset();
+      } catch (err) {
+        errBox?.classList.remove('d-none'); if (errBox) errBox.textContent = String(err?.message || 'Upload failed');
+      } finally {
+        submitBtn.disabled = false; submitBtn.textContent = prev;
+      }
+    });
+  })();

@@ -12,8 +12,21 @@
     .td-hero__meta { position:relative; z-index:1; padding: 40px 20px; max-width: 1100px; margin: 0 auto; }
     .td-meta__row { display:flex; gap:16px; align-items:center; flex-wrap: wrap; }
     .td-meta__likes { display:flex; align-items:center; gap:8px; }
-    .td-body { max-width:1100px; margin: 20px auto; padding: 0 20px; }
+    /* Elevate the body content above the global dim overlay from styles.css (body::before) */
+    .td-body { position: relative; z-index: 1; max-width:1100px; margin: 20px auto; padding: 0 20px; }
     .td-section { margin-top: 24px; }
+    /* Ensure headings and episode titles are white */
+    .td-section h3,
+    #episodesSection > h3,
+    #similarSection > h3 { color: #fff !important; }
+    /* Force the entire episode title column to white */
+    #episodesSection,
+    #episodesSection *,
+    #episodesList,
+    #episodesList .td-episodes__item,
+    #episodesList .td-episodes__item > div:first-of-type,
+    #episodesList .td-episodes__item > div:first-of-type *,
+    #episodesList .td-episodes__item strong { color: #fff !important; }
     .td-episodes__item { display:flex; justify-content: space-between; align-items:center; padding:10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
     .td-progress { height: 4px; background: rgba(255,255,255,0.2); width: 160px; border-radius: 2px; overflow:hidden; }
     .td-progress__bar { height:100%; background:#e50914; width:0%; }
@@ -85,7 +98,7 @@
         <img id="navAvatar" class="nf-avatar" src="IMG/profile1.jpg" alt="Profile" />
         <img class="nf-caret" src="IMG/icons/caret-down.svg" alt="" />
       </a>
-      <div id="greet" style="white-space:nowrap; opacity:.9;"></div>
+      <div id="greet" style="white-space:nowrap;"></div>
       <a class="nf-iconlink" aria-label="Notifications">
         <img class="nf-icon" src="IMG/icons/bell-outline.svg" alt="" />
       </a>
@@ -111,7 +124,7 @@
             <span>Continue Watching</span>
           </button>
           <button id="btnRewatch" class="nf-cta nf-cta--info" type="button" hidden>
-            <span>Re-watch</span>
+            <span>Rewatch</span>
           </button>
           <div class="td-meta__likes">
             <button class="btn btn-sm rounded-pill like-btn" id="likeBtn" type="button" aria-pressed="false" aria-label="Like">
@@ -130,20 +143,69 @@
 
     <section class="td-body">
       <div class="td-section" id="playerSection" hidden>
-        <video id="player" width="100%" controls>
-          <source id="playerSource" type="video/mp4" />
-          Your browser does not support HTML5 video.
-        </video>
+        <div class="player-wrap">
+          <video id="player" width="100%" controls>
+            <source id="playerSource" type="video/mp4" />
+            Your browser does not support HTML5 video.
+          </video>
+
+          <!-- Overlay controls on top of the player -->
+          <div class="player-overlay-controls" aria-label="Player controls overlay">
+            <div class="player-overlay-controls__cluster player-overlay-controls__cluster--left">
+              <button id="btnSeekBack" class="player-ctrl player-ctrl--seek" type="button" aria-label="Back 10 seconds">
+                <span aria-hidden="true">⏪ 10s</span>
+              </button>
+              <button id="btnSeekFwd" class="player-ctrl player-ctrl--seek" type="button" aria-label="Forward 10 seconds">
+                <span aria-hidden="true">10s ⏩</span>
+              </button>
+            </div>
+
+            <div class="player-overlay-controls__cluster player-overlay-controls__cluster--right">
+              <button id="btnEpisodesOverlay" class="player-ctrl player-ctrl--list" type="button" aria-label="Show episodes">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                  <path fill="#fff" d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h12v2H3v-2z"/>
+                </svg>
+              </button>
+              <button id="btnNextEpisode" class="player-ctrl player-ctrl--next" type="button" aria-label="Next episode" title="Next episode" hidden>
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                  <path fill="#fff" d="M5 4l10 8-10 8V4z"/>
+                  <rect x="17" y="4" width="2" height="16" fill="#fff" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Episodes drawer overlay -->
+          <div id="episodesDrawer" class="player-episodes-drawer" hidden aria-label="Episodes">
+            <div class="player-episodes-drawer__head">
+              <span>Episodes</span>
+              <button id="btnCloseEpisodes" class="player-ctrl player-ctrl--close" type="button" aria-label="Close episodes">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                  <path fill="#fff" d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.59 10.59 16.89 4.29z"/>
+                </svg>
+              </button>
+            </div>
+            <div id="episodesDrawerList" class="player-episodes-drawer__list"></div>
+          </div>
+        </div>
       </div>
 
       <div class="td-section" id="episodesSection" hidden>
-        <h3>Episodes</h3>
-        <div id="episodesList"></div>
+        <h3 class="text-white">Episodes</h3>
+        <div id="episodesList" class="text-white"></div>
       </div>
 
       <div class="td-section" id="similarSection">
-        <h3>Similar to this</h3>
-        <div id="similarRow" class="nf-row__scroller"></div>
+        <h3 class="text-white">Similar to this</h3>
+        <div class="nf-row__viewport">
+          <button type="button" class="btn nf-row__arrow nf-row__arrow--left" aria-label="Scroll left" disabled>
+            <svg viewBox="0 0 24 24" width="36" height="36" class="nf-icon" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div id="similarRow" class="nf-row__scroller"></div>
+          <button type="button" class="btn nf-row__arrow nf-row__arrow--right" aria-label="Scroll right">
+            <svg viewBox="0 0 24 24" width="36" height="36" class="nf-icon" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
       </div>
     </section>
   </main>

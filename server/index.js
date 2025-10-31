@@ -1036,11 +1036,30 @@ app.get('/api/search', async (req, res) => {
         break;
     }
 
-    const items = await Content.find(filter)
+    let items = await Content.find(filter)
       .sort(sortSpec)
       .skip(offset)
       .limit(limit)
       .lean();
+
+    // Deduplicate by normalized title to avoid multiple entries for the same movie/series title
+    const norm = (t) => String(t || '').trim().toLowerCase();
+    const pickScore = (i) => {
+      const likes = Number(i.likes || 0);
+      const rating = Number.isFinite(i.ratingValue) ? Number(i.ratingValue) : 0;
+      return likes * 1000 + rating; // prioritize likes, then rating
+    };
+    const byTitle = new Map();
+    for (const it of items) {
+      const key = norm(it.title);
+      const prev = byTitle.get(key);
+      if (!prev) {
+        byTitle.set(key, it);
+      } else {
+        if (pickScore(it) > pickScore(prev)) byTitle.set(key, it);
+      }
+    }
+    items = Array.from(byTitle.values());
 
     if (!profileId) {
       await writeLog({ event: 'search', details: { q, type, genre, yFrom, yTo, sort, limit, offset, count: items.length } });
@@ -1148,22 +1167,8 @@ app.get('/api/content/:extId', async (req, res) => {
       }
     }
 
-    // Optional convenience (non-persistent): If this is a Movie without a set video and no episodes,
-    // temporarily use the most recent uploaded video only if it's not used by another item
-    if (!movieVideo && /movie/i.test(doc.type || '') && (!Array.isArray(episodes) || episodes.length === 0)) {
-      try {
-        const fb = await findMostRecentVideoUpload();
-        if (fb) {
-          const rel = String(fb).replace(/^\/+/, '');
-          const abs = path.join(__dirname, '..', rel);
-          await fs.access(abs);
-          const alreadyUsed = await Content.exists({ videoPath: fb, extId: { $ne: extId } });
-          if (!alreadyUsed) {
-            movieVideo = fb; // do not persist; avoids stale DB if uploads are cleared later
-          }
-        }
-      } catch {}
-    }
+    // Do not auto-assign arbitrary uploaded videos to movies without a video.
+    // A movie's video must be explicitly uploaded and linked via the admin panel.
 
     // Sanitize image/cover paths that point to missing local files
     const toUnset = {};

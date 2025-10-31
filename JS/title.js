@@ -68,6 +68,52 @@
     return Math.min(100, Math.floor((Number(pos||0) / Number(dur||0)) * 100));
   }
 
+  // Compute combined percent for series across ALL episodes.
+  // If episode durations are fully known, use duration-weighted percent.
+  // Otherwise, fall back to unweighted average of episode percents,
+  // counting missing/unknown episodes as 0% (unless marked completed).
+  function seriesCombinedPercent(contentEpisodes, progressEpisodes) {
+    const eps = Array.isArray(contentEpisodes) ? contentEpisodes : [];
+    const prog = Array.isArray(progressEpisodes) ? progressEpisodes : [];
+    const keyOf = (s,e) => `${String(s)}-${String(e)}`;
+    const n = eps.length;
+    if (!n) return 0;
+
+    const pmap = new Map(prog.map(p => [keyOf(p.season, p.episode), p]));
+    const allDurKnown = eps.every(e => Number(e?.durationSec) > 0);
+
+    if (allDurKnown) {
+      let totalDur = 0;
+      let watched = 0;
+      for (const e of eps) {
+        const p = pmap.get(keyOf(e.season, e.episode));
+        const dur = Number(e.durationSec) || 0;
+        const pos = p ? (p.completed ? dur : Number(p.positionSec) || 0) : 0;
+        totalDur += dur;
+        watched += Math.min(pos, dur);
+      }
+      if (!totalDur) return 0;
+      return Math.min(100, Math.floor((watched / totalDur) * 100));
+    }
+
+    // Fallback: average percent per episode (unknown durations counted as 0%)
+    let sumPct = 0;
+    for (const e of eps) {
+      const p = pmap.get(keyOf(e.season, e.episode));
+      const dur = Number(e.durationSec) || Number(p?.durationSec) || 0;
+      let epPct = 0;
+      if (dur > 0) {
+        epPct = percentFrom(p?.positionSec || 0, dur);
+      } else if (p?.completed) {
+        epPct = 100;
+      } else {
+        epPct = 0;
+      }
+      sumPct += Math.max(0, Math.min(100, epPct));
+    }
+    return Math.floor(sumPct / n);
+  }
+
   function updateFeedProgressCache(profileId, extId, percent) {
     try {
       const key = `progress_by_${profileId}`;
@@ -185,6 +231,13 @@
     const player = document.getElementById('player');
     const playerSource = document.getElementById('playerSource');
     const playerSection = document.getElementById('playerSection');
+    const btnSeekBack = document.getElementById('btnSeekBack');
+    const btnSeekFwd = document.getElementById('btnSeekFwd');
+    const btnNextEpisode = document.getElementById('btnNextEpisode');
+    const btnEpisodesOverlay = document.getElementById('btnEpisodesOverlay');
+    const episodesDrawer = document.getElementById('episodesDrawer');
+    const btnCloseEpisodes = document.getElementById('btnCloseEpisodes');
+    const episodesDrawerList = document.getElementById('episodesDrawerList');
     const episodesSection = document.getElementById('episodesSection');
     const episodesList = document.getElementById('episodesList');
     const actorsBox = document.getElementById('actors');
@@ -237,30 +290,133 @@
         row.className = 'td-episodes__item';
         const epId = `S${ep.season||1}E${ep.episode||1}`;
         const epProg = (progress.episodes || []).find(p => String(p.season) === String(ep.season||1) && String(p.episode) === String(ep.episode||1));
+        const started = !!(epProg && ((epProg.positionSec||0) > 0 || epProg.completed));
         const percent = epProg ? percentFrom(epProg.positionSec, epProg.durationSec) : 0;
+        const controlsHtml = started
+          ? `<button type="button" class="btn btn-sm btn-primary ep-btn-resume">Resume</button>
+             <button type="button" class="btn btn-sm btn-secondary ep-btn-restart">Restart</button>`
+          : `<button type="button" class="btn btn-sm btn-primary ep-btn-play">Play</button>`;
         row.innerHTML = `
           <div><strong>${epId}</strong> ${ep.title || ''}</div>
           <div class="d-flex align-items-center" style="gap:12px;">
             <div class="td-progress"><div class="td-progress__bar" style="width:${percent}%"></div></div>
-            <button type="button" class="btn btn-sm btn-primary">Play</button>
+            ${controlsHtml}
           </div>
         `;
-        row.querySelector('button').addEventListener('click', () => {
+        const playBtn    = row.querySelector('.ep-btn-play');
+        const resumeBtn  = row.querySelector('.ep-btn-resume');
+        const restartBtn = row.querySelector('.ep-btn-restart');
+        if (playBtn) playBtn.addEventListener('click', () => {
+          playSource({ src: ep.videoPath, season: ep.season || 1, episode: ep.episode || 1, resume: false });
+        });
+        if (resumeBtn) resumeBtn.addEventListener('click', () => {
           playSource({ src: ep.videoPath, season: ep.season || 1, episode: ep.episode || 1, resume: true });
+        });
+        if (restartBtn) restartBtn.addEventListener('click', () => {
+          playSource({ src: ep.videoPath, season: ep.season || 1, episode: ep.episode || 1, resume: false });
         });
         episodesList.appendChild(row);
       });
     }
 
+    // Track current episode ref for next-episode button and drawer highlight
+    let currentSeason = null;
+    let currentEpisodeNum = null;
+
+    function currentEpisodeIndex() {
+      if (!hasEpisodes) return -1;
+      const s = currentSeason;
+      const e = currentEpisodeNum;
+      return episodes.findIndex(ep => String(ep.season||1) === String(s) && String(ep.episode||1) === String(e));
+    }
+
+    function nextEpisodeObj() {
+      const idx = currentEpisodeIndex();
+      if (idx >= 0 && idx + 1 < episodes.length) return episodes[idx + 1];
+      return null;
+    }
+
+    function updateNextButton() {
+      if (!btnNextEpisode) return;
+      if (!hasEpisodes) { btnNextEpisode.hidden = true; return; }
+      const next = nextEpisodeObj();
+      if (!next) { btnNextEpisode.hidden = true; return; }
+      btnNextEpisode.title = `Next: S${next.season||1}E${next.episode||1}`;
+      btnNextEpisode.hidden = false;
+    }
+
+    function highlightDrawerCurrent() {
+      if (!episodesDrawerList) return;
+      try {
+        episodesDrawerList.querySelectorAll('.is-current').forEach(el => el.classList.remove('is-current'));
+        const idx = currentEpisodeIndex();
+        if (idx >= 0) {
+          const node = episodesDrawerList.querySelector(`[data-epi-idx="${idx}"]`);
+          if (node) node.classList.add('is-current');
+        }
+      } catch {}
+    }
+
+    function renderEpisodesDrawer() {
+      if (!episodesDrawerList) return;
+      episodesDrawerList.innerHTML = '';
+      episodes.forEach((ep, i) => {
+        const row = document.createElement('div');
+        row.className = 'td-episodes__item';
+        row.dataset.epiIdx = String(i);
+        const epId = `S${ep.season||1}E${ep.episode||1}`;
+        const epProg = (progress.episodes || []).find(p => String(p.season) === String(ep.season||1) && String(p.episode) === String(ep.episode||1));
+        const percent = epProg ? percentFrom(epProg.positionSec, epProg.durationSec) : 0;
+        row.innerHTML = `
+          <div><strong>${epId}</strong> ${ep.title || ''}</div>
+          <div class="d-flex align-items-center" style="gap:12px;">
+            <div class="td-progress"><div class="td-progress__bar" style="width:${percent}%"></div></div>
+            <button type="button" class="btn btn-sm btn-primary epd-btn-play">Play</button>
+          </div>
+        `;
+        row.querySelector('.epd-btn-play')?.addEventListener('click', () => {
+          playSource({ src: ep.videoPath, season: ep.season || 1, episode: ep.episode || 1, resume: !!(epProg && (epProg.positionSec||0) > 0) });
+          if (episodesDrawer) episodesDrawer.hidden = true;
+        });
+        episodesDrawerList.appendChild(row);
+      });
+      highlightDrawerCurrent();
+    }
+
     function playSource({ src, season = null, episode = null, resume = false }) {
       if (!src) return;
       const resolvedSrc = normalizePath(src);
+
+      // Clean up previous handlers to avoid stacking and autoplay loops
+      if (player._handlers) {
+        const h = player._handlers;
+        try { player.removeEventListener('loadedmetadata', h.onLoaded); } catch {}
+        try { player.removeEventListener('canplay', h.onCanPlay); } catch {}
+        try { player.removeEventListener('timeupdate', h.onTime); } catch {}
+        try { player.removeEventListener('ended', h.onEnded); } catch {}
+        try { player.removeEventListener('error', h.onError); } catch {}
+      }
+
       player.setAttribute('playsinline', '');
+      try { player.setAttribute('webkit-playsinline', ''); } catch {}
+      try { player.playsInline = true; } catch {}
+      try { player.autoplay = true; } catch {}
+
+      // Reset and set source
+      try { player.pause(); } catch {}
       if (playerSource) playerSource.src = resolvedSrc;
       player.src = resolvedSrc;
       playerSection.hidden = false;
       player.load();
       try { playerSection.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+
+      // Track current episode ref
+      currentSeason = season != null ? (season || 1) : null;
+      currentEpisodeNum = episode != null ? (episode || 1) : null;
+      updateNextButton();
+      highlightDrawerCurrent();
+
+      // Resume position
       let seekTo = 0;
       if (resume) {
         if (season != null || episode != null) {
@@ -270,15 +426,28 @@
           seekTo = progress.lastPositionSec || 0;
         }
       }
-      const onLoaded = () => {
-        try { if (seekTo > 0 && player.duration && seekTo < player.duration) player.currentTime = seekTo; } catch {}
-        player.play().catch(()=>{});
+
+      // Single guarded autoplay attempt
+      let autoplayPending = true;
+      const attemptPlay = () => {
+        if (!autoplayPending) return;
+        autoplayPending = false;
+        try {
+          const p = player.play && player.play();
+          if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch {}
       };
-      const onCanPlay = () => { onLoaded(); };
-      player.removeEventListener('loadedmetadata', onLoaded);
-      player.removeEventListener('canplay', onCanPlay);
-      player.addEventListener('loadedmetadata', onLoaded);
-      player.addEventListener('canplay', onCanPlay);
+
+      const onLoaded = () => {
+        try {
+          if (player.duration && seekTo > 0) {
+            const safeSeek = Math.min(seekTo, Math.max(0, player.duration - 1));
+            if (safeSeek >= 0 && safeSeek < player.duration) player.currentTime = safeSeek;
+          }
+        } catch {}
+        attemptPlay();
+      };
+      const onCanPlay = () => { attemptPlay(); };
 
       // Progress saver
       let lastSent = 0;
@@ -291,49 +460,99 @@
           updateFeedProgressCache(profileId, extId, pct);
         } catch (e) { console.warn('progress save failed', e?.message); }
       };
-      const onTime = async () => {
+      const onTime = () => {
         const now = Date.now();
         if (now - lastSent > 5000) { lastSent = now; save(false); }
       };
-      const onEnded = async () => { await save(true); player.removeEventListener('timeupdate', onTime); };
+      const onEnded = async () => { await save(true); try { player.removeEventListener('timeupdate', onTime); } catch {} ; updateNextButton(); };
       const onError = () => { console.error('Video failed to load:', resolvedSrc); };
-      player.removeEventListener('timeupdate', onTime);
-      player.removeEventListener('ended', onEnded);
-      player.removeEventListener('error', onError);
+
+      player.addEventListener('loadedmetadata', onLoaded);
+      player.addEventListener('canplay', onCanPlay);
       player.addEventListener('timeupdate', onTime);
       player.addEventListener('ended', onEnded);
       player.addEventListener('error', onError);
 
-      // If metadata is already available (cache), kick off immediately
-      try {
-        if (player.readyState >= 1) {
-          onLoaded();
-        } else {
-          setTimeout(() => { if (player.readyState >= 1) onLoaded(); }, 300);
-        }
-      } catch {}
+      // Keep references for proper cleanup next call
+      player._handlers = { onLoaded, onCanPlay, onTime, onEnded, onError };
+
+      // Immediate attempt (user gesture) — guarded
+      attemptPlay();
     }
 
     // Buttons
-    if (hasEpisodes) {
-      // Start = first episode; Continue = last
-      btnStart.hidden = false;
-      btnStart.addEventListener('click', () => {
-        const first = episodes[0];
-        playSource({ src: first?.videoPath, season: first?.season || 1, episode: first?.episode || 1, resume: false });
+    if (btnSeekBack) btnSeekBack.addEventListener('click', (e) => {
+      e.preventDefault();
+      try { player.currentTime = Math.max(0, (player.currentTime || 0) - 10); } catch {}
+    });
+    if (btnSeekFwd) btnSeekFwd.addEventListener('click', (e) => {
+      e.preventDefault();
+      const dur = Number(player.duration || 0);
+      try { player.currentTime = Math.min(dur ? (dur - 0.5) : (player.currentTime||0)+10, (player.currentTime || 0) + 10); } catch {}
+    });
+    if (btnEpisodesOverlay && episodesDrawer) {
+      btnEpisodesOverlay.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!hasEpisodes) return;
+        if (episodesDrawer.hidden) renderEpisodesDrawer();
+        episodesDrawer.hidden = !episodesDrawer.hidden;
       });
+    }
+    if (btnCloseEpisodes && episodesDrawer) {
+      btnCloseEpisodes.addEventListener('click', (e) => {
+        e.preventDefault();
+        episodesDrawer.hidden = true;
+      });
+    }
+    if (btnNextEpisode) {
+      btnNextEpisode.addEventListener('click', (e) => {
+        e.preventDefault();
+        const next = nextEpisodeObj();
+        if (next) playSource({ src: next.videoPath, season: next.season || 1, episode: next.episode || 1, resume: false });
+      });
+    }
+    // Compute overall percent for gating buttons
+    let overallPercent = 0;
+    if (hasEpisodes) overallPercent = seriesCombinedPercent(episodes, progress.episodes || []);
+    else overallPercent = percentFrom(progress.lastPositionSec || 0, progress.lastDurationSec || 0);
+    if (!overallPercent) overallPercent = Number(progress?.percent || 0);
+
+    const showRewatchNow = overallPercent >= 97; // show only if ~finished
+    const finishedOver98 = overallPercent > 98;  // stricter rule for Continue
+    const hasStartedSeries = Array.isArray(progress?.episodes) && progress.episodes.some(e => (e.positionSec || 0) > 0);
+    const hasStartedMovie  = (progress?.lastPositionSec || 0) > 0;
+
+    // Rewatch: visible only when ~finished
+    btnRewatch.hidden = !showRewatchNow;
+
+    if (hasEpisodes) {
       const epLatest = (progress.episodes || [])[0];
-      if (epLatest) {
-        btnContinue.hidden = false;
+      const canContinue = !!(epLatest && hasStartedSeries && !finishedOver98);
+      // Start only if cannot continue (no ongoing watch)
+      btnStart.hidden = canContinue;
+      if (!btnStart.hidden) {
+        btnStart.addEventListener('click', () => {
+          const first = episodes[0];
+          playSource({ src: first?.videoPath, season: first?.season || 1, episode: first?.episode || 1, resume: false });
+        });
+      }
+      // Continue only if user started and not almost finished
+      btnContinue.hidden = !canContinue;
+      if (!btnContinue.hidden) {
         btnContinue.addEventListener('click', () => {
           playSource({ src: episodes.find(e => String(e.season)===String(epLatest.season) && String(e.episode)===String(epLatest.episode))?.videoPath, season: epLatest.season, episode: epLatest.episode, resume: true });
         });
       }
     } else if (hasMovieVideo) {
-      btnStart.hidden = false;
-      btnStart.addEventListener('click', () => playSource({ src: content.videoPath, resume: false }));
-      if (progress && (progress.lastPositionSec||0) > 0) {
-        btnContinue.hidden = false;
+      const canContinue = !!(hasStartedMovie && !finishedOver98);
+      // Start only if cannot continue
+      btnStart.hidden = canContinue;
+      if (!btnStart.hidden) {
+        btnStart.addEventListener('click', () => playSource({ src: content.videoPath, resume: false }));
+      }
+      // Continue only if user started and not almost finished
+      btnContinue.hidden = !canContinue;
+      if (!btnContinue.hidden) {
         btnContinue.addEventListener('click', () => playSource({ src: content.videoPath, resume: true }));
       }
     } else {
@@ -342,22 +561,99 @@
       btnContinue.hidden = true;
     }
 
-    // Rewatch: visible if overall percent = 100 (or flagged completed)
-    if ((progress?.percent || 0) >= 98) {
-      btnRewatch.hidden = false;
-      btnRewatch.addEventListener('click', async () => {
-        try {
-          await resetProgress(profileId, extId);
-          // Clear cached progress for feed
-          updateFeedProgressCache(profileId, extId, 0);
-          btnRewatch.hidden = true;
-          btnContinue.hidden = true;
-        } catch (e) { console.error('rewatch reset failed', e); }
-      });
+    // Rewatch handler: reset all watch records and hide Continue
+    btnRewatch.addEventListener('click', async () => {
+      try {
+        await resetProgress(profileId, extId);
+        updateFeedProgressCache(profileId, extId, 0);
+        // Reset local state
+        progress = { percent: 0, lastPositionSec: 0, lastDurationSec: 0, lastEpisodeRef: null, episodes: [] };
+        // Update UI: no continue available after reset
+        btnContinue.hidden = true;
+        btnStart.hidden = false;
+        btnRewatch.hidden = true;
+        try { episodesList?.querySelectorAll('.td-progress__bar').forEach(el => el.style.width = '0%'); } catch {}
+        // Immediately play from the start
+        if (hasEpisodes) {
+          const first = episodes[0];
+          playSource({ src: first?.videoPath, season: first?.season || 1, episode: first?.episode || 1, resume: false });
+        } else if (hasMovieVideo) {
+          playSource({ src: content.videoPath, resume: false });
+        }
+      } catch (e) {
+        console.error('rewatch reset failed', e);
+      }
+    });
+
+    // Update visibility of overlay controls for non-series
+    if (!hasEpisodes) {
+      if (btnEpisodesOverlay) btnEpisodesOverlay.hidden = true;
+      if (btnNextEpisode) btnNextEpisode.hidden = true;
+    } else {
+      updateNextButton();
     }
 
     // Similar items
     renderSimilar(similarRow, similarItems);
+
+    // Add row arrows for Similar section
+    (function initSimilarRowArrows() {
+      const scroller = document.getElementById('similarRow');
+      if (!scroller) return;
+      const left = document.querySelector('#similarSection .nf-row__arrow--left');
+      const right = document.querySelector('#similarSection .nf-row__arrow--right');
+      const ROW_SCROLL_STEP = 5;
+
+      function setDisabled(btn, disabled) {
+        if (!btn) return;
+        btn.disabled = !!disabled;
+        btn.classList.toggle('is-disabled', !!disabled);
+        btn.setAttribute('aria-disabled', String(!!disabled));
+      }
+      function updateArrows() {
+        const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+        const x = scroller.scrollLeft;
+        setDisabled(left,  x <= 5);
+        setDisabled(right, x >= (maxScroll - 5));
+      }
+      function getGapPx() {
+        const styles = window.getComputedStyle(scroller);
+        const gapStr = styles.columnGap || styles.gap || '0';
+        const v = parseFloat(gapStr);
+        return Number.isFinite(v) ? v : 0;
+      }
+      function cardWidthPx() {
+        const card = scroller.querySelector('.nf-card');
+        if (!card) return scroller.clientWidth || 0;
+        const rect = card.getBoundingClientRect();
+        return rect.width;
+      }
+      function scrollAmountPx() {
+        const cardW = cardWidthPx();
+        const gap = getGapPx();
+        const cards = Math.max(1, ROW_SCROLL_STEP);
+        const totalGap = gap * Math.max(0, cards - 1);
+        const amount = (cardW * cards) + totalGap;
+        return amount > 0 ? amount : (scroller.clientWidth || 0);
+      }
+      requestAnimationFrame(updateArrows);
+      scroller.addEventListener('scroll', () => {
+        requestAnimationFrame(updateArrows);
+      });
+      if (left) left.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (left.disabled) return;
+        scroller.scrollBy({ left: -scrollAmountPx(), behavior: 'smooth' });
+        setTimeout(updateArrows, 350);
+      });
+      if (right) right.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
+        if (right.disabled) return;
+        scroller.scrollBy({ left: scrollAmountPx(), behavior: 'smooth' });
+        setTimeout(updateArrows, 350);
+      });
+      window.addEventListener('resize', () => requestAnimationFrame(updateArrows));
+    })();
 
     // Likes in similar list (delegated)
     document.getElementById('similarSection')?.addEventListener('click', async (e) => {
