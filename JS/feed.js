@@ -41,6 +41,46 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  const profileMenuToggle = document.getElementById("profileMenuToggle");
+  const profileMenu = document.getElementById("profileMenu");
+  const changeProfileBtn = document.getElementById("changeProfileBtn");
+
+  function setProfileMenu(open) {
+    if (!profileMenu || !profileMenuToggle) return;
+    const willOpen = !!open;
+    profileMenu.hidden = !willOpen;
+    profileMenuToggle.setAttribute("aria-expanded", String(willOpen));
+    profileMenuToggle.classList.toggle("is-open", willOpen);
+  }
+
+  function toggleProfileMenu() {
+    if (!profileMenu) return;
+    setProfileMenu(profileMenu.hidden);
+  }
+
+  if (profileMenuToggle && profileMenu) {
+    profileMenuToggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleProfileMenu();
+    });
+  }
+
+  if (changeProfileBtn) {
+    changeProfileBtn.addEventListener("click", () => {
+      setProfileMenu(false);
+      ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
+      window.location.href = "profiles.html";
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    if (!profileMenu || !profileMenuToggle) return;
+    if (profileMenu.hidden) return;
+    const within = profileMenu.contains(e.target) || profileMenuToggle.contains(e.target);
+    if (!within) setProfileMenu(false);
+  });
+
   // ===== 2) Local state
   let CURRENT_ITEMS = []; // last loaded list (feed or search)
   const progressKey = `progress_by_${selectedId}`;
@@ -978,6 +1018,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         searchInput.value = ""; 
         searchInput.blur(); 
       }
+      setProfileMenu(false);
       displayDefaultRows(lastSort);
     }
   });

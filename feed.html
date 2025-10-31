@@ -15,37 +15,31 @@
       <img src="IMG/Netflix-Logo.png" alt="Netflix" />
     </a>
 
-    <!-- Primary menu -->
-    <nav class="nf-nav__menu" aria-label="Primary">
-      <a class="active" href="#">Home</a>
-      <a href="#">TV Shows</a>
-      <a href="#">Movies</a>
-      <a href="#">Games</a>
-      <a href="#">New &amp; Popular</a>
-      <a href="#">My List</a>
-      <a href="#">Browse by Languages</a>
-    </nav>
-
     <div class="nf-nav__actions">
       <!-- Search field -->
       <div class="nf-toolbar">
-  <div class="nf-searchbox" id="searchBox" aria-expanded="false">
-    <button id="searchBtn" class="nf-searchbtn" type="button" aria-label="Search" aria-controls="searchInput">
-      <img class="nf-icon" src="IMG/icons/search.svg" alt="Search" />
-    </button>
-    <input id="searchInput" class="nf-search" type="search" placeholder="Titles, people, genres" aria-label="Search titles" />
-  </div>
+        <div class="nf-searchbox" id="searchBox" aria-expanded="false">
+          <button id="searchBtn" class="nf-searchbtn" type="button" aria-label="Search" aria-controls="searchInput">
+            <img class="nf-icon" src="IMG/icons/search.svg" alt="Search" />
+          </button>
+          <input id="searchInput" class="nf-search" type="search" placeholder="Titles, people, genres" aria-label="Search titles" />
+        </div>
 
-  <label class="alpha-toggle" for="alphaToggle">
-    <input id="alphaToggle" type="checkbox" />
-    <span>A→Z</span>
-  </label>
-</div>
+        <label class="alpha-toggle" for="alphaToggle">
+          <input id="alphaToggle" type="checkbox" />
+          <span>A→Z</span>
+        </label>
+      </div>
 
-      <a class="nf-profile nf-iconlink" aria-label="Profile">
-        <img id="navAvatar" class="nf-avatar" src="IMG/profile1.jpg" alt="Profile" />
-        <img class="nf-caret" src="IMG/icons/caret-down.svg" alt="" />
-      </a>
+      <div class="nf-profile-menu">
+        <button class="nf-profile nf-iconlink" type="button" id="profileMenuToggle" aria-haspopup="true" aria-expanded="false" aria-controls="profileMenu">
+          <img id="navAvatar" class="nf-avatar" src="IMG/profile1.jpg" alt="Profile avatar" />
+          <img class="nf-caret" src="IMG/icons/caret-down.svg" alt="" />
+        </button>
+        <div class="nf-profile-dropdown" id="profileMenu" role="menu" hidden>
+          <button type="button" class="nf-profile-dropdown__action" id="changeProfileBtn">Change Profile</button>
+        </div>
+      </div>
 
       <!--  Adding Hello + Name of Profile  -->
       <div id="greet" style="white-space:nowrap; opacity:.9;"></div>
