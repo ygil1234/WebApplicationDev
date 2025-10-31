@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const progressKey = `progress_by_${selectedId}`;
   const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
   const DEFAULT_SCROLL_STEP = 5;
+  const LOOP_MIN_ITEMS = 6;
   let ROW_SCROLL_STEP = DEFAULT_SCROLL_STEP;
   const ROW_META = new WeakMap();
 
@@ -246,7 +247,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setBtnDisabled(rightArrow, x >= (maxScroll - 5));
   }
 
-  function makeRow({ id, title, items, withProgress = false, loadMore = null, pageSize = 0, initialOffset = 0 }) {
+  function makeRow({ id, title, items, withProgress = false, loadMore = null, pageSize = 0, initialOffset = 0, allowLoop = true }) {
     const section = document.createElement("section");
     section.className = "nf-row";
     section.innerHTML = `
@@ -267,15 +268,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     const left = section.querySelector(".nf-row__arrow--left");
     const right = section.querySelector(".nf-row__arrow--right");
     const initialCount = Array.isArray(items) ? items.length : 0;
+    const canLoop = allowLoop && !loadMore && initialCount >= LOOP_MIN_ITEMS;
     const state = {
       loadMore,
       pageSize: pageSize > 0 ? pageSize : 0,
       offset: initialOffset + initialCount,
       isFetching: false,
       exhausted: !loadMore,
-      loop: !loadMore && initialCount > 0,
-      loopSeedCount: Math.max(0, initialCount),
-      loopBlocks: 1,
+      loop: canLoop,
+      loopSeedCount: canLoop ? Math.max(0, initialCount) : 0,
+      loopBlocks: canLoop ? 1 : 0,
       loopActivated: false,
     };
     if (loadMore) state.exhausted = false;
@@ -372,25 +374,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         const nextItems = await state.loadMore(params);
         if (Array.isArray(nextItems) && nextItems.length) {
           state.loop = false;
-          state.loopSeedCount = Math.max(0, scroller.childElementCount + nextItems.length);
-          state.loopBlocks = 1;
+          state.loopSeedCount = allowLoop ? Math.max(0, scroller.childElementCount + nextItems.length) : 0;
+          state.loopBlocks = allowLoop ? 1 : 0;
           state.loopActivated = false;
           nextItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
           collectIds(nextItems);
           state.offset += nextItems.length;
           if (state.pageSize > 0 && nextItems.length < state.pageSize) {
             state.exhausted = true;
-            state.loop = scroller.childElementCount > 0;
-            state.loopSeedCount = Math.max(0, scroller.childElementCount);
-            state.loopBlocks = 1;
+            const total = scroller.childElementCount;
+            const loopPossible = allowLoop && total >= LOOP_MIN_ITEMS;
+            state.loop = loopPossible;
+            state.loopSeedCount = loopPossible ? Math.max(0, total) : 0;
+            state.loopBlocks = loopPossible ? 1 : 0;
             state.loopActivated = false;
           }
         } else {
           state.exhausted = true;
           if (scroller.childElementCount > 0) {
-            state.loop = true;
-            state.loopSeedCount = Math.max(0, scroller.childElementCount);
-            state.loopBlocks = 1;
+            const total = scroller.childElementCount;
+            const loopPossible = allowLoop && total >= LOOP_MIN_ITEMS;
+            state.loop = loopPossible;
+            state.loopSeedCount = loopPossible ? Math.max(0, total) : 0;
+            state.loopBlocks = loopPossible ? 1 : 0;
             state.loopActivated = false;
           }
         }
@@ -742,6 +748,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function displaySearchResults(results, query) {
       if (!rowsRoot) return;
+      disableInfinite();
       rowsRoot.innerHTML = "";
       
       if (!results?.length) {
@@ -753,7 +760,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const row = { 
         id: "row-search", 
         title: `Search Results for "${query}" (${results.length})`, 
-        items: results 
+        items: results,
+        allowLoop: false,
       };
       rowsRoot.appendChild(makeRow(row));
     }
