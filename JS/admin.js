@@ -19,11 +19,25 @@
     const typeEl = document.getElementById("type");
     const imageFileEl = document.getElementById("imageFile"); 
     const videoFileEl = document.getElementById("videoFile"); 
+    // Optional episode fields for Series
+    const seriesEpisodeFields = document.getElementById("seriesEpisodeFields");
+    const seasonNumEl = document.getElementById("seasonNum");
+    const episodeNumEl = document.getElementById("episodeNum");
+    const episodeTitleEl = document.getElementById("episodeTitle");
   
     const successBox = document.getElementById("contentSuccess");
     const generalErr = document.getElementById("contentGeneralError");
   
     const { validators, attach, showError, clearError } = window.Validation;
+
+    // Toggle episode fields visibility based on type
+    function syncEpisodeVisibility() {
+      if (!seriesEpisodeFields) return;
+      const isSeries = String(typeEl.value) === 'Series';
+      seriesEpisodeFields.classList.toggle('d-none', !isSeries);
+    }
+    typeEl.addEventListener('change', syncEpisodeVisibility);
+    syncEpisodeVisibility();
   
     // 3. Attach Validation 
     attach(
@@ -50,19 +64,26 @@
           b.classList.add("d-none"); 
           b.textContent = ""; 
         });
-        const formData = new FormData();
-        
-        formData.append('extId', extIdEl.value.trim());
-        formData.append('title', titleEl.value.trim());
-        formData.append('year', yearEl.value.trim());
-        formData.append('genres', genresEl.value.trim()); 
-        formData.append('type', typeEl.value);
+        const isSeries = String(typeEl.value) === 'Series';
+        const seasonVal = Number(seasonNumEl?.value || 0);
+        const episodeVal = Number(episodeNumEl?.value || 0);
+        const hasEpisodeNumbers = Number.isFinite(seasonVal) && seasonVal > 0 && Number.isFinite(episodeVal) && episodeVal > 0;
+        const hasEpisodeVideo = videoFileEl.files.length > 0;
+        const shouldAddEpisode = isSeries && hasEpisodeNumbers && hasEpisodeVideo;
+
+        const contentData = new FormData();
+        contentData.append('extId', extIdEl.value.trim());
+        contentData.append('title', titleEl.value.trim());
+        contentData.append('year', yearEl.value.trim());
+        contentData.append('genres', genresEl.value.trim()); 
+        contentData.append('type', typeEl.value);
 
         if (imageFileEl.files.length > 0) {
-          formData.append('imageFile', imageFileEl.files[0]);
+          contentData.append('imageFile', imageFileEl.files[0]);
         }
-        if (videoFileEl.files.length > 0) {
-          formData.append('videoFile', videoFileEl.files[0]);
+        // Only attach videoFile for Movies on the content endpoint.
+        if (!isSeries && videoFileEl.files.length > 0) {
+          contentData.append('videoFile', videoFileEl.files[0]);
         }
 
         const prevBtnText = submitBtn.textContent;
@@ -72,7 +93,7 @@
         try {
           const res = await fetch("/api/admin/content", {
             method: "POST",
-            body: formData, 
+            body: contentData, 
             credentials: 'include',
           });
 
@@ -88,7 +109,33 @@
           // Success
           successBox.classList.remove("d-none");
           let actionText = (res.status === 201) ? "created" : "updated";
-          successBox.textContent = `Success! Content '${data.data.title}' was ${actionText}. Rating: ${data.data.rating || 'N/A'}`;
+          let message = `Success! Content '${data.data.title}' was ${actionText}. Rating: ${data.data.rating || 'N/A'}`;
+
+          // If Series and episode details provided, upload episode using the same video file
+          if (shouldAddEpisode) {
+            try {
+              const epData = new FormData();
+              epData.append('seriesExtId', extIdEl.value.trim());
+              epData.append('season', String(seasonVal));
+              epData.append('episode', String(episodeVal));
+              epData.append('title', String(episodeTitleEl?.value || ''));
+              epData.append('videoFile', videoFileEl.files[0]);
+
+              const epRes = await fetch('/api/admin/episodes', { method: 'POST', body: epData, credentials: 'include' });
+              const epJson = await epRes.json().catch(()=>({}));
+              if (!epRes.ok) {
+                throw new Error(epJson?.error || `Episode upload failed (HTTP ${epRes.status})`);
+              }
+              const s = epJson?.episode?.season ?? seasonVal;
+              const e = epJson?.episode?.episode ?? episodeVal;
+              message += ` Episode uploaded: S${s}E${e}.`;
+            } catch (epErr) {
+              generalErr.classList.remove("d-none");
+              generalErr.textContent = String(epErr?.message || 'Episode upload failed');
+            }
+          }
+
+          successBox.textContent = message;
           
           form.reset(); 
           
@@ -101,50 +148,4 @@
         }
       }
     );
-  })();
-
-  // Episode uploader
-  (function(){
-    const loggedInUser = localStorage.getItem("loggedInUser");
-    if (loggedInUser !== "admin") return;
-    const form = document.getElementById('episodeForm');
-    if (!form) return;
-    const seriesExtIdEl = document.getElementById('seriesExtId');
-    const seasonEl = document.getElementById('seasonNum');
-    const episodeEl = document.getElementById('episodeNum');
-    const titleEl = document.getElementById('episodeTitle');
-    const videoEl = document.getElementById('episodeVideo');
-    const submitBtn = document.getElementById('episodeSubmitBtn');
-    const okBox = document.getElementById('episodeSuccess');
-    const errBox = document.getElementById('episodeError');
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      okBox?.classList.add('d-none'); okBox.textContent = '';
-      errBox?.classList.add('d-none'); errBox.textContent = '';
-      if (!seriesExtIdEl.value.trim() || !seasonEl.value || !episodeEl.value || videoEl.files.length === 0) {
-        errBox?.classList.remove('d-none');
-        if (errBox) errBox.textContent = 'Please provide series ID, season, episode, and a video file.';
-        return;
-      }
-      const fd = new FormData();
-      fd.append('seriesExtId', seriesExtIdEl.value.trim());
-      fd.append('season', String(seasonEl.value));
-      fd.append('episode', String(episodeEl.value));
-      fd.append('title', titleEl.value.trim());
-      fd.append('videoFile', videoEl.files[0]);
-      const prev = submitBtn.textContent;
-      submitBtn.disabled = true; submitBtn.textContent = 'Uploading...';
-      try {
-        const res = await fetch('/api/admin/episodes', { method: 'POST', body: fd, credentials: 'include' });
-        const data = await res.json().catch(()=>({}));
-        if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-        okBox?.classList.remove('d-none'); if (okBox) okBox.textContent = `Episode uploaded: S${data.episode?.season}E${data.episode?.episode}`;
-        form.reset();
-      } catch (err) {
-        errBox?.classList.remove('d-none'); if (errBox) errBox.textContent = String(err?.message || 'Upload failed');
-      } finally {
-        submitBtn.disabled = false; submitBtn.textContent = prev;
-      }
-    });
   })();
