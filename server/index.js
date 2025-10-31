@@ -21,6 +21,10 @@ const IS_PROD   = NODE_ENV === 'production';
 const MONGODB_URI    = process.env.MONGODB_URI    || 'mongodb://127.0.0.1:27017/netflix_feed';
 const SESSION_SECRET = process.env.SESSION_SECRET || 'dev_secret_change_me';
 const SEED_CONTENT   = process.env.SEED_CONTENT   === '1';
+const ROW_SCROLL_STEP_RAW = Number.parseInt(process.env.ROW_SCROLL_STEP ?? '5', 10);
+const ROW_SCROLL_STEP = Number.isFinite(ROW_SCROLL_STEP_RAW) && ROW_SCROLL_STEP_RAW > 0
+  ? ROW_SCROLL_STEP_RAW
+  : 5;
 const OMDB_API_KEY   = process.env.OMDB_API_KEY;
 
 // ====== CORS & JSON ======
@@ -91,7 +95,8 @@ const contentSchema = new mongoose.Schema(
     plot:       { type: String },
     director:   { type: String },
     actors:     { type: [String], default: [] },
-    rating:     { type: String }, // "e.g. "8.8/10"
+    rating:     { type: String }, // e.g. "8.8/10"
+    ratingValue:{ type: Number, default: null },
     imagePath:  { type: String }, 
     videoPath:  { type: String }, 
     episodes:   { 
@@ -112,6 +117,7 @@ const contentSchema = new mongoose.Schema(
 contentSchema.index({ title: 'text' });
 contentSchema.index({ genres: 1 });
 contentSchema.index({ likes: -1, title: 1 });
+contentSchema.index({ ratingValue: -1, likes: -1 });
 
 const likeSchema = new mongoose.Schema(
   {
@@ -232,9 +238,20 @@ app.get('/api/debug/session', (req, res) => {
   });
 });
 
+app.get('/api/config', (req, res) => {
+  res.json({
+    ok: true,
+    scrollStep: ROW_SCROLL_STEP,
+  });
+});
+
 // ====== Helpers ======
 function sanitizeRegex(input) {
   return String(input || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+function parsePositiveInt(value, fallback = 0) {
+  const n = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 async function writeLog({ level = 'info', event, userId = null, profileId = null, details = {} }) {
   try { await Log.create({ level, event, userId, profileId, details }); }
@@ -749,14 +766,20 @@ app.post(
         const url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}&y=${year}`;
         const response = await axios.get(url);
         
-        if (response.data && response.data.Response === "True") {
-          omdbData = {
-            plot: response.data.Plot,
-            director: response.data.Director,
-            actors: response.data.Actors ? response.data.Actors.split(',').map(s => s.trim()) : [],
-            rating: response.data.imdbRating ? `${response.data.imdbRating}/10 (IMDb)` : 'N/A',
-          };
-          console.log(`[OMDb] Fetched rating for ${title}: ${omdbData.rating}`);
+    if (response.data && response.data.Response === "True") {
+      const ratingRaw = Number.parseFloat(response.data.imdbRating);
+      const hasRating = Number.isFinite(ratingRaw);
+      omdbData = {
+        plot: response.data.Plot,
+        director: response.data.Director,
+        actors: response.data.Actors ? response.data.Actors.split(',').map(s => s.trim()) : [],
+        ...(hasRating ? { rating: `${response.data.imdbRating}/10 (IMDb)`, ratingValue: ratingRaw } : {}),
+      };
+      if (hasRating) {
+        console.log(`[OMDb] Fetched rating for ${title}: ${omdbData.rating}`);
+      } else {
+        console.warn(`[OMDb] Rating missing for ${title}`);
+      }
         } else {
           console.warn(`[OMDb] Could not find data for ${title} (${year})`);
         }
@@ -920,19 +943,33 @@ app.post('/api/admin/repair-media-paths', requireAuth, requireAdmin, async (req,
 app.get('/api/feed', async (req, res) => {
   try {
     const profileId = String(req.query.profileId || '').trim();
-    const sort  = String(req.query.sort || 'popular').toLowerCase();
-    const limit = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
+    const sort   = String(req.query.sort || 'popular').toLowerCase();
+    const limit  = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
+    const offset = parsePositiveInt(req.query.offset, 0);
 
-    const sortSpec = (sort === 'alpha') ? { title: 1 } : { likes: -1, title: 1 };
-    let items = await Content.find({}).sort(sortSpec).limit(limit).lean();
-    // Ensure a valid cover/imagePath for each item
-    items = await Promise.all(items.map(async (i) => {
-      const cover = await resolveCoverForDoc(i);
-      return { ...i, cover: cover || i.cover, imagePath: i.imagePath || cover };
-    }));
+    const baseFilter = {};
+    let sortSpec;
+    switch (sort) {
+      case 'alpha':
+        sortSpec = { title: 1 };
+        break;
+      case 'rating':
+        sortSpec = { ratingValue: -1, likes: -1, title: 1 };
+        baseFilter.ratingValue = { $ne: null };
+        break;
+      default:
+        sortSpec = { likes: -1, title: 1 };
+        break;
+    }
+
+    const items = await Content.find(baseFilter)
+      .sort(sortSpec)
+      .skip(offset)
+      .limit(limit)
+      .lean();
 
     if (!profileId) {
-      await writeLog({ event: 'feed', details: { sort, limit, count: items.length } });
+      await writeLog({ event: 'feed', details: { sort, limit, offset, count: items.length } });
       return res.json({ ok: true, items });
     }
 
@@ -944,7 +981,7 @@ app.get('/api/feed', async (req, res) => {
     const likedSet = new Set(liked.map(l => l.contentExtId));
     const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
 
-    await writeLog({ event: 'feed', profileId, details: { sort, limit, count: annotated.length } });
+    await writeLog({ event: 'feed', profileId, details: { sort, limit, offset, count: annotated.length } });
     res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/feed error:', err);
@@ -963,6 +1000,7 @@ app.get('/api/search', async (req, res) => {
     const yToStr    = String(req.query.year_to   || '').trim();
     const sort      = String(req.query.sort || 'popular').toLowerCase();
     const limit     = Math.min(Math.max(parseInt(req.query.limit || '30', 10) || 30, 1), 200);
+    const offset    = parsePositiveInt(req.query.offset, 0);
     const profileId = String(req.query.profileId || '').trim();
 
     const yFrom = yFromStr ? Number(yFromStr) : null;
@@ -984,16 +1022,29 @@ app.get('/api/search', async (req, res) => {
       if (yTo   != null) filter.year.$lte = yTo;
     }
 
-    const sortSpec = (sort === 'alpha') ? { title: 1 } : { likes: -1, title: 1 };
-    let items = await Content.find(filter).sort(sortSpec).limit(limit).lean();
-    items = await Promise.all(items.map(async (i) => {
-      const cover = await resolveCoverForDoc(i);
-      return { ...i, cover: cover || i.cover, imagePath: i.imagePath || cover };
-    }));
+    let sortSpec;
+    switch (sort) {
+      case 'alpha':
+        sortSpec = { title: 1 };
+        break;
+      case 'rating':
+        sortSpec = { ratingValue: -1, likes: -1, title: 1 };
+        filter.ratingValue = { $ne: null };
+        break;
+      default:
+        sortSpec = { likes: -1, title: 1 };
+        break;
+    }
+
+    const items = await Content.find(filter)
+      .sort(sortSpec)
+      .skip(offset)
+      .limit(limit)
+      .lean();
 
     if (!profileId) {
-      await writeLog({ event: 'search', details: { q, type, genre, yFrom, yTo, sort, limit, count: items.length } });
-      return res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, items });
+      await writeLog({ event: 'search', details: { q, type, genre, yFrom, yTo, sort, limit, offset, count: items.length } });
+      return res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit, offset }, items });
     }
 
     const liked = await Like.find({ 
@@ -1004,8 +1055,8 @@ app.get('/api/search', async (req, res) => {
     const likedSet = new Set(liked.map(l => l.contentExtId));
     const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
 
-    await writeLog({ event: 'search', profileId, details: { q, type, genre, yFrom, yTo, sort, limit, count: annotated.length } });
-    res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit }, items: annotated });
+    await writeLog({ event: 'search', profileId, details: { q, type, genre, yFrom, yTo, sort, limit, offset, count: annotated.length } });
+    res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit, offset }, items: annotated });
   } catch (err) {
     console.error('GET /api/search error:', err);
     await writeLog({ level: 'error', event: 'search', details: { error: err.message } });
@@ -1288,6 +1339,7 @@ app.get('/api/recommendations', async (req, res) => {
   try {
     const profileId = String(req.query.profileId || '').trim();
     const limit = Math.min(Math.max(parseInt(req.query.limit || '20', 10) || 20, 1), 100);
+    const offset = parsePositiveInt(req.query.offset, 0);
     
     if (!profileId) {
       return res.status(400).json({ ok: false, error: 'profileId is required' });
@@ -1297,14 +1349,13 @@ app.get('/api/recommendations', async (req, res) => {
     const likedIds  = likedDocs.map(l => l.contentExtId);
     
     if (likedIds.length === 0) {
-      let popular = await Content.find({}).sort({ likes: -1, title: 1 }).limit(limit).lean();
-      // ensure covers
-      popular = await Promise.all(popular.map(async (i) => {
-        const cover = await resolveCoverForDoc(i);
-        return { ...i, cover: cover || i.cover, imagePath: i.imagePath || cover };
-      }));
+      const popular = await Content.find({})
+        .sort({ likes: -1, title: 1 })
+        .skip(offset)
+        .limit(limit)
+        .lean();
       const annotated = popular.map(i => ({ ...i, liked: false }));
-      await writeLog({ event: 'recommendations', profileId, details: { topGenres: [], out: annotated.length, note: 'no_likes_yet' } });
+      await writeLog({ event: 'recommendations', profileId, details: { topGenres: [], out: annotated.length, offset, note: 'no_likes_yet' } });
       return res.json({ ok: true, items: annotated });
     }
 
@@ -1317,6 +1368,7 @@ app.get('/api/recommendations', async (req, res) => {
     const baseFilter = topGenres.length ? { genres: { $in: topGenres } } : {};
     let candidates = await Content.find({ ...baseFilter, extId: { $nin: likedIds } })
       .sort({ likes: -1, title: 1 })
+      .skip(offset)
       .limit(limit)
       .lean();
     // ensure covers
@@ -1326,7 +1378,7 @@ app.get('/api/recommendations', async (req, res) => {
     }));
 
     const annotated = candidates.map(i => ({ ...i, liked: false }));
-    await writeLog({ event: 'recommendations', profileId, details: { topGenres, out: annotated.length } });
+    await writeLog({ event: 'recommendations', profileId, details: { topGenres, out: annotated.length, offset } });
     res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/recommendations error:', err);
@@ -1378,16 +1430,36 @@ async function seedContentIfNeeded() {
                     : (typeof it.genre === 'string'
                         ? it.genre.split(',').map(s => s.trim()).filter(Boolean)
                         : []);
-      return {
+      const doc = {
         extId,
         title,
         year: Number(it.year ?? it.releaseYear ?? '') || undefined,
         genres,
         likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
-        cover: it.cover || it.poster || it.image || it.img || '', 
+        cover: it.cover || it.poster || it.image || it.img || '',
         imagePath: it.cover || it.poster || it.image || it.img || '',
         type: it.type || (it.seasons ? 'Series' : 'Movie'),
       };
+
+      if (it.plot) doc.plot = String(it.plot);
+      if (it.director) doc.director = String(it.director);
+      if (Array.isArray(it.actors) && it.actors.length) {
+        doc.actors = it.actors.map((a) => String(a).trim()).filter(Boolean);
+      } else if (typeof it.actors === 'string' && it.actors.trim()) {
+        doc.actors = it.actors.split(',').map((a) => a.trim()).filter(Boolean);
+      }
+      if (it.rating) {
+        const ratingStr = String(it.rating);
+        doc.rating = ratingStr;
+        const match = ratingStr.match(/[0-9]+(?:\.[0-9]+)?/);
+        if (match) {
+          const ratingNum = Number.parseFloat(match[0]);
+          if (Number.isFinite(ratingNum)) doc.ratingValue = ratingNum;
+        }
+      }
+      if (it.videoPath) doc.videoPath = String(it.videoPath);
+
+      return doc;
     };
 
     let inserted = 0, updated = 0, skipped = 0;
@@ -1404,9 +1476,24 @@ async function seedContentIfNeeded() {
       if (upsertRes.upsertedCount === 1) {
         inserted++;
       } else {
+        const baseUpdate = {
+          title: doc.title,
+          year: doc.year,
+          genres: doc.genres,
+          imagePath: doc.imagePath,
+          cover: doc.cover,
+          type: doc.type,
+        };
+        if ('plot' in doc) baseUpdate.plot = doc.plot;
+        if ('director' in doc) baseUpdate.director = doc.director;
+        if ('actors' in doc) baseUpdate.actors = doc.actors;
+        if ('rating' in doc) baseUpdate.rating = doc.rating;
+        if ('ratingValue' in doc) baseUpdate.ratingValue = doc.ratingValue;
+        if ('videoPath' in doc) baseUpdate.videoPath = doc.videoPath;
+
         const updRes = await Content.updateOne(
           { extId: doc.extId },
-          { $set: { title: doc.title, year: doc.year, genres: doc.genres, imagePath: doc.imagePath, type: doc.type } }
+          { $set: baseUpdate }
         );
         inserted += 0;
         updated += (updRes.modifiedCount || 0);

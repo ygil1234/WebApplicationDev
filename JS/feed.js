@@ -45,6 +45,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   let CURRENT_ITEMS = []; // last loaded list (feed or search)
   const progressKey = `progress_by_${selectedId}`;
   const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
+  const DEFAULT_SCROLL_STEP = 5;
+  let ROW_SCROLL_STEP = DEFAULT_SCROLL_STEP;
+  const ROW_META = new WeakMap();
+
+  try {
+    const cfg = await loadConfig();
+    const step = Number(cfg?.scrollStep);
+    if (Number.isFinite(step) && step > 0) {
+      ROW_SCROLL_STEP = step;
+    }
+  } catch (err) {
+    console.warn("Falling back to default row scroll step:", err);
+  }
 
   // ===== 3) API helpers
   function normalizePath(p) {
@@ -73,17 +86,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     return res.json();
   }
 
-  async function loadFeed({ profileId, sort = "popular", limit = 30 } = {}) {
+  async function loadConfig() {
+    try {
+      const data = await apiGet(`${API_BASE}/config`);
+      return data || {};
+    } catch (err) {
+      console.warn("Failed to load config:", err);
+      return {};
+    }
+  }
+
+  async function loadFeed({ profileId, sort = "popular", limit = 30, offset = 0 } = {}) {
     const qs = new URLSearchParams({ 
       profileId: String(profileId || selectedId), 
       sort, 
-      limit: String(limit) 
+      limit: String(limit),
+      offset: String(offset),
     });
     const data = await apiGet(`${API_BASE}/feed?${qs.toString()}`);
     return data.items || [];
   }
 
-  async function searchContent({ profileId, query, type = "", genre = "", year_from = "", year_to = "", sort = "popular", limit = 50 }) {
+  async function searchContent({ profileId, query, type = "", genre = "", year_from = "", year_to = "", sort = "popular", limit = 50, offset = 0 }) {
     const qs = new URLSearchParams({
       profileId: String(profileId || selectedId),
       query: String(query || ""),
@@ -93,15 +117,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       year_to: String(year_to || ""),
       sort, 
       limit: String(limit),
+      offset: String(offset),
     });
     const data = await apiGet(`${API_BASE}/search?${qs.toString()}`);
     return data.items || [];
   }
 
-  async function loadRecommendations({ profileId, limit = 20 } = {}) {
+  async function loadRecommendations({ profileId, limit = 20, offset = 0 } = {}) {
     const qs = new URLSearchParams({ 
       profileId: String(profileId || selectedId), 
-      limit: String(limit) 
+      limit: String(limit),
+      offset: String(offset),
     });
     const data = await apiGet(`${API_BASE}/recommendations?${qs.toString()}`);
     return data.items || [];
@@ -201,6 +227,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     btn.classList.toggle("is-disabled", !!isDisabled);
   }
   
+  function escapeAttrValue(value) {
+    const str = String(value ?? "");
+    if (window.CSS && typeof window.CSS.escape === "function") {
+      return window.CSS.escape(str);
+    }
+    return str.replace(/["\\]/g, "\\$&");
+  }
+
+  function syncCardLikeState(extId, liked, likeCount) {
+    const escaped = escapeAttrValue(extId);
+    const buttons = document.querySelectorAll(`.nf-card[data-ext-id="${escaped}"] .like-btn`);
+    buttons.forEach(btn => {
+      btn.classList.toggle("liked", !!liked);
+      btn.setAttribute("aria-pressed", String(!!liked));
+      const countEl = btn.querySelector(".like-count");
+      if (countEl) countEl.textContent = String(Math.max(0, Number(likeCount || 0)));
+    });
+  }
+  
   function updateArrowStates(scroller, leftArrow, rightArrow) {
     const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
     const x = scroller.scrollLeft;
@@ -208,7 +253,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setBtnDisabled(rightArrow, x >= (maxScroll - 5));
   }
 
-  function makeRow({ id, title, items, withProgress = false }) {
+  function makeRow({ id, title, items, withProgress = false, loadMore = null, pageSize = 0, initialOffset = 0 }) {
     const section = document.createElement("section");
     section.className = "nf-row";
     section.innerHTML = `
@@ -224,37 +269,205 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `;
     const scroller = section.querySelector(".nf-row__scroller");
-    items.forEach(item => scroller.appendChild(createCard(item, withProgress)));
+    (items || []).forEach(item => scroller.appendChild(createCard(item, withProgress)));
 
     const left = section.querySelector(".nf-row__arrow--left");
     const right = section.querySelector(".nf-row__arrow--right");
-    const scrollAmount = () => scroller.clientWidth;
+    const initialCount = Array.isArray(items) ? items.length : 0;
+    const state = {
+      loadMore,
+      pageSize: pageSize > 0 ? pageSize : 0,
+      offset: initialOffset + initialCount,
+      isFetching: false,
+      exhausted: !loadMore,
+      loop: !loadMore && initialCount > 0,
+      loopSeedCount: Math.max(0, initialCount),
+      loopBlocks: 1,
+      loopActivated: false,
+    };
+    if (loadMore) state.exhausted = false;
 
-    requestAnimationFrame(() => updateArrowStates(scroller, left, right));
+    function getGapPx() {
+      const styles = window.getComputedStyle(scroller);
+      const gapStr = styles.columnGap || styles.gap || "0";
+      const parsed = parseFloat(gapStr);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    function cardWidthPx() {
+      const card = scroller.querySelector(".nf-card");
+      if (!card) return scroller.clientWidth || 0;
+      const rect = card.getBoundingClientRect();
+      return rect.width;
+    }
+
+    function scrollAmountPx() {
+      const cardWidth = cardWidthPx();
+      const gap = getGapPx();
+      const cardsToScroll = Math.max(1, ROW_SCROLL_STEP);
+      const totalGap = gap * Math.max(0, cardsToScroll - 1);
+      const amount = (cardWidth * cardsToScroll) + totalGap;
+      return amount > 0 ? amount : (scroller.clientWidth || 0);
+    }
+
+    function loopThresholdPx() {
+      const base = scrollAmountPx();
+      return base > 0 ? base : Math.max(12, scroller.clientWidth * 0.25);
+    }
+
+    function updateArrows() {
+      updateArrowStates(scroller, left, right);
+      const loopEnabled = state.loop && scroller.childElementCount > 0 && scroller.scrollWidth > scroller.clientWidth + 1;
+      if (loopEnabled) {
+        setBtnDisabled(left, false);
+        setBtnDisabled(right, false);
+      }
+    }
+
+    function measureBlockWidth(count) {
+      if (!count || !scroller.firstElementChild) return 0;
+      const nodes = Array.from(scroller.children).slice(0, count);
+      if (!nodes.length) return 0;
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      const start = first.offsetLeft;
+      const end = last.offsetLeft + last.offsetWidth;
+      return Math.max(0, end - start);
+    }
+
+    function appendLoopBlock() {
+      if (!state.loopSeedCount) return;
+      const sample = Array.from(scroller.children).slice(0, state.loopSeedCount);
+      if (!sample.length) return;
+      const frag = document.createDocumentFragment();
+      sample.forEach(node => frag.appendChild(node.cloneNode(true)));
+      scroller.appendChild(frag);
+      state.loopBlocks += 1;
+    }
+
+    function trimLeadingBlock() {
+      if (state.loopBlocks <= 2 || !state.loopSeedCount) return;
+      const toRemove = Array.from(scroller.children).slice(0, state.loopSeedCount);
+      if (!toRemove.length) return;
+      const adjust = measureBlockWidth(state.loopSeedCount);
+      toRemove.forEach(node => node.remove());
+      state.loopBlocks = Math.max(1, state.loopBlocks - 1);
+      if (adjust > 0) scroller.scrollLeft = Math.max(0, scroller.scrollLeft - adjust);
+    }
+
+    function ensureLoopContinuity() {
+      if (!state.loop || state.loopSeedCount === 0) return;
+      if (!state.loopActivated) {
+        state.loopSeedCount = Math.max(0, scroller.childElementCount);
+        state.loopBlocks = 1;
+        state.loopActivated = true;
+        appendLoopBlock();
+      }
+      const threshold = Math.max(loopThresholdPx(), scroller.clientWidth || 0);
+      const remaining = Math.max(0, scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft);
+      if (remaining < threshold) appendLoopBlock();
+      if (scroller.scrollLeft > threshold * 2) trimLeadingBlock();
+    }
+
+    async function fetchMore() {
+      if (!state.loadMore || state.exhausted || state.isFetching) return;
+      state.isFetching = true;
+      right.classList.add("is-loading");
+      try {
+        const params = { offset: state.offset };
+        if (state.pageSize > 0) params.limit = state.pageSize;
+        const nextItems = await state.loadMore(params);
+        if (Array.isArray(nextItems) && nextItems.length) {
+          state.loop = false;
+          state.loopSeedCount = Math.max(0, scroller.childElementCount + nextItems.length);
+          state.loopBlocks = 1;
+          state.loopActivated = false;
+          nextItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
+          collectIds(nextItems);
+          state.offset += nextItems.length;
+          if (state.pageSize > 0 && nextItems.length < state.pageSize) {
+            state.exhausted = true;
+            state.loop = scroller.childElementCount > 0;
+            state.loopSeedCount = Math.max(0, scroller.childElementCount);
+            state.loopBlocks = 1;
+            state.loopActivated = false;
+          }
+        } else {
+          state.exhausted = true;
+          if (scroller.childElementCount > 0) {
+            state.loop = true;
+            state.loopSeedCount = Math.max(0, scroller.childElementCount);
+            state.loopBlocks = 1;
+            state.loopActivated = false;
+          }
+        }
+      } catch (err) {
+        console.error(`loadMore failed for row ${id}:`, err);
+      } finally {
+        state.isFetching = false;
+        right.classList.remove("is-loading");
+        requestAnimationFrame(() => {
+          updateArrows();
+          ensureLoopContinuity();
+          maybeLoadMore();
+        });
+      }
+    }
+
+    function maybeLoadMore() {
+      if (!state.loadMore || state.exhausted || state.isFetching) return;
+      const remaining =
+        Math.max(0, scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft);
+      if (remaining <= scrollAmountPx() * 1.5) {
+        fetchMore();
+      }
+    }
+
+    requestAnimationFrame(() => {
+      updateArrows();
+      ensureLoopContinuity();
+      maybeLoadMore();
+    });
 
     let t;
     scroller.addEventListener("scroll", () => {
       clearTimeout(t);
-      t = setTimeout(() => updateArrowStates(scroller, left, right), 50);
+      ensureLoopContinuity();
+      t = setTimeout(() => {
+        updateArrows();
+        ensureLoopContinuity();
+        maybeLoadMore();
+      }, 50);
     });
 
     left.addEventListener("click", (e) => {
       e.preventDefault(); 
       e.stopPropagation();
-      if (!left.disabled) {
-        scroller.scrollBy({ left: -scrollAmount(), behavior: "smooth" });
-        setTimeout(() => updateArrowStates(scroller, left, right), 350);
-      }
+      if (left.disabled) return;
+      scroller.scrollBy({ left: -scrollAmountPx(), behavior: "smooth" });
+      setTimeout(() => {
+        updateArrows();
+        ensureLoopContinuity();
+        maybeLoadMore();
+      }, 350);
     });
     
     right.addEventListener("click", (e) => {
       e.preventDefault(); 
       e.stopPropagation();
-      if (!right.disabled) {
-        scroller.scrollBy({ left: scrollAmount(), behavior: "smooth" });
-        setTimeout(() => updateArrowStates(scroller, left, right), 350);
+      if (right.disabled) return;
+      if (!state.loop) {
+        maybeLoadMore();
       }
+      scroller.scrollBy({ left: scrollAmountPx(), behavior: "smooth" });
+      setTimeout(() => {
+        updateArrows();
+        ensureLoopContinuity();
+        if (!state.loop) maybeLoadMore();
+      }, 350);
     });
+
+    ROW_META.set(scroller, { maybeLoadMore, updateArrows, ensureLoopContinuity, state });
 
     return section;
   }
@@ -264,7 +477,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       const scroller = row.querySelector(".nf-row__scroller");
       const left = row.querySelector(".nf-row__arrow--left");
       const right = row.querySelector(".nf-row__arrow--right");
-      if (scroller && left && right) updateArrowStates(scroller, left, right);
+      if (scroller && left && right) {
+        updateArrowStates(scroller, left, right);
+        const meta = ROW_META.get(scroller);
+        if (meta?.ensureLoopContinuity) meta.ensureLoopContinuity();
+        if (meta?.maybeLoadMore) meta.maybeLoadMore();
+      }
     });
   }
 
@@ -305,63 +523,247 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===== 5) Build rows (default/search/recommend)
   const rowsRoot = document.getElementById("rows");
 
+  // ===== 5a) Infinite scroll state & helpers =====
+  async function loadHomeContent(sortMode = "popular") {
+    const POP_LIMIT = 16;
+    const GEN_LIMIT = 16;
+    const CLASSIC_LIMIT = 12;
+    const REC_LIMIT = 16;
+
+    const ratedPromise = sortMode === "alpha"
+      ? Promise.resolve([])
+      : loadFeed({ profileId: selectedId, sort: "rating", limit: POP_LIMIT });
+
+    const [popular, sciFi, drama, classics, recs, rated] = await Promise.all([
+      loadFeed({ profileId: selectedId, sort: sortMode, limit: POP_LIMIT }),
+      searchContent({ profileId: selectedId, genre: "sci-fi", sort: sortMode, limit: GEN_LIMIT }),
+      searchContent({ profileId: selectedId, genre: "drama",  sort: sortMode, limit: GEN_LIMIT }),
+      searchContent({ profileId: selectedId, year_to: "1999", sort: sortMode, limit: CLASSIC_LIMIT }),
+      loadRecommendations({ profileId: selectedId, limit: REC_LIMIT }),
+      ratedPromise,
+    ]);
+
+    const rows = [
+      { 
+        id: "row-recs",    
+        title: `Recommended for you`, 
+        items: recs || [],
+        pageSize: REC_LIMIT,
+        loadMore: ({ offset = 0, limit = REC_LIMIT } = {}) =>
+          loadRecommendations({ profileId: selectedId, limit, offset }),
+      },
+      { 
+        id: "row-popular", 
+        title: sortMode === "alpha" ? "A–Z Catalog" : "Popular on Netflix", 
+        items: popular || [],
+        pageSize: POP_LIMIT,
+        loadMore: ({ offset = 0, limit = POP_LIMIT } = {}) =>
+          loadFeed({ profileId: selectedId, sort: sortMode, limit, offset }),
+      },
+      ...(sortMode === "alpha"
+        ? []
+        : [{
+            id: "row-rated",
+            title: "Most Rated on IMDb",
+            items: rated || [],
+            pageSize: POP_LIMIT,
+            loadMore: ({ offset = 0, limit = POP_LIMIT } = {}) =>
+              loadFeed({ profileId: selectedId, sort: "rating", limit, offset }),
+          }]
+      ),
+    { 
+      id: "row-sci",     
+      title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A–Z)" : "Sci-Fi & Fantasy", 
+        items: sciFi || [],
+        pageSize: GEN_LIMIT,
+        loadMore: ({ offset = 0, limit = GEN_LIMIT } = {}) =>
+          searchContent({ profileId: selectedId, genre: "sci-fi", sort: sortMode, limit, offset }),
+      },
+      { 
+        id: "row-drama",   
+        title: sortMode === "alpha" ? "Drama (A–Z)" : "Critically-acclaimed Drama", 
+        items: drama || [],
+        pageSize: GEN_LIMIT,
+        loadMore: ({ offset = 0, limit = GEN_LIMIT } = {}) =>
+          searchContent({ profileId: selectedId, genre: "drama",  sort: sortMode, limit, offset }),
+      },
+      { 
+        id: "row-classic", 
+        title: sortMode === "alpha" ? "Classics (A–Z)" : "Classics", 
+        items: classics || [],
+        pageSize: CLASSIC_LIMIT,
+        loadMore: ({ offset = 0, limit = CLASSIC_LIMIT } = {}) =>
+          searchContent({ profileId: selectedId, year_to: "1999", sort: sortMode, limit, offset }),
+      },
+    ];
+
+    return { popular, sciFi, drama, classics, recs, rows };
+  }
+
+  async function appendHomeCycle(sortMode = lastSort) {
+    try {
+      const { rows } = await loadHomeContent(sortMode);
+      // Append again (we do NOT de-dupe here so the loop visibly repeats)
+      rows
+        .map((r, idx) => ({
+          ...r,
+          id: `${r.id}-loop-${Date.now()}-${idx}`,
+        }))
+        .forEach(r => { if (r.items?.length) rowsRoot.appendChild(makeRow(r)); });
+    } catch (err) {
+      console.error("appendHomeCycle error:", err);
+    }
+  }
+
+  const GENRE_SEQ = [
+    "action","comedy","thriller","romance","documentary","animation",
+    "crime","family","horror","fantasy","adventure","history","war","music","mystery","western"
+  ];
+  let nextGenreIdx = 0;
+  let isLoadingMore = false;
+  let isInfiniteEnabled = false;
+  let loadedIds = new Set();
+
+  function collectIds(items=[]) {
+    items.forEach(i => loadedIds.add(String(i?.extId ?? i?.id ?? "")));
+  }
+  function filterNew(items=[]) {
+    return items.filter(i => !loadedIds.has(String(i?.extId ?? i?.id ?? "")));
+  }
+
+  let sentinel = null;
+  let io = null;
+
+  function ensureSentinel() {
+    if (sentinel) return sentinel;
+    sentinel = document.createElement("div");
+    sentinel.id = "infinite-sentinel";
+    sentinel.style.cssText = "height:1px;margin:0;opacity:0;";
+    // place after the rows section so it’s near the bottom of the page
+    rowsRoot.parentElement.appendChild(sentinel);
+    return sentinel;
+  }
+
+  async function appendRowsBatch() {
+    if (isLoadingMore || !isInfiniteEnabled) return;
+    isLoadingMore = true;
+    try {
+      const batch = [];
+
+      // If we still have genres, load a small batch of 3 rows
+      if (nextGenreIdx < GENRE_SEQ.length) {
+        const sortForRow = lastSort;
+        const ROW_LIMIT = 16;
+        for (let k = 0; k < 3 && nextGenreIdx < GENRE_SEQ.length; k++) {
+          const g = GENRE_SEQ[nextGenreIdx++];
+          const itemsRaw = await searchContent({
+            profileId: selectedId,
+            genre: g,
+            sort: sortForRow,
+            limit: ROW_LIMIT
+          });
+          const items = filterNew(itemsRaw);   // keep genre rows de-duped within this pass
+          if (items.length) {
+            batch.push({
+              id: `row-${g}-${Date.now()}-${k}`,
+              title: (sortForRow === "alpha") ? `${g[0].toUpperCase()+g.slice(1)} (A–Z)` : (g[0].toUpperCase()+g.slice(1)),
+              items,
+              pageSize: ROW_LIMIT,
+              loadMore: ({ offset = 0, limit = ROW_LIMIT } = {}) =>
+                searchContent({ profileId: selectedId, genre: g, sort: sortForRow, limit, offset }),
+            });
+            collectIds(items);
+          }
+        }
+        batch.forEach(r => rowsRoot.appendChild(makeRow(r)));
+      }
+
+      // If we ran out of genres, append the home set again and restart the genre sequence
+      if (nextGenreIdx >= GENRE_SEQ.length) {
+        await appendHomeCycle(lastSort);
+        nextGenreIdx = 0;           // restart genre loop
+        loadedIds = new Set();      // reset de-dupe so new genre pass can show items again
+      }
+    } catch (err) {
+      console.error("Infinite scroll load error:", err);
+      showAlert({ type: "error", title: "Loading more failed", message: err?.message || "Couldn’t load more rows." });
+    } finally {
+      isLoadingMore = false;
+    }
+  }
+
+
+  function enableInfinite() {
+    if (isInfiniteEnabled) return;
+    isInfiniteEnabled = true;
+    const s = ensureSentinel();
+    io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) appendRowsBatch();
+    }, { root: null, rootMargin: "800px 0px", threshold: 0 });
+    io.observe(s);
+  }
+
+  function disableInfinite() {
+    isInfiniteEnabled = false;
+    if (io) { io.disconnect(); io = null; }
+    if (sentinel) { sentinel.remove(); sentinel = null; }
+  }
+
+
   async function displayDefaultRows(sortMode = "popular") {
     if (!rowsRoot) return;
     rowsRoot.innerHTML = "";
+    disableInfinite();
+
+    // reset paging state
+    nextGenreIdx = 0;
+    isLoadingMore = false;
+    loadedIds = new Set();
 
     try {
-      const [popular, sciFi, drama, classics, recs] = await Promise.all([
-        loadFeed({ profileId: selectedId, sort: sortMode, limit: 16 }),
-        searchContent({ profileId: selectedId, genre: "sci-fi", sort: sortMode, limit: 16 }),
-        searchContent({ profileId: selectedId, genre: "drama",  sort: sortMode, limit: 16 }),
-        searchContent({ profileId: selectedId, year_to: "1999", sort: sortMode, limit: 12 }),
-        loadRecommendations({ profileId: selectedId, limit: 16 }),
-      ]);
+      const { popular, sciFi, drama, classics, recs, rows } = await loadHomeContent(sortMode);
 
       CURRENT_ITEMS = popular.slice();
+      collectIds(popular);
+      collectIds(sciFi);
+      collectIds(drama);
+      collectIds(classics);
+      collectIds(recs);
+
       displayFeatured(CURRENT_ITEMS);
 
-      const rows = [
-        { id: "row-recs",     title: `Recommended for you`, items: recs || [] },
-        { id: "row-popular",  title: sortMode === "alpha" ? "A–Z Catalog" : "Popular on Netflix", items: popular || [] },
-        { id: "row-sci",      title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A–Z)" : "Sci-Fi & Fantasy", items: sciFi || [] },
-        { id: "row-drama",    title: sortMode === "alpha" ? "Drama (A–Z)" : "Critically-acclaimed Drama", items: drama || [] },
-        { id: "row-classic",  title: sortMode === "alpha" ? "Classics (A–Z)" : "Classics", items: classics || [] },
-      ];
-      
-      rows.forEach(r => { 
-        if (r.items?.length) rowsRoot.appendChild(makeRow(r)); 
-      });
-      
-      refreshAllArrows();
+      rows.forEach(r => { if (r.items?.length) rowsRoot.appendChild(makeRow(r)); });
+
+      // turn on infinite scroll after initial rows render
+      enableInfinite();
     } catch (err) {
       console.error('Error loading default rows:', err);
-      showAlert({ 
-        type: 'error', 
-        title: 'Loading Error', 
-        message: 'Failed to load content. Please refresh the page.' 
+      showAlert({
+        type: 'error',
+        title: 'Loading Error',
+        message: 'Failed to load content. Please refresh the page.'
       });
     }
   }
 
-  function displaySearchResults(results, query) {
-    if (!rowsRoot) return;
-    rowsRoot.innerHTML = "";
-    
-    if (!results?.length) {
-      rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results for "${query}"</div>`;
-      return;
+
+    function displaySearchResults(results, query) {
+      if (!rowsRoot) return;
+      rowsRoot.innerHTML = "";
+      
+      if (!results?.length) {
+        rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results for "${query}"</div>`;
+        return;
+      }
+      
+      CURRENT_ITEMS = results.slice();
+      const row = { 
+        id: "row-search", 
+        title: `Search Results for "${query}" (${results.length})`, 
+        items: results 
+      };
+      rowsRoot.appendChild(makeRow(row));
     }
-    
-    CURRENT_ITEMS = results.slice();
-    const row = { 
-      id: "row-search", 
-      title: `Search Results for "${query}" (${results.length})`, 
-      items: results 
-    };
-    rowsRoot.appendChild(makeRow(row));
-    refreshAllArrows();
-  }
 
   // ===== 6) Likes (delegation)
   if (rowsRoot) {
@@ -386,6 +788,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const prev = Number(countEl?.textContent || "0") || 0;
       const optimistic = Math.max(0, prev + (goingLiked ? 1 : -1));
       if (countEl) countEl.textContent = String(optimistic);
+      syncCardLikeState(extId, goingLiked, optimistic);
 
       btn.dataset.busy = "1";
       btn.setAttribute("aria-busy", "true");
@@ -399,7 +802,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         btn.classList.toggle("liked", !!liked);
         btn.setAttribute("aria-pressed", String(!!liked));
-        if (countEl) countEl.textContent = String(Math.max(0, Number(likes || 0)));
+        const resolvedLikes = Math.max(0, Number(likes || 0));
+        if (countEl) countEl.textContent = String(resolvedLikes);
+        syncCardLikeState(extId, !!liked, resolvedLikes);
         
         // sync local CURRENT_ITEMS
         const i = CURRENT_ITEMS.findIndex(x => String(x.extId || x.id) === extId);
@@ -412,6 +817,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.classList.toggle("liked", wasLiked);
         btn.setAttribute("aria-pressed", String(wasLiked));
         if (countEl) countEl.textContent = String(prev);
+        syncCardLikeState(extId, wasLiked, prev);
         showAlert({ 
           type: 'error', 
           title: 'Like failed', 
