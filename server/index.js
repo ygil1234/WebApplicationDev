@@ -369,7 +369,6 @@ async function requireAdmin(req, res, next) {
 
 // ====== File-based Users/Profiles (helpers) ======
 const DATA_DIR      = path.resolve(__dirname);
-const PROFILES_PATH = path.join(DATA_DIR, 'profiles.json');
 
 async function readJSON(p, fallback) {
   try {
@@ -386,9 +385,6 @@ async function writeJsonAtomic(p, data) {
 async function ensureFileJSON(p, initial) {
   try { await fs.access(p); } catch { await writeJsonAtomic(p, initial); }
 }
-
-async function readProfiles()   { return await readJSON(PROFILES_PATH, []); }
-async function writeProfiles(a) { await writeJsonAtomic(PROFILES_PATH, a); }
 
 // ====== Resolve userId (accept id / username / email / session) ======
 async function resolveUserId(userIdOrName, session) {
@@ -415,16 +411,6 @@ function validPassword(p, username = '') {
   return typeof p === 'string' && p.trim().length >= 6; 
 }
 function validUsername(n) { return /^[A-Za-z0-9_]{3,15}$/.test(String(n || '').trim()); }
-
-// ====== Bootstrap JSON stores for users/profiles ======
-(async () => {
-  try {
-    await ensureFileJSON(PROFILES_PATH, []);
-  } catch (err) {
-    console.error('Failed to initialize users/profiles stores', err);
-    process.exit(1);
-  }
-})();
 
 // ====== Auth ======
 app.post('/api/signup', async (req, res) => {
