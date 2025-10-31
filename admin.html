@@ -81,6 +81,44 @@
       <div class="mt-4 subtext">
           <a href="feed.html" class="nf-link">← Back to Feed</a>
       </div>
+      <hr class="my-4"/>
+      <h2 class="mb-3">Add Episode to Series</h2>
+      <form id="episodeForm" novalidate enctype="multipart/form-data">
+        <div class="mb-3">
+          <label for="seriesExtId" class="form-label nf-label">Series External ID (e.g., s5 for Breaking Bad)</label>
+          <input type="text" class="form-control nf-input" id="seriesExtId" placeholder="Series extId" required/>
+          <div class="login-error-message d-none" id="seriesExtIdError"></div>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label for="seasonNum" class="form-label nf-label">Season</label>
+            <input type="number" class="form-control nf-input" id="seasonNum" required min="1" value="1"/>
+            <div class="login-error-message d-none" id="seasonNumError"></div>
+          </div>
+          <div class="col-6">
+            <label for="episodeNum" class="form-label nf-label">Episode</label>
+            <input type="number" class="form-control nf-input" id="episodeNum" required min="1" value="1"/>
+            <div class="login-error-message d-none" id="episodeNumError"></div>
+          </div>
+        </div>
+        <div class="mb-3 mt-2">
+          <label for="episodeTitle" class="form-label nf-label">Episode Title</label>
+          <input type="text" class="form-control nf-input" id="episodeTitle" placeholder="Optional"/>
+        </div>
+        <div class="mb-3">
+          <label for="episodeVideo" class="form-label nf-label">Episode Video (MP4)</label>
+          <input type="file" class="form-control nf-input" id="episodeVideo" accept="video/mp4" required/>
+          <div class="login-error-message d-none" id="episodeVideoError"></div>
+        </div>
+        <div class="d-grid mt-3">
+          <button type="submit" class="btn btn-nf-primary" id="episodeSubmitBtn">Upload Episode</button>
+        </div>
+      </form>
+      <div class="mt-3">
+        <div class="alert alert-success d-none" id="episodeSuccess"></div>
+        <div class="alert alert-danger d-none" id="episodeError"></div>
+      </div>
+
     </main>
   </div>
 

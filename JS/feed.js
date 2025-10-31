@@ -47,6 +47,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const progress = JSON.parse(localStorage.getItem(progressKey) || "{}");
 
   // ===== 3) API helpers
+  function normalizePath(p) {
+    const s = String(p || '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    return s.startsWith('/') ? s : ('/' + s);
+  }
   async function apiGet(url) {
     const res = await fetch(url, { credentials: "include" });
     if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
@@ -165,9 +171,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const count = Number(item.likes || 0);
     const liked = !!item.liked;
 
+    const coverSrc = normalizePath(item.cover || item.imagePath || '');
     card.innerHTML = `
       <div class="nf-card__cover">
-        <img src="${item.cover || ''}" alt="${item.title || ''}" loading="lazy"
+        <img src="${coverSrc}" alt="${item.title || ''}" loading="lazy"
              onerror="this.onerror=null;this.style.display='none';" />
         ${withProgress ? `<div class="nf-progress"><div class="nf-progress__bar" style="width:${prog}%"></div></div>` : ``}
       </div>
@@ -273,7 +280,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const hero = document.getElementById("hero");
     if (!hero || !items?.length) return;
     const featured = mostLiked(items) || items[0];
-    const heroImg = featured.backdrop || featured.cover || '';
+    const heroImg = normalizePath(featured.backdrop || featured.cover || featured.imagePath || '');
     hero.innerHTML = `
       <div class="nf-hero__bg" style="background-image:url('${heroImg}')"></div>
       <div class="nf-hero__meta" dir="rtl">
@@ -415,6 +422,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.removeAttribute("aria-busy");
       }
     }, false);
+  }
+
+  // ===== 6b) Card click -> title page
+  if (rowsRoot) {
+    rowsRoot.addEventListener('click', (e) => {
+      if (e.defaultPrevented) return;
+      // ignore clicks on interactive elements
+      if (e.target.closest('.like-btn, .nf-row__arrow, button, a, input, select, textarea')) return;
+      const card = e.target.closest('.nf-card');
+      if (!card) return;
+      const extId = String(card.dataset.extId || '');
+      if (!extId) return;
+      e.preventDefault();
+      window.location.href = `title.html?extId=${encodeURIComponent(extId)}`;
+    });
   }
 
   // ===== 7) Search UI + behavior (ENHANCED)
