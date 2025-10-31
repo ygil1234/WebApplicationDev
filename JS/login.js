@@ -26,28 +26,72 @@
         el: emailInput,
         rules: [
           {
-            test: validators.email,
-            message: "Please enter a valid email address."
+            test: (value) => {
+              if (value.trim().toLowerCase() === "admin") return true; 
+              return validators.email(value); 
+            },
+            message: "Please enter a valid email address or 'admin'."
           }
         ]
       },
       {
         el: passwordInput,
         rules: [
-          { test: validators.minLength(6), message: "Password must be at least 6 characters." }
+          { 
+            test: (passValue) => {
+              const emailVal = emailInput.value.trim().toLowerCase();
+              if (emailVal === 'admin') {
+                return passValue.length > 0; 
+              }
+              return validators.minLength(6)(passValue); 
+            }, 
+            message: "Password is required." 
+          }
         ]
       }
     ],
     async () => {
       clearGeneral();
+
+      const emailVal = emailInput.value.trim().toLowerCase();
+      const passVal = passwordInput.value.trim();
+
+      if (emailVal === "admin") {
+        try {
+          const res = await fetch("/api/admin-login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: 'include', 
+            body: JSON.stringify({ email: emailVal, password: passVal })
+          });
+
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            showError(passwordInput, data?.error || "Incorrect admin credentials.");
+            return;
+          }
+
+          const data = await res.json();
+          localStorage.setItem("loggedInUser", "admin");
+          localStorage.setItem("loggedInUserEmail", "admin");
+          window.location.href = "admin.html"; 
+          return;
+        } catch {
+          showGeneral("Server Unreachable");
+          return;
+        }
+      }
+
       const payload = {
-        email: emailInput.value.trim(),
-        password: passwordInput.value.trim()
+        email: emailVal,
+        password: passVal
       };
+
       try {
         const res = await fetch("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: 'include',
           body: JSON.stringify(payload)
         });
 
@@ -69,7 +113,12 @@
         const data = await res.json();
         localStorage.setItem("loggedInUser", data.user.username);
         localStorage.setItem("loggedInUserEmail", data.user.email);
-        window.location.href = "profiles.html";
+
+        if (data.user.username.toLowerCase() === 'admin') {
+            window.location.href = "admin.html";
+        } else {
+            window.location.href = "profiles.html";
+        }
       } catch {
         showGeneral("Server Unreachable");
       }

@@ -9,6 +9,8 @@ const mongoose   = require('mongoose');
 const sessionLib = require('express-session');
 const MongoStore = require('connect-mongo');
 const bcrypt     = require('bcryptjs');
+const multer     = require('multer'); 
+const axios      = require('axios');  
 
 const app = express();
 const PORT      = process.env.PORT || 3000;
@@ -23,20 +25,21 @@ const ROW_SCROLL_STEP_RAW = Number.parseInt(process.env.ROW_SCROLL_STEP ?? '5', 
 const ROW_SCROLL_STEP = Number.isFinite(ROW_SCROLL_STEP_RAW) && ROW_SCROLL_STEP_RAW > 0
   ? ROW_SCROLL_STEP_RAW
   : 5;
+const OMDB_API_KEY   = process.env.OMDB_API_KEY;
 
 // ====== CORS & JSON ======
 app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      const ok = /^(http:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      const ok = /^(http:\/\/)?(localhost|127\.0\.0.1)(:\d+)?$/.test(origin);
       cb(null, ok);
     },
     credentials: true,
   })
 );
 app.options(/.*/, cors());
-app.use(express.json());
+app.use(express.json()); 
 
 // ====== Sessions (install early, with fallback) ======
 if (IS_PROD) app.set('trust proxy', 1);
@@ -78,6 +81,7 @@ mongoose.connection.once('open', () => {
 });
 
 // ====== Schemas & Models ======
+
 const contentSchema = new mongoose.Schema(
   {
     extId:  { type: String, unique: true, index: true }, // e.g. "m7"
@@ -85,8 +89,15 @@ const contentSchema = new mongoose.Schema(
     year:   Number,
     genres: { type: [String], default: [] },
     likes:  { type: Number, default: 0 },
-    cover:  String,
+    cover:  String, 
     type:   String, // "Movie" / "Series"
+    
+    plot:       { type: String },
+    director:   { type: String },
+    actors:     { type: [String], default: [] },
+    rating:     { type: String }, // "e.g. "8.8/10"
+    imagePath:  { type: String }, 
+    videoPath:  { type: String }, 
   },
   { timestamps: true }
 );
@@ -144,12 +155,27 @@ const Content = mongoose.models.Content || mongoose.model('Content', contentSche
 const Like    = mongoose.models.Like    || mongoose.model('Like', likeSchema);
 const Log     = mongoose.models.Log     || mongoose.model('Log', logSchema);
 
+const profileSchema = new mongoose.Schema(
+  {
+    userId:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true, required: true },
+    name:      { type: String, required: true },
+    avatar:    { type: String, required: true },
+    likedContent: { type: [String], default: [] },
+  },
+  { timestamps: true }
+);
+profileSchema.index({ userId: 1, name: 1 }, { unique: true });
+
+const Profile = mongoose.models.Profile || mongoose.model('Profile', profileSchema);
+
 User.init().catch(e => console.warn('[mongo] User.init index warn:', e.message));
 Content.init().catch(e => console.warn('[mongo] Content.init index warn:', e.message));
 Like.init().catch(e => console.warn('[mongo] Like.init index warn:', e.message));
 
 // ====== Static Front-End ======
 app.use(express.static(path.join(__dirname, '..')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
 
 // ====== Health ======
 app.get('/api/health', async (req, res) => {
@@ -159,6 +185,15 @@ app.get('/api/health', async (req, res) => {
     mongo: mongoose.connection.readyState, 
     hasSession: Boolean(req.session),
     sessionUser: req.session?.userId || null 
+  });
+});
+app.get('/api/debug/session', (req, res) => {
+  res.json({
+    hasSession: Boolean(req.session),
+    userId: req.session?.userId,
+    username: req.session?.username,
+    sessionID: req.sessionID,
+    cookies: req.headers.cookie
   });
 });
 
@@ -188,6 +223,28 @@ function requireAuth(req, res, next) {
     return res.status(401).json({ ok: false, error: 'Authentication required' });
   }
   next();
+}
+async function requireAdmin(req, res, next) {
+  try {
+    if (req.session?.username === 'admin' && req.session?.userId === 'admin-user-id') {
+      return next();
+    }
+
+    const user = await User.findById(req.session.userId, 'username').lean();
+    if (user && user.username === 'admin') {
+      return next();
+    }
+
+    await writeLog({ 
+      level: 'warn', 
+      event: 'admin_access_denied', 
+      userId: req.session.userId,
+      details: { username: user?.username || 'unknown' } 
+    });
+    return res.status(403).json({ ok: false, error: 'Forbidden: Admin access required.' });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: 'Server error during auth check.' });
+  }
 }
 
 // ====== File-based Users/Profiles (helpers) ======
@@ -233,7 +290,10 @@ async function resolveUserId(userIdOrName, session) {
 // ====== Server-side validators (signup/login) ======
 const EMAIL_RX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 function validEmail(v)    { return EMAIL_RX.test(String(v || '').trim()); }
-function validPassword(p) { return typeof p === 'string' && p.trim().length >= 6; }
+function validPassword(p, username = '') { 
+  if (String(username).toLowerCase() === 'admin' && p === 'admin') return true;
+  return typeof p === 'string' && p.trim().length >= 6; 
+}
 function validUsername(n) { return /^[A-Za-z0-9_]{3,15}$/.test(String(n || '').trim()); }
 
 // ====== Bootstrap JSON stores for users/profiles ======
@@ -255,7 +315,7 @@ app.post('/api/signup', async (req, res) => {
 
     if (!validEmail(email))       return res.status(400).json({ ok:false, error: 'Invalid email.' });
     if (!validUsername(username)) return res.status(400).json({ ok:false, error: 'Username must be 3-15 characters (letters/numbers/underscores).' });
-    if (!validPassword(password)) return res.status(400).json({ ok:false, error: 'Password must be at least 6 characters.' });
+    if (!validPassword(password, username)) return res.status(400).json({ ok:false, error: 'Password must be at least 6 characters (unless admin/admin).' });
 
     // Uniqueness checks (case-insensitive)
     const emailExists = await User.exists({ email: new RegExp(`^${sanitizeRegex(email)}$`, 'i') });
@@ -290,32 +350,65 @@ app.post('/api/signup', async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+// ====== Admin Login (Special Case) ======
+app.post('/api/admin-login', async (req, res) => {
   try {
-    const email    = String(req.body?.email || '').trim();
+    const email = String(req.body?.email || '').trim();
     const password = String(req.body?.password || '');
 
-    if (!validEmail(email)) {
-      await writeLog({ event: 'login', success: false, details: { email, reason: 'invalid email format' } });
-      return res.status(400).json({ ok: false, error: 'Invalid email format.' });
+    if (email === 'admin' && password === 'admin') {
+      req.session.userId = 'admin-user-id';
+      req.session.username = 'admin';
+
+      await writeLog({ event: 'admin_login', success: true, details: { email } });
+
+      return res.json({
+        ok: true,
+        user: { id: 'admin-user-id', email: 'admin', username: 'admin' }
+      });
     }
 
-    const user = await User.findOne({ email: new RegExp(`^${sanitizeRegex(email)}$`, 'i') });
+    await writeLog({ event: 'admin_login', success: false, details: { email, reason: 'invalid credentials' } });
+    return res.status(401).json({ ok: false, error: 'Invalid admin credentials.' });
+
+  } catch (err) {
+    console.error('POST /api/admin-login error:', err);
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+app.post('/api/login', async (req, res) => {
+  try {
+    const loginIdentifier = String(req.body?.email || '').trim(); 
+    const password = String(req.body?.password || '');
+
+    if (!loginIdentifier) {
+        return res.status(400).json({ ok: false, error: 'Email or Username is required.' });
+    }
+    const isEmail = validEmail(loginIdentifier);
+    
+    const query = isEmail 
+        ? { email: new RegExp(`^${sanitizeRegex(loginIdentifier)}$`, 'i') }
+        : { username: new RegExp(`^${sanitizeRegex(loginIdentifier)}$`, 'i') };
+
+    const user = await User.findOne(query); 
+    
     if (!user) {
-      await writeLog({ event: 'login', success: false, details: { email, reason: 'user not found' } });
-      return res.status(401).json({ ok: false, error: 'Email not found.' });
+      const reason = isEmail ? 'Email not found.' : 'Username not found.';
+      await writeLog({ event: 'login', success: false, details: { loginIdentifier, reason } });
+      return res.status(401).json({ ok: false, error: reason });
     }
 
     const passwordOk = await user.comparePassword(password);
     if (!passwordOk) {
-      await writeLog({ event: 'login', success: false, userId: String(user._id), details: { email, reason: 'bad password' } });
+      await writeLog({ event: 'login', success: false, userId: String(user._id), details: { loginIdentifier, reason: 'bad password' } });
       return res.status(401).json({ ok: false, error: 'Incorrect password.' });
     }
 
     req.session.userId   = String(user._id);
     req.session.username = user.username;
 
-    await writeLog({ event: 'login', success: true, userId: String(user._id), details: { email } });
+    await writeLog({ event: 'login', success: true, userId: String(user._id), details: { loginIdentifier } });
 
     return res.json({
       ok: true,
@@ -329,33 +422,34 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-
 // ====== Profiles ======
 app.get('/api/profiles', requireAuth, async (req, res) => {
   try {
     const resolvedUserId = await resolveUserId(req.query.userId, req.session);
     if (!resolvedUserId) return res.status(400).json({ error: 'User ID is required.' });
 
-    const allProfiles  = await readProfiles();
-    const userProfiles = allProfiles.filter(p => String(p.userId) === String(resolvedUserId));
-    
+    const profiles = await Profile.find({ userId: resolvedUserId }).sort({ createdAt: 1 }).lean();
+
+    const payload = profiles.map(p => ({
+      id: String(p._id),
+      userId: String(p.userId),
+      name: p.name,
+      avatar: p.avatar,
+      likedContent: p.likedContent || [],
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt
+    }));
+
     await writeLog({ 
       event: 'profiles_load', 
       userId: resolvedUserId, 
-      details: { 
-        profileCount: userProfiles.length,
-        profileNames: userProfiles.map(p => p.name)
-      } 
+      details: { profileCount: payload.length, profileNames: payload.map(p => p.name) } 
     });
-    
-    return res.json(userProfiles); 
+
+    return res.json(payload);
   } catch (e) {
     console.error('Error reading profiles:', e);
-    await writeLog({ 
-      level: 'error', 
-      event: 'profiles_load', 
-      details: { error: e.message } 
-    });
+    await writeLog({ level: 'error', event: 'profiles_load', details: { error: e.message } });
     return res.status(500).json({ error: 'Failed to load profiles.' });
   }
 });
@@ -368,153 +462,106 @@ app.post('/api/profiles', requireAuth, async (req, res) => {
 
     if (!userIdResolved || !name || !avatar)
       return res.status(400).json({ error: 'User ID, name, and avatar are required.' });
-    if (name.length < 2)
-      return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
-    if (name.length > 20)
-      return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
+    if (name.length < 2)  return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+    if (name.length > 20) return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
 
-    const allProfiles  = await readProfiles();
-    const userProfiles = allProfiles.filter(p => String(p.userId) === String(userIdResolved));
+    const count = await Profile.countDocuments({ userId: userIdResolved });
+    if (count >= 5) return res.status(400).json({ error: 'Maximum of 5 profiles per user.' });
 
-    if (userProfiles.length >= 5)
-      return res.status(400).json({ error: 'Maximum of 5 profiles per user.' });
-    if (userProfiles.some(p => p.name.toLowerCase() === name.toLowerCase()))
-      return res.status(409).json({ error: 'Profile name already exists.' });
+    const dup = await Profile.exists({ userId: userIdResolved, name: new RegExp(`^${sanitizeRegex(name)}$`, 'i') });
+    if (dup) return res.status(409).json({ error: 'Profile name already exists.' });
 
-    const maxId = allProfiles.length > 0 ? Math.max(...allProfiles.map(p => p.id || 0)) : 0;
-    const newProfile = {
-      id: maxId + 1,
-      userId: userIdResolved,
-      name,
-      avatar,
-      createdAt: new Date().toISOString(),
-      likedContent: []
-    };
-
-    allProfiles.push(newProfile);
-    await writeProfiles(allProfiles);
+    const doc = await Profile.create({ userId: userIdResolved, name, avatar });
 
     await writeLog({ 
       event: 'profile_create', 
       userId: userIdResolved, 
-      profileId: String(newProfile.id),
-      details: { profileId: newProfile.id, profileName: name, avatar } 
+      profileId: String(doc._id),
+      details: { profileId: String(doc._id), profileName: name, avatar } 
     });
-    return res.status(201).json(newProfile); 
+
+    return res.status(201).json({
+      id: String(doc._id),
+      userId: String(doc.userId),
+      name: doc.name,
+      avatar: doc.avatar,
+      likedContent: doc.likedContent || [],
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt
+    });
   } catch (e) {
     console.error('Error creating profile:', e);
     return res.status(500).json({ error: 'Failed to create profile.' });
   }
 });
 
-// ====== Update Profile (PUT) ======
 app.put('/api/profiles/:id', requireAuth, async (req, res) => {
   try {
-    const profileId = parseInt(req.params.id, 10);
+    const profileId = String(req.params.id);
     const userIdResolved = await resolveUserId(req.body?.userId, req.session);
     const name = String(req.body?.name || '').trim();
     const avatar = String(req.body?.avatar || '').trim();
 
-    if (!userIdResolved) {
-      return res.status(400).json({ error: 'User ID is required.' });
-    }
+    if (!userIdResolved) return res.status(400).json({ error: 'User ID is required.' });
+    if (!name || !avatar) return res.status(400).json({ error: 'Name and avatar are required.' });
+    if (name.length < 2)  return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
+    if (name.length > 20) return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
 
-    if (!name || !avatar) {
-      return res.status(400).json({ error: 'Name and avatar are required.' });
-    }
+    const profile = await Profile.findById(profileId);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+    if (String(profile.userId) != String(userIdResolved)) return res.status(403).json({ error: 'Not authorized to edit this profile.' });
 
-    if (name.length < 2) {
-      return res.status(400).json({ error: 'Profile name must be at least 2 characters.' });
-    }
+    const dup = await Profile.exists({
+      _id: { $ne: profile._id },
+      userId: userIdResolved,
+      name: new RegExp(`^${sanitizeRegex(name)}$`, 'i')
+    });
+    if (dup) return res.status(409).json({ error: 'Profile name already exists.' });
 
-    if (name.length > 20) {
-      return res.status(400).json({ error: 'Profile name must be at most 20 characters.' });
-    }
-
-    const allProfiles = await readProfiles();
-    const profileIndex = allProfiles.findIndex(p => p.id === profileId);
-
-    if (profileIndex === -1) {
-      return res.status(404).json({ error: 'Profile not found.' });
-    }
-
-    const profile = allProfiles[profileIndex];
-
-    // Verify ownership
-    if (String(profile.userId) !== String(userIdResolved)) {
-      return res.status(403).json({ error: 'Not authorized to edit this profile.' });
-    }
-
-    // Check for duplicate name (excluding current profile)
-    const userProfiles = allProfiles.filter(p => String(p.userId) === String(userIdResolved));
-    const duplicateName = userProfiles.some(p => 
-      p.id !== profileId && p.name.toLowerCase() === name.toLowerCase()
-    );
-
-    if (duplicateName) {
-      return res.status(409).json({ error: 'Profile name already exists.' });
-    }
-
-    // Update profile
-    allProfiles[profileIndex] = {
-      ...profile,
-      name,
-      avatar,
-      updatedAt: new Date().toISOString()
-    };
-
-    await writeProfiles(allProfiles);
+    profile.name = name;
+    profile.avatar = avatar;
+    await profile.save();
 
     await writeLog({ 
       event: 'profile_update', 
       userId: userIdResolved, 
       profileId: String(profileId),
-      details: { profileId, profileName: name, avatar } 
+      details: { profileId: String(profileId), profileName: name, avatar } 
     });
 
-    return res.json(allProfiles[profileIndex]);
+    return res.json({
+      id: String(profile._id),
+      userId: String(profile.userId),
+      name: profile.name,
+      avatar: profile.avatar,
+      likedContent: profile.likedContent || [],
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt
+    });
   } catch (e) {
     console.error('Error updating profile:', e);
     return res.status(500).json({ error: 'Failed to update profile.' });
   }
 });
 
-// ====== Delete Profile (DELETE) ======
 app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
   try {
-    const profileId = parseInt(req.params.id, 10);
+    const profileId = String(req.params.id);
     const userIdResolved = req.session?.userId;
+    if (!userIdResolved) return res.status(401).json({ error: 'Authentication required.' });
 
-    if (!userIdResolved) {
-      return res.status(401).json({ error: 'Authentication required.' });
-    }
+    const profile = await Profile.findById(profileId);
+    if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+    if (String(profile.userId) != String(userIdResolved)) return res.status(403).json({ error: 'Not authorized to delete this profile.' });
 
-    const allProfiles = await readProfiles();
-    const profileIndex = allProfiles.findIndex(p => p.id === profileId);
-
-    if (profileIndex === -1) {
-      return res.status(404).json({ error: 'Profile not found.' });
-    }
-
-    const profile = allProfiles[profileIndex];
-
-    // Verify ownership
-    if (String(profile.userId) !== String(userIdResolved)) {
-      return res.status(403).json({ error: 'Not authorized to delete this profile.' });
-    }
-
-    // Delete all likes associated with this profile
     await Like.deleteMany({ profileId: String(profileId) });
-
-    // Remove profile from array
-    allProfiles.splice(profileIndex, 1);
-    await writeProfiles(allProfiles);
+    await Profile.deleteOne({ _id: profileId });
 
     await writeLog({ 
       event: 'profile_delete', 
       userId: userIdResolved, 
       profileId: String(profileId),
-      details: { profileId, profileName: profile.name, avatar: profile.avatar } 
+      details: { profileId: String(profileId), profileName: profile.name, avatar: profile.avatar } 
     });
 
     return res.json({ ok: true, message: 'Profile deleted successfully.' });
@@ -524,6 +571,139 @@ app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
   }
 });
 
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    let dest;
+    if (file.fieldname === 'imageFile') {
+      dest = path.join(__dirname, '..', 'uploads/images');
+    } else if (file.fieldname === 'videoFile') {
+      dest = path.join(__dirname, '..', 'uploads/videos');
+    } else {
+      dest = path.join(__dirname, '..', 'uploads/other');
+    }
+    fs.mkdir(dest, { recursive: true }).then(() => cb(null, dest)).catch(cb);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  if (file.fieldname === 'imageFile') {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  } else if (file.fieldname === 'videoFile') {
+    if (file.mimetype === 'video/mp4') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only MP4 video files are allowed!'), false);
+    }
+  } else {
+    cb(new Error('Invalid file field!'), false);
+  }
+};
+
+const upload = multer({ storage: storage, fileFilter: fileFilter });
+
+app.post(
+  '/api/admin/content', 
+  requireAuth, 
+  requireAdmin, 
+  upload.fields([
+    { name: 'imageFile', maxCount: 1 },
+    { name: 'videoFile', maxCount: 1 }
+  ]), 
+  async (req, res) => {
+    
+    const { extId, title, year, genres, type } = req.body;
+
+    if (!extId || !title || !year || !genres || !type) {
+      return res.status(400).json({ ok: false, error: 'All text fields are required (extId, title, year, genres, type).' });
+    }
+    
+    const imageFile = req.files?.imageFile?.[0];
+    const videoFile = req.files?.videoFile?.[0];
+    
+    const existingContent = await Content.findOne({ extId: extId }).lean();
+    
+    if (!existingContent && (!imageFile || !videoFile)) {
+        return res.status(400).json({ ok: false, error: 'Image and Video files are required when creating new content.' });
+    }
+    let omdbData = {};
+    if (OMDB_API_KEY) {
+      try {
+        const url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}&y=${year}`;
+        const response = await axios.get(url);
+        
+        if (response.data && response.data.Response === "True") {
+          omdbData = {
+            plot: response.data.Plot,
+            director: response.data.Director,
+            actors: response.data.Actors ? response.data.Actors.split(',').map(s => s.trim()) : [],
+            rating: response.data.imdbRating ? `${response.data.imdbRating}/10 (IMDb)` : 'N/A',
+          };
+          console.log(`[OMDb] Fetched rating for ${title}: ${omdbData.rating}`);
+        } else {
+          console.warn(`[OMDb] Could not find data for ${title} (${year})`);
+        }
+      } catch (e) {
+        console.error('[OMDb] Error fetching data:', e.message);
+      }
+    } else {
+      console.warn('[OMDb] OMDB_API_KEY is not set. Skipping rating fetch.');
+    }
+    const doc = {
+      extId,
+      title,
+      year: Number(year),
+      genres: Array.isArray(genres) ? genres.filter(Boolean) : String(genres).split(',').map(s => s.trim()).filter(Boolean),
+      type,
+      ...omdbData 
+    };
+    
+    if (imageFile) {
+      const path = `/uploads/images/${imageFile.filename}`;
+      doc.imagePath = path;
+      doc.cover = path; 
+  }
+    
+    if (videoFile) {
+        doc.videoPath = `/uploads/videos/${videoFile.filename}`;
+    }
+    try {
+      const upsertRes = await Content.updateOne(
+        { extId: doc.extId },
+        { 
+          $set: doc, 
+          $setOnInsert: { likes: 0 } 
+        },
+        { upsert: true } 
+      );
+
+      const finalDoc = await Content.findOne({ extId: doc.extId }).lean();
+      const logDetails = { contentExtId: finalDoc.extId, title: finalDoc.title };
+      
+      if (upsertRes.upsertedCount > 0) {
+        await writeLog({ event: 'content_create', userId: req.session.userId, details: logDetails });
+        return res.status(201).json({ ok: true, data: finalDoc, action: 'created' });
+      } else {
+        await writeLog({ event: 'content_update', userId: req.session.userId, details: logDetails });
+        return res.status(200).json({ ok: true, data: finalDoc, action: 'updated' });
+      }
+
+    } catch (err) {
+      console.error('POST /api/admin/content error:', err);
+      if (err?.code === 11000) {
+        return res.status(409).json({ ok:false, error: 'A content item with this External ID already exists.' });
+      }
+      await writeLog({ level: 'error', event: 'content_admin_op', userId: req.session.userId, details: { error: err.message } });
+      return res.status(500).json({ ok: false, error: 'Server error' });
+    }
+});
 // ====== Feed ======
 app.get('/api/feed', async (req, res) => {
   try {
@@ -761,7 +941,8 @@ async function seedContentIfNeeded() {
         year: Number(it.year ?? it.releaseYear ?? '') || undefined,
         genres,
         likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
-        cover: it.cover || it.poster || it.image || it.img || '',
+        cover: it.cover || it.poster || it.image || it.img || '', 
+        imagePath: it.cover || it.poster || it.image || it.img || '',
         type: it.type || (it.seasons ? 'Series' : 'Movie'),
       };
     };
@@ -782,7 +963,7 @@ async function seedContentIfNeeded() {
       } else {
         const updRes = await Content.updateOne(
           { extId: doc.extId },
-          { $set: { title: doc.title, year: doc.year, genres: doc.genres, cover: doc.cover, type: doc.type } }
+          { $set: { title: doc.title, year: doc.year, genres: doc.genres, imagePath: doc.imagePath, type: doc.type } }
         );
         inserted += 0;
         updated += (updRes.modifiedCount || 0);

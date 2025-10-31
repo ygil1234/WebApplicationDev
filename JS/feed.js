@@ -17,11 +17,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const API_BASE = "http://localhost:3000/api";
 
   const selectedIdStr   = localStorage.getItem("selectedProfileId");
-  const selectedId      = selectedIdStr ? Number(selectedIdStr) : NaN;
+  const selectedId      = selectedIdStr ? String(selectedIdStr) : "";
   const profileName     = localStorage.getItem("selectedProfileName");
   const profileAvatar   = localStorage.getItem("selectedProfileAvatar");
 
-  if (!selectedId || Number.isNaN(selectedId) || !profileName || !profileAvatar) {
+  if (!selectedId || !profileName || !profileAvatar) {
     window.location.href = "profiles.html";
     return;
   }
