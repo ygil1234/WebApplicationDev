@@ -9,7 +9,7 @@
   <style>
     .td-hero { position: relative; min-height: 40vh; color: #fff; }
     .td-hero__bg { position:absolute; inset:0; background-size:cover; background-position:center; filter:brightness(0.6); }
-    .td-hero__meta { position:relative; z-index:1; padding: 40px 20px; max-width: 1100px; margin: 0 auto; }
+    .td-hero__meta { position:relative; z-index:1; padding: 120px 20px 40px; max-width: 1100px; margin: 0 auto; }
     .td-meta__row { display:flex; gap:16px; align-items:center; flex-wrap: wrap; }
     .td-meta__likes { display:flex; align-items:center; gap:8px; }
     /* Elevate the body content above the global dim overlay from styles.css (body::before) */
@@ -32,6 +32,14 @@
     .td-progress__bar { height:100%; background:#e50914; width:0%; }
     .nf-card--mini { width: 180px; }
     .nf-card--mini .nf-card__meta { padding: 6px 8px; }
+    .td-back-link { position:absolute; top:84px; left:28px; z-index:1100; }
+    .td-back-link .btn { display:inline-flex; align-items:center; gap:6px; padding:6px 16px; border-radius:999px; border-color:rgba(255,255,255,0.5); background:rgba(0,0,0,0.65); color:#fff; box-shadow:0 8px 16px rgba(0,0,0,0.35); }
+    .td-back-link .btn:hover,
+    .td-back-link .btn:focus-visible { background:rgba(0,0,0,0.8); border-color:rgba(255,255,255,0.7); color:#fff; }
+    @media (max-width: 767px) {
+      .td-back-link { top:76px; left:16px; }
+      .td-back-link .btn { padding:6px 14px; font-size:0.9rem; }
+    }
   </style>
   <script defer src="JS/title.js"></script>
   <script>
@@ -109,8 +117,13 @@
   <main>
     <section id="titleHero" class="td-hero" aria-label="Title">
       <div class="td-hero__bg" id="titleBg"></div>
+      <div class="td-back-link">
+        <a href="feed.html" class="btn btn-sm btn-secondary" data-allow-default>
+          <span aria-hidden="true">←</span>
+          <span>Back</span>
+        </a>
+      </div>
       <div class="td-hero__meta">
-        <a href="feed.html" class="btn btn-sm btn-secondary" data-allow-default>← Back</a>
         <h1 id="titleName" class="mt-3"></h1>
         <div id="titleMeta" class="td-meta__row mt-1"></div>
         <p id="titleDesc" class="mt-2"></p>
