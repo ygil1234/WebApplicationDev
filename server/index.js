@@ -26,6 +26,11 @@ const ROW_SCROLL_STEP = Number.isFinite(ROW_SCROLL_STEP_RAW) && ROW_SCROLL_STEP_
   ? ROW_SCROLL_STEP_RAW
   : 5;
 const OMDB_API_KEY   = process.env.OMDB_API_KEY;
+const CONTENT_JSON_CANDIDATES = [
+  path.resolve(__dirname, 'content.json'),
+  path.resolve(process.cwd(), 'server/content.json'),
+  path.resolve(process.cwd(), 'content.json'),
+];
 
 // ====== CORS & JSON ======
 app.use(
@@ -808,6 +813,27 @@ app.post(
       );
 
       const finalDoc = await Content.findOne({ extId: doc.extId }).lean();
+      if (!finalDoc) {
+        throw new Error('Content was saved but could not be reloaded');
+      }
+
+      try {
+        await syncContentJsonWithDoc(finalDoc);
+        await seedContentIfNeeded({ force: true });
+      } catch (syncErr) {
+        console.error('POST /api/admin/content sync error:', syncErr);
+        await writeLog({
+          level: 'error',
+          event: 'content_admin_sync',
+          userId: req.session.userId,
+          details: { error: syncErr.message, extId: doc.extId },
+        });
+        return res.status(500).json({
+          ok: false,
+          error: 'Content saved but failed to sync content.json. Please retry.',
+        });
+      }
+
       const logDetails = { contentExtId: finalDoc.extId, title: finalDoc.title };
       
       if (upsertRes.upsertedCount > 0) {
@@ -848,11 +874,13 @@ app.post(
       if (!series) return res.status(404).json({ ok: false, error: 'Series not found' });
       if (!/series/i.test(series.type || '')) return res.status(400).json({ ok: false, error: 'Target content is not a Series' });
 
+      const durationRaw = Number.parseInt((req.body && (req.body.durationSec ?? req.body.duration)) ?? '0', 10);
       const ep = {
         season: Number(season),
         episode: Number(episode),
         title: String(title || `Episode ${episode}`),
         videoPath: `/uploads/videos/${videoFile.filename}`,
+        durationSec: Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : 0,
       };
 
       // Upsert: remove existing same S/E and push new one
@@ -862,6 +890,28 @@ app.post(
       filtered.sort((a,b)=> (a.season - b.season) || (a.episode - b.episode));
       series.episodes = filtered;
       await series.save();
+
+      const updatedSeries = await Content.findOne({ extId: String(seriesExtId) }).lean();
+      if (!updatedSeries) {
+        throw new Error('Series saved but could not be reloaded');
+      }
+
+      try {
+        await syncContentJsonWithDoc(updatedSeries, { overrideEpisodes: updatedSeries.episodes || [] });
+        await seedContentIfNeeded({ force: true });
+      } catch (syncErr) {
+        console.error('POST /api/admin/episodes sync error:', syncErr);
+        await writeLog({
+          level: 'error',
+          event: 'episode_admin_sync',
+          userId: req.session.userId,
+          details: { error: syncErr.message, seriesExtId },
+        });
+        return res.status(500).json({
+          ok: false,
+          error: 'Episode saved but failed to sync content.json. Please retry.',
+        });
+      }
 
       await writeLog({ event: 'episode_upsert', userId: req.session.userId, details: { seriesExtId, season: ep.season, episode: ep.episode, title: ep.title } });
       return res.status(201).json({ ok: true, seriesExtId, episode: ep });
@@ -1387,48 +1437,161 @@ app.post('/api/logout', async (req, res) => {
   });
 });
 
-// ====== Seed from content.json  ======
-async function seedContentIfNeeded() {
-  if (!SEED_CONTENT) return;
-  try {
-    const candidates = [
-      path.resolve(__dirname, 'content.json'),
-      path.resolve(process.cwd(), 'server/content.json'),
-      path.resolve(process.cwd(), 'content.json'),
-    ];
-
-    let raw = null, usedPath = null;
-    for (const p of candidates) {
-      try { raw = await fs.readFile(p, 'utf-8'); usedPath = p; break; } catch {}
+function unwrapContentJsonRoot(data) {
+  if (Array.isArray(data)) {
+    return {
+      items: data,
+      wrap: (items) => items,
+    };
+  }
+  if (data && typeof data === 'object') {
+    const preferredKeys = ['items', 'catalog', 'data'];
+    for (const key of preferredKeys) {
+      if (Array.isArray(data[key])) {
+        return {
+          items: data[key],
+          wrap: (items) => ({ ...data, [key]: items }),
+        };
+      }
     }
-    if (!raw) throw new Error('content.json not found in server/ or project root');
+    for (const key of Object.keys(data)) {
+      if (Array.isArray(data[key])) {
+        return {
+          items: data[key],
+          wrap: (items) => ({ ...data, [key]: items }),
+        };
+      }
+    }
+  }
+  throw new Error('content.json must be/contain an array');
+}
 
-    const data = JSON.parse(raw);
-    let arr =
-      Array.isArray(data) ? data :
-      (data && typeof data === 'object' && Array.isArray(data.items))   ? data.items   :
-      (data && typeof data === 'object' && Array.isArray(data.catalog)) ? data.catalog :
-      (data && typeof data === 'object' && Array.isArray(data.data))    ? data.data    :
-      (data && typeof data === 'object' ? Object.values(data).find(Array.isArray) : null);
+async function readContentJsonFile() {
+  let lastErr = null;
+  for (const candidate of CONTENT_JSON_CANDIDATES) {
+    try {
+      const raw = await fs.readFile(candidate, 'utf8');
+      const parsed = JSON.parse(raw);
+      const { items, wrap } = unwrapContentJsonRoot(parsed);
+      if (!Array.isArray(items)) {
+        throw new Error('content.json must be/contain an array');
+      }
+      return { items: items.slice(), wrap, usedPath: candidate };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error('content.json not found');
+}
 
-    if (!Array.isArray(arr)) throw new Error('content.json must be/contain an array');
+async function writeContentJsonFile(targetPath, items, wrap) {
+  const payload = wrap(items);
+  const serialized = `${JSON.stringify(payload, null, 2)}\n`;
+  await fs.writeFile(targetPath, serialized, 'utf8');
+}
+
+function normalizeEpisodeRecord(ep) {
+  if (!ep) return null;
+  const seasonRaw = Number.parseInt(ep.season ?? ep.seasonNumber ?? '', 10);
+  const episodeRaw = Number.parseInt(ep.episode ?? ep.episodeNumber ?? '', 10);
+  if (!Number.isFinite(seasonRaw) || !Number.isFinite(episodeRaw)) return null;
+  const videoPathRaw = ep.videoPath || ep.path || ep.url;
+  if (!videoPathRaw) return null;
+  const durationRaw = Number.parseInt(ep.durationSec ?? ep.duration ?? '0', 10);
+  const normalized = {
+    season: seasonRaw,
+    episode: episodeRaw,
+    title: typeof ep.title === 'string' ? ep.title : '',
+    videoPath: String(videoPathRaw),
+    durationSec: Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : 0,
+  };
+  return normalized;
+}
+
+function buildJsonEntryFromDoc(doc, prevEntry = {}, { overrideEpisodes } = {}) {
+  const next = { ...prevEntry };
+  const extId = String(doc.extId || prevEntry.id || '').trim();
+  if (!extId) return prevEntry;
+  next.id = extId;
+
+  if (doc.title) next.title = doc.title;
+  if (doc.year != null) next.year = doc.year;
+  if (Array.isArray(doc.genres)) next.genres = doc.genres.slice();
+  if (doc.type) next.type = doc.type;
+
+  if (doc.cover) next.cover = doc.cover;
+  if (doc.imagePath) next.imagePath = doc.imagePath;
+  if (doc.videoPath) next.videoPath = doc.videoPath;
+
+  if (doc.plot) next.plot = doc.plot;
+  if (doc.director) next.director = doc.director;
+  if (Array.isArray(doc.actors)) next.actors = doc.actors.slice();
+  if (doc.rating) next.rating = doc.rating;
+  if (doc.ratingValue != null) next.ratingValue = doc.ratingValue;
+  if (doc.likes != null) next.likes = doc.likes;
+
+  const episodesSource = overrideEpisodes ?? doc.episodes;
+  if (episodesSource !== undefined) {
+    if (Array.isArray(episodesSource)) {
+      const normalized = episodesSource
+        .map(normalizeEpisodeRecord)
+        .filter((ep) => ep !== null);
+      const isSeries = /series/i.test(String(doc.type ?? prevEntry.type ?? ''));
+      if (normalized.length || isSeries) {
+        next.episodes = normalized;
+      } else {
+        delete next.episodes;
+      }
+    } else if (episodesSource === null) {
+      delete next.episodes;
+    }
+  }
+
+  return next;
+}
+
+async function syncContentJsonWithDoc(doc, options = {}) {
+  if (!doc?.extId) return;
+  const { items, wrap, usedPath } = await readContentJsonFile();
+  const targetId = String(doc.extId).trim();
+  const idx = items.findIndex((item) => {
+    const candidateId = String(item?.id ?? item?.extId ?? '').trim();
+    return candidateId === targetId;
+  });
+  const prev = idx >= 0 ? items[idx] : {};
+  const next = buildJsonEntryFromDoc(doc, prev, options);
+  if (next.likes == null) next.likes = prev.likes ?? doc.likes ?? 0;
+  if (idx >= 0) {
+    items[idx] = next;
+  } else {
+    items.push(next);
+  }
+  await writeContentJsonFile(usedPath, items, wrap);
+}
+
+// ====== Seed from content.json  ======
+async function seedContentIfNeeded({ force = false } = {}) {
+  if (!force && !SEED_CONTENT) return;
+  try {
+    const { items: arr, usedPath } = await readContentJsonFile();
 
     const toDoc = (it) => {
       const title = it.title || it.name || 'Untitled';
-      const extId = String(it.id ?? title).trim();
+      const extId = String(it.id ?? it.extId ?? title).trim();
       const genres = Array.isArray(it.genres) ? it.genres
-                    : Array.isArray(it.genre)  ? it.genre
-                    : (typeof it.genre === 'string'
-                        ? it.genre.split(',').map(s => s.trim()).filter(Boolean)
-                        : []);
+        : Array.isArray(it.genre) ? it.genre
+        : typeof it.genre === 'string'
+          ? it.genre.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+      const cover = it.cover || it.poster || it.image || it.img || '';
       const doc = {
         extId,
         title,
         year: Number(it.year ?? it.releaseYear ?? '') || undefined,
         genres,
         likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
-        cover: it.cover || it.poster || it.image || it.img || '',
-        imagePath: it.cover || it.poster || it.image || it.img || '',
+        cover,
+        imagePath: cover,
         type: it.type || (it.seasons ? 'Series' : 'Movie'),
       };
 
@@ -1449,6 +1612,12 @@ async function seedContentIfNeeded() {
         }
       }
       if (it.videoPath) doc.videoPath = String(it.videoPath);
+      if (Array.isArray(it.episodes)) {
+        const normalized = it.episodes
+          .map(normalizeEpisodeRecord)
+          .filter((ep) => ep !== null);
+        doc.episodes = normalized;
+      }
 
       return doc;
     };
@@ -1481,12 +1650,12 @@ async function seedContentIfNeeded() {
         if ('rating' in doc) baseUpdate.rating = doc.rating;
         if ('ratingValue' in doc) baseUpdate.ratingValue = doc.ratingValue;
         if ('videoPath' in doc) baseUpdate.videoPath = doc.videoPath;
+        if ('episodes' in doc) baseUpdate.episodes = doc.episodes;
 
         const updRes = await Content.updateOne(
           { extId: doc.extId },
           { $set: baseUpdate }
         );
-        inserted += 0;
         updated += (updRes.modifiedCount || 0);
       }
     }

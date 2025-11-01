@@ -157,7 +157,10 @@
       "Robin Wright",
       "Gary Sinise"
     ],
-    "rating": "8.8/10 (IMDb)"
+    "rating": "8.8/10 (IMDb)",
+    "imagePath": "IMG/feed/forrestgump.jpg",
+    "videoPath": "/uploads/videos/videoFile-1762031760874-110576184.mp4",
+    "ratingValue": 8.8
   },
   {
     "id": "m15",
@@ -563,7 +566,7 @@
       "Drama",
       "Thriller"
     ],
-    "likes": 7800,
+    "likes": 7801,
     "cover": "IMG/feed/breakingbad.jpg",
     "type": "Series",
     "plot": "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student to secure his family's future.",
@@ -572,7 +575,33 @@
       "Aaron Paul",
       "Anna Gunn"
     ],
-    "rating": "9.5/10 (IMDb)"
+    "rating": "9.5/10 (IMDb)",
+    "imagePath": "IMG/feed/breakingbad.jpg",
+    "director": "N/A",
+    "ratingValue": 9.5,
+    "episodes": [
+      {
+        "season": 1,
+        "episode": 1,
+        "title": "Episode 1",
+        "videoPath": "/uploads/videos/videoFile-1762031804178-649886854.mp4",
+        "durationSec": 0
+      },
+      {
+        "season": 1,
+        "episode": 2,
+        "title": "Episode 2",
+        "videoPath": "/uploads/videos/videoFile-1762031823393-483602256.mp4",
+        "durationSec": 0
+      },
+      {
+        "season": 1,
+        "episode": 3,
+        "title": "Trailer",
+        "videoPath": "/uploads/videos/videoFile-1762031838777-473164277.mp4",
+        "durationSec": 0
+      }
+    ]
   },
   {
     "id": "s6",
