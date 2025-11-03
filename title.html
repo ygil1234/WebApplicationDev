@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Title - Netflix</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .td-hero { position: relative; min-height: 40vh; color: #fff; }
+    .td-hero__bg { position:absolute; inset:0; background-size:cover; background-position:center; filter:brightness(0.6); }
+    .td-hero__meta { position:relative; z-index:1; padding: 120px 20px 40px; max-width: 1100px; margin: 0 auto; }
+    .td-meta__row { display:flex; gap:16px; align-items:center; flex-wrap: wrap; }
+    .td-meta__likes { display:flex; align-items:center; gap:8px; }
+    /* Elevate the body content above the global dim overlay from styles.css (body::before) */
+    .td-body { position: relative; z-index: 1; max-width:1100px; margin: 20px auto; padding: 0 20px; }
+    .td-section { margin-top: 24px; }
+    /* Ensure headings and episode titles are white */
+    .td-section h3,
+    #episodesSection > h3,
+    #similarSection > h3 { color: #fff !important; }
+    /* Force the entire episode title column to white */
+    #episodesSection,
+    #episodesSection *,
+    #episodesList,
+    #episodesList .td-episodes__item,
+    #episodesList .td-episodes__item > div:first-of-type,
+    #episodesList .td-episodes__item > div:first-of-type *,
+    #episodesList .td-episodes__item strong { color: #fff !important; }
+    .td-episodes__item { display:flex; justify-content: space-between; align-items:center; padding:10px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .td-progress { height: 4px; background: rgba(255,255,255,0.2); width: 160px; border-radius: 2px; overflow:hidden; }
+    .td-progress__bar { height:100%; background:#e50914; width:0%; }
+    .nf-card--mini { width: 180px; }
+    .nf-card--mini .nf-card__meta { padding: 6px 8px; }
+    .td-back-link { position:absolute; top:84px; left:28px; z-index:1100; }
+    .td-back-link .btn { display:inline-flex; align-items:center; gap:6px; padding:6px 16px; border-radius:999px; border-color:rgba(255,255,255,0.5); background:rgba(0,0,0,0.65); color:#fff; box-shadow:0 8px 16px rgba(0,0,0,0.35); }
+    .td-back-link .btn:hover,
+    .td-back-link .btn:focus-visible { background:rgba(0,0,0,0.8); border-color:rgba(255,255,255,0.7); color:#fff; }
+    @media (max-width: 767px) {
+      .td-back-link { top:76px; left:16px; }
+      .td-back-link .btn { padding:6px 14px; font-size:0.9rem; }
+    }
+  </style>
+  <script defer src="JS/title.js"></script>
+  <script>
+    (function () {
+      document.addEventListener('click', (e) => {
+        const allow = e.target.closest('#alphaToggle, label[for="alphaToggle"], .sort-toggle, [data-allow-default], .allow-default, button, input, select, textarea');
+        if (allow) return;
+        const a = e.target.closest('a');
+        if (!a) return;
+        if (a.id === 'logoutLink') return;
+        const href = (a.getAttribute('href') || '').trim().toLowerCase();
+        const isDead = href === '' || href === '#' || href === 'javascript:void(0)';
+        if (isDead) e.preventDefault();
+      }, true);
+    })();
+  </script>
+  <script>
+    (function () {
+      const onReady = () => {
+        const logoutLink = document.getElementById('logoutLink');
+        if (!logoutLink) return;
+        logoutLink.addEventListener('click', function (e) {
+          e.preventDefault();
+          localStorage.clear();
+          window.location.href = 'login.html';
+        });
+      };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady);
+      else onReady();
+    })();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>window.__APP_TITLE_PAGE__ = true;</script>
+  <script src="JS/feed.js" defer></script>
+</head>
+<body class="nf-nav-page">
+  <div id="nav-mount"></div><!-- <header class="nf-nav" role="navigation" aria-label="Netflix primary">
+    <a class="nf-nav__brand" href="feed.html" aria-label="Netflix Home">
+      <img src="IMG/Netflix-Logo.png" alt="Netflix" />
+    </a>
+    <nav class="nf-nav__menu" aria-label="Primary">
+      <a class="active" href="feed.html">Home</a>
+      <a href="#">TV Shows</a>
+      <a href="#">Movies</a>
+      <a href="#">Games</a>
+      <a href="#">New &amp; Popular</a>
+      <a href="#">My List</a>
+      <a href="#">Browse by Languages</a>
+    </nav>
+    <div class="nf-nav__actions">
+      <div class="nf-toolbar">
+        <div class="nf-searchbox" id="searchBox" aria-expanded="false">
+          <button id="searchBtn" class="nf-searchbtn" type="button" aria-label="Search" aria-controls="searchInput">
+            <img class="nf-icon" src="IMG/icons/search.svg" alt="Search" />
+          </button>
+          <input id="searchInput" class="nf-search" type="search" placeholder="Titles, people, genres" aria-label="Search titles" />
+        </div>
+        <label class="alpha-toggle" for="alphaToggle">
+          <input id="alphaToggle" type="checkbox" />
+          <span>A–Z</span>
+        </label>
+      </div>
+      <a class="nf-profile nf-iconlink" aria-label="Profile">
+        <img id="navAvatar" class="nf-avatar" src="IMG/profile1.jpg" alt="Profile" />
+        <img class="nf-caret" src="IMG/icons/caret-down.svg" alt="" />
+      </a>
+      <div id="greet" style="white-space:nowrap;"></div>
+      <a class="nf-iconlink" aria-label="Notifications">
+        <img class="nf-icon" src="IMG/icons/bell-outline.svg" alt="" />
+      </a>
+      <a id="logoutLink" class="nf-nav__menu-link" href="#" style="margin-left:8px;">Logout</a>
+    </div>
+  </header> -->
+
+  <main>
+    <section id="titleHero" class="td-hero" aria-label="Title">
+      <div class="td-hero__bg" id="titleBg"></div>
+      <div class="td-back-link">
+        <a href="feed.html" class="btn btn-sm btn-secondary" data-allow-default>
+          <span aria-hidden="true">←</span>
+          <span>Back</span>
+        </a>
+      </div>
+      <div class="td-hero__meta">
+        <h1 id="titleName" class="mt-3"></h1>
+        <div id="titleMeta" class="td-meta__row mt-1"></div>
+        <p id="titleDesc" class="mt-2"></p>
+        <div class="td-meta__row mt-3">
+          <button id="btnStart" class="nf-cta nf-cta--play" type="button">
+            <svg viewBox="0 0 24 24" class="nf-cta__icon" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>
+            <span>Start Watching</span>
+          </button>
+          <button id="btnContinue" class="nf-cta nf-cta--play" type="button" hidden>
+            <svg viewBox="0 0 24 24" class="nf-cta__icon" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>
+            <span>Continue Watching</span>
+          </button>
+          <button id="btnRewatch" class="nf-cta nf-cta--info" type="button" hidden>
+            <span>Rewatch</span>
+          </button>
+          <div class="td-meta__likes">
+            <button class="btn btn-sm rounded-pill like-btn" id="likeBtn" type="button" aria-pressed="false" aria-label="Like">
+              <span class="heart" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" role="img">
+                  <path d="M12 21s-6.716-4.555-9.193-7.032C.977 12.139.5 10.96.5 9.708.5 6.817 2.817 4.5 5.708 4.5c1.522 0 2.974.62 4.042 1.688L12 8.439l2.25-2.25A5.726 5.726 0 0 1 18.292 4.5c2.891 0 5.208 2.317 5.208 5.208 0 1.252-.477 2.431-2.307 4.26C18.716 16.445 12 21 12 21z"></path>
+                </svg>
+              </span>
+              <span class="like-count">0</span>
+            </button>
+          </div>
+        </div>
+        <div id="actors" class="mt-2"></div>
+      </div>
+    </section>
+
+    <section class="td-body">
+      <div class="td-section" id="playerSection" hidden>
+        <div class="player-wrap">
+          <video id="player" width="100%" controls>
+            <source id="playerSource" type="video/mp4" />
+            Your browser does not support HTML5 video.
+          </video>
+
+          <!-- Overlay controls on top of the player -->
+          <div class="player-overlay-controls" aria-label="Player controls overlay">
+            <div class="player-overlay-controls__cluster player-overlay-controls__cluster--left">
+              <button id="btnSeekBack" class="player-ctrl player-ctrl--seek" type="button" aria-label="Back 10 seconds">
+                <span aria-hidden="true">⏪ 10s</span>
+              </button>
+              <button id="btnSeekFwd" class="player-ctrl player-ctrl--seek" type="button" aria-label="Forward 10 seconds">
+                <span aria-hidden="true">10s ⏩</span>
+              </button>
+            </div>
+
+            <div class="player-overlay-controls__cluster player-overlay-controls__cluster--right">
+              <button id="btnEpisodesOverlay" class="player-ctrl player-ctrl--list" type="button" aria-label="Show episodes">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                  <path fill="#fff" d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h12v2H3v-2z"/>
+                </svg>
+              </button>
+              <button id="btnNextEpisode" class="player-ctrl player-ctrl--next" type="button" aria-label="Next episode" title="Next episode" hidden>
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+                  <path fill="#fff" d="M5 4l10 8-10 8V4z"/>
+                  <rect x="17" y="4" width="2" height="16" fill="#fff" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Episodes drawer overlay -->
+          <div id="episodesDrawer" class="player-episodes-drawer" hidden aria-label="Episodes">
+            <div class="player-episodes-drawer__head">
+              <span>Episodes</span>
+              <button id="btnCloseEpisodes" class="player-ctrl player-ctrl--close" type="button" aria-label="Close episodes">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                  <path fill="#fff" d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.41 4.29 19.71 2.88 18.3 9.17 12 2.88 5.71 4.29 4.29 10.59 10.59 16.89 4.29z"/>
+                </svg>
+              </button>
+            </div>
+            <div id="episodesDrawerList" class="player-episodes-drawer__list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="td-section" id="episodesSection" hidden>
+        <h3 class="text-white">Episodes</h3>
+        <div id="episodesList" class="text-white"></div>
+      </div>
+
+      <div class="td-section" id="similarSection">
+        <h3 class="text-white">Similar to this</h3>
+        <div class="nf-row__viewport">
+          <button type="button" class="btn nf-row__arrow nf-row__arrow--left" aria-label="Scroll left" disabled>
+            <svg viewBox="0 0 24 24" width="36" height="36" class="nf-icon" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div id="similarRow" class="nf-row__scroller"></div>
+          <button type="button" class="btn nf-row__arrow nf-row__arrow--right" aria-label="Scroll right">
+            <svg viewBox="0 0 24 24" width="36" height="36" class="nf-icon" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

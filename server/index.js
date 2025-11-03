@@ -26,6 +26,11 @@ const ROW_SCROLL_STEP = Number.isFinite(ROW_SCROLL_STEP_RAW) && ROW_SCROLL_STEP_
   ? ROW_SCROLL_STEP_RAW
   : 5;
 const OMDB_API_KEY   = process.env.OMDB_API_KEY;
+const CONTENT_JSON_CANDIDATES = [
+  path.resolve(__dirname, 'content.json'),
+  path.resolve(process.cwd(), 'server/content.json'),
+  path.resolve(process.cwd(), 'content.json'),
+];
 
 // ====== CORS & JSON ======
 app.use(
@@ -99,6 +104,18 @@ const contentSchema = new mongoose.Schema(
     ratingValue:{ type: Number, default: null },
     imagePath:  { type: String }, 
     videoPath:  { type: String }, 
+    episodes:   { 
+      type: [
+        new mongoose.Schema({
+          season:     { type: Number, required: true },
+          episode:    { type: Number, required: true },
+          title:      { type: String, default: '' },
+          videoPath:  { type: String, required: true },
+          durationSec:{ type: Number, default: 0 },
+        }, { _id: false })
+      ],
+      default: []
+    },
   },
   { timestamps: true }
 );
@@ -174,9 +191,36 @@ User.init().catch(e => console.warn('[mongo] User.init index warn:', e.message))
 Content.init().catch(e => console.warn('[mongo] Content.init index warn:', e.message));
 Like.init().catch(e => console.warn('[mongo] Like.init index warn:', e.message));
 
+// ====== Watch Progress Schema ======
+const watchProgressSchema = new mongoose.Schema(
+  {
+    profileId:    { type: String, index: true, required: true },
+    contentExtId: { type: String, index: true, required: true },
+    season:       { type: Number, default: null },
+    episode:      { type: Number, default: null },
+    positionSec:  { type: Number, default: 0 },
+    durationSec:  { type: Number, default: 0 },
+    completed:    { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+watchProgressSchema.index({ profileId: 1, contentExtId: 1, season: 1, episode: 1 }, { unique: true });
+
+const WatchProgress = mongoose.models.WatchProgress || mongoose.model('WatchProgress', watchProgressSchema);
+
 // ====== Static Front-End ======
 app.use(express.static(path.join(__dirname, '..')));
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+// Static uploads with explicit headers for videos (ensure inline playback)
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+app.use('/uploads', express.static(uploadsDir, {
+  setHeaders: (res, filePath) => {
+    if (/\.mp4$/i.test(filePath)) {
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Disposition', 'inline');
+    }
+  }
+}));
 
 
 // ====== Health ======
@@ -217,6 +261,85 @@ function parsePositiveInt(value, fallback = 0) {
 async function writeLog({ level = 'info', event, userId = null, profileId = null, details = {} }) {
   try { await Log.create({ level, event, userId, profileId, details }); }
   catch (e) { console.warn('[log] skip:', e.message); }
+}
+
+// ====== Seed content fallback cache (for missing cover/imagePath) ======
+let __seedCache = null; // Map extId -> item from server/content.json
+async function loadSeedCache() {
+  if (__seedCache) return __seedCache;
+  try {
+    const candidates = [
+      path.resolve(__dirname, 'content.json'),
+      path.resolve(process.cwd(), 'server/content.json'),
+      path.resolve(process.cwd(), 'content.json'),
+    ];
+    let raw = null;
+    for (const p of candidates) { try { raw = await fs.readFile(p, 'utf-8'); break; } catch {} }
+    if (!raw) { __seedCache = new Map(); return __seedCache; }
+    const data = JSON.parse(raw);
+    const arr = Array.isArray(data) ? data : (data && typeof data === 'object' ? Object.values(data).find(Array.isArray) : []);
+    const map = new Map();
+    if (Array.isArray(arr)) {
+      for (const it of arr) {
+        const id = String(it.id ?? it.extId ?? it.title ?? '').trim();
+        if (!id) continue;
+        map.set(id, it);
+      }
+    }
+    __seedCache = map;
+  } catch {
+    __seedCache = new Map();
+  }
+  return __seedCache;
+}
+async function getSeedItem(extId) {
+  if (!extId) return null;
+  const cache = await loadSeedCache();
+  return cache.get(String(extId)) || null;
+}
+
+function isHttpUrl(u) {
+  return /^https?:\/\//i.test(String(u || ''));
+}
+
+async function resolveCoverForDoc(doc) {
+  // Prefer provided cover/imagePath if valid; otherwise, fall back to seed cover
+  const pick = (doc && (doc.cover || doc.imagePath)) ? (doc.cover || doc.imagePath) : '';
+  const candidate = String(pick || '').trim();
+  // If remote URL, trust it
+  if (candidate && isHttpUrl(candidate)) return candidate;
+  // If relative asset under IMG/, keep as-is
+  if (/^\/?IMG\//i.test(candidate)) return candidate;
+  // If it's a local path (e.g., /uploads/...), verify exists; else, fallback
+  if (candidate) {
+    try {
+      const rel = candidate.replace(/^\/+/, '');
+      const abs = path.join(__dirname, '..', rel);
+      await fs.access(abs);
+      return candidate; // existing file
+    } catch {
+      // will try seed fallback below
+    }
+  }
+  // Seed fallback
+  try {
+    const seed = await getSeedItem(doc?.extId || doc?.id || '');
+    const fb = seed?.cover || seed?.poster || seed?.image || seed?.img || '';
+    if (fb) return fb;
+  } catch {}
+  return candidate; // may be empty; frontend will handle gracefully
+}
+
+async function findMostRecentVideoUpload() {
+  try {
+    const dir = path.join(__dirname, '..', 'uploads', 'videos');
+    const files = await fs.readdir(dir);
+    const mp4s = files.filter(f => /\.mp4$/i.test(f));
+    if (!mp4s.length) return null;
+    const stats = await Promise.all(mp4s.map(async f => ({ f, s: await fs.stat(path.join(dir, f)) })));
+    stats.sort((a,b) => b.s.mtimeMs - a.s.mtimeMs);
+    return `/uploads/videos/${stats[0].f}`;
+  } catch { return null; }
 }
 
 // ====== Authentication Middleware ======
@@ -618,8 +741,15 @@ app.post(
     
     const existingContent = await Content.findOne({ extId: extId }).lean();
     
-    if (!existingContent && (!imageFile || !videoFile)) {
-        return res.status(400).json({ ok: false, error: 'Image and Video files are required when creating new content.' });
+    // For new content: require image for all; require video only for Movies
+    if (!existingContent) {
+      const isMovie = /movie/i.test(String(type || ''));
+      if (!imageFile || (isMovie && !videoFile)) {
+        return res.status(400).json({ ok: false, error: isMovie
+          ? 'Image and Video files are required when creating a Movie.'
+          : 'Image file is required when creating a Series.'
+        });
+      }
     }
     let omdbData = {};
     if (OMDB_API_KEY) {
@@ -666,7 +796,11 @@ app.post(
   }
     
     if (videoFile) {
+      const isMovie = /movie/i.test(String(type || ''));
+      if (isMovie) {
         doc.videoPath = `/uploads/videos/${videoFile.filename}`;
+      }
+      // For Series, videos should be added via /api/admin/episodes; ignore here to avoid bad data
     }
     try {
       const upsertRes = await Content.updateOne(
@@ -679,6 +813,27 @@ app.post(
       );
 
       const finalDoc = await Content.findOne({ extId: doc.extId }).lean();
+      if (!finalDoc) {
+        throw new Error('Content was saved but could not be reloaded');
+      }
+
+      try {
+        await syncContentJsonWithDoc(finalDoc);
+        await seedContentIfNeeded({ force: true });
+      } catch (syncErr) {
+        console.error('POST /api/admin/content sync error:', syncErr);
+        await writeLog({
+          level: 'error',
+          event: 'content_admin_sync',
+          userId: req.session.userId,
+          details: { error: syncErr.message, extId: doc.extId },
+        });
+        return res.status(500).json({
+          ok: false,
+          error: 'Content saved but failed to sync content.json. Please retry.',
+        });
+      }
+
       const logDetails = { contentExtId: finalDoc.extId, title: finalDoc.title };
       
       if (upsertRes.upsertedCount > 0) {
@@ -697,6 +852,128 @@ app.post(
       await writeLog({ level: 'error', event: 'content_admin_op', userId: req.session.userId, details: { error: err.message } });
       return res.status(500).json({ ok: false, error: 'Server error' });
     }
+});
+
+// ====== Admin: Add/Update Episode for Series ======
+app.post(
+  '/api/admin/episodes',
+  requireAuth,
+  requireAdmin,
+  upload.fields([
+    { name: 'videoFile', maxCount: 1 },
+  ]),
+  async (req, res) => {
+    try {
+      const { seriesExtId, season, episode, title } = req.body || {};
+      const videoFile = req.files?.videoFile?.[0];
+      if (!seriesExtId || !season || !episode || !videoFile) {
+        return res.status(400).json({ ok: false, error: 'seriesExtId, season, episode and videoFile are required' });
+      }
+
+      const series = await Content.findOne({ extId: String(seriesExtId) });
+      if (!series) return res.status(404).json({ ok: false, error: 'Series not found' });
+      if (!/series/i.test(series.type || '')) return res.status(400).json({ ok: false, error: 'Target content is not a Series' });
+
+      const durationRaw = Number.parseInt((req.body && (req.body.durationSec ?? req.body.duration)) ?? '0', 10);
+      const ep = {
+        season: Number(season),
+        episode: Number(episode),
+        title: String(title || `Episode ${episode}`),
+        videoPath: `/uploads/videos/${videoFile.filename}`,
+        durationSec: Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : 0,
+      };
+
+      // Upsert: remove existing same S/E and push new one
+      const filtered = (series.episodes || []).filter(e => !(Number(e.season) === ep.season && Number(e.episode) === ep.episode));
+      filtered.push(ep);
+      // sort by season then episode
+      filtered.sort((a,b)=> (a.season - b.season) || (a.episode - b.episode));
+      series.episodes = filtered;
+      await series.save();
+
+      const updatedSeries = await Content.findOne({ extId: String(seriesExtId) }).lean();
+      if (!updatedSeries) {
+        throw new Error('Series saved but could not be reloaded');
+      }
+
+      try {
+        await syncContentJsonWithDoc(updatedSeries, { overrideEpisodes: updatedSeries.episodes || [] });
+        await seedContentIfNeeded({ force: true });
+      } catch (syncErr) {
+        console.error('POST /api/admin/episodes sync error:', syncErr);
+        await writeLog({
+          level: 'error',
+          event: 'episode_admin_sync',
+          userId: req.session.userId,
+          details: { error: syncErr.message, seriesExtId },
+        });
+        return res.status(500).json({
+          ok: false,
+          error: 'Episode saved but failed to sync content.json. Please retry.',
+        });
+      }
+
+      await writeLog({ event: 'episode_upsert', userId: req.session.userId, details: { seriesExtId, season: ep.season, episode: ep.episode, title: ep.title } });
+      return res.status(201).json({ ok: true, seriesExtId, episode: ep });
+    } catch (err) {
+      console.error('POST /api/admin/episodes error:', err);
+      await writeLog({ level: 'error', event: 'episode_admin_op', userId: req.session.userId, details: { error: err.message } });
+      return res.status(500).json({ ok: false, error: 'Server error' });
+    }
+  }
+);
+
+// ====== Admin: Repair media paths (cleanup stale DB entries) ======
+app.post('/api/admin/repair-media-paths', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const items = await Content.find({}).lean();
+    let cleaned = 0, episodePruned = 0, checked = 0;
+    const existsLocal = async (p) => {
+      try {
+        const rel = String(p || '').replace(/^\/+/, '');
+        const abs = path.join(__dirname, '..', rel);
+        await fs.access(abs);
+        return true;
+      } catch { return false; }
+    };
+    for (const it of items) {
+      checked++;
+      const unset = {};
+      const set = {};
+      if (it.videoPath && /^\/?uploads\//i.test(String(it.videoPath))) {
+        const ok = await existsLocal(it.videoPath);
+        if (!ok) { unset.videoPath = ''; cleaned++; }
+      }
+      if (it.imagePath && /^\/?uploads\//i.test(String(it.imagePath))) {
+        const ok = await existsLocal(it.imagePath);
+        if (!ok) { unset.imagePath = ''; cleaned++; }
+      }
+      if (it.cover && /^\/?uploads\//i.test(String(it.cover))) {
+        const ok = await existsLocal(it.cover);
+        if (!ok) { unset.cover = ''; cleaned++; }
+      }
+      if (Array.isArray(it.episodes) && it.episodes.length) {
+        const checks = await Promise.all(it.episodes.map(e => existsLocal(e.videoPath)));
+        const filtered = it.episodes.filter((_, i) => checks[i]);
+        if (filtered.length !== it.episodes.length) {
+          set.episodes = filtered;
+          episodePruned += (it.episodes.length - filtered.length);
+        }
+      }
+      if (Object.keys(unset).length || Object.keys(set).length) {
+        const update = {};
+        if (Object.keys(unset).length) update.$unset = unset;
+        if (Object.keys(set).length) update.$set = set;
+        await Content.updateOne({ _id: it._id }, update);
+      }
+    }
+    await writeLog({ event: 'admin_repair_media_paths', details: { checked, cleaned, episodePruned } });
+    res.json({ ok: true, checked, cleaned, episodePruned });
+  } catch (err) {
+    console.error('POST /api/admin/repair-media-paths error:', err);
+    await writeLog({ level: 'error', event: 'admin_repair_media_paths', details: { error: err.message } });
+    res.status(500).json({ ok: false, error: 'Server error during repair' });
+  }
 });
 // ====== Feed ======
 app.get('/api/feed', async (req, res) => {
@@ -795,11 +1072,30 @@ app.get('/api/search', async (req, res) => {
         break;
     }
 
-    const items = await Content.find(filter)
+    let items = await Content.find(filter)
       .sort(sortSpec)
       .skip(offset)
       .limit(limit)
       .lean();
+
+    // Deduplicate by normalized title to avoid multiple entries for the same movie/series title
+    const norm = (t) => String(t || '').trim().toLowerCase();
+    const pickScore = (i) => {
+      const likes = Number(i.likes || 0);
+      const rating = Number.isFinite(i.ratingValue) ? Number(i.ratingValue) : 0;
+      return likes * 1000 + rating; // prioritize likes, then rating
+    };
+    const byTitle = new Map();
+    for (const it of items) {
+      const key = norm(it.title);
+      const prev = byTitle.get(key);
+      if (!prev) {
+        byTitle.set(key, it);
+      } else {
+        if (pickScore(it) > pickScore(prev)) byTitle.set(key, it);
+      }
+    }
+    items = Array.from(byTitle.values());
 
     if (!profileId) {
       await writeLog({ event: 'search', details: { q, type, genre, yFrom, yTo, sort, limit, offset, count: items.length } });
@@ -865,6 +1161,220 @@ app.post('/api/likes/toggle', async (req, res) => {
   }
 });
 
+// ====== Content Details ======
+app.get('/api/content/:extId', async (req, res) => {
+  try {
+    const extId = String(req.params.extId || '').trim();
+    const profileId = String(req.query.profileId || '').trim();
+    if (!extId) return res.status(400).json({ ok: false, error: 'extId is required' });
+
+    const doc = await Content.findOne({ extId }).lean();
+    if (!doc) return res.status(404).json({ ok: false, error: 'Content not found' });
+
+    // Filter out episodes whose files no longer exist
+    let episodes = Array.isArray(doc.episodes) ? doc.episodes.slice() : [];
+    if (episodes.length) {
+      const checks = await Promise.all(episodes.map(async (e) => {
+        try {
+          const p = String(e.videoPath || '').replace(/^\/+/, '');
+          const abs = path.join(__dirname, '..', p);
+          await fs.access(abs);
+          return true;
+        } catch { return false; }
+      }));
+      episodes = episodes.filter((_, i) => checks[i]);
+    }
+
+    // Resolve a reliable cover/image path
+    const cover = await resolveCoverForDoc(doc);
+
+    // Ensure videoPath points to an existing file only; no global cross-fallback
+    let movieVideo = '';
+    let shouldUnsetVideoPath = false;
+    if (doc.videoPath) {
+      try {
+        const rel = String(doc.videoPath).replace(/^\/+/, '');
+        const abs = path.join(__dirname, '..', rel);
+        await fs.access(abs);
+        movieVideo = doc.videoPath; // valid, keep original
+      } catch {
+        movieVideo = '';
+        shouldUnsetVideoPath = true; // clean stale DB value
+      }
+    }
+
+    // Do not auto-assign arbitrary uploaded videos to movies without a video.
+    // A movie's video must be explicitly uploaded and linked via the admin panel.
+
+    // Sanitize image/cover paths that point to missing local files
+    const toUnset = {};
+    async function existsLocal(p) {
+      try {
+        const rel = String(p || '').replace(/^\/+/, '');
+        const abs = path.join(__dirname, '..', rel);
+        await fs.access(abs);
+        return true;
+      } catch { return false; }
+    }
+    if (doc.imagePath && /^\/?uploads\//i.test(String(doc.imagePath))) {
+      const ok = await existsLocal(doc.imagePath);
+      if (!ok) toUnset.imagePath = '';
+    }
+    if (doc.cover && /^\/?uploads\//i.test(String(doc.cover))) {
+      const ok = await existsLocal(doc.cover);
+      if (!ok) toUnset.cover = '';
+    }
+    if (shouldUnsetVideoPath) toUnset.videoPath = '';
+
+    // If any episodes were filtered out, persist the cleaned list to DB to prevent stale entries
+    const hadEpisodes = Array.isArray(doc.episodes) ? doc.episodes.length : 0;
+    const episodesChanged = hadEpisodes && hadEpisodes !== episodes.length;
+    if (Object.keys(toUnset).length || episodesChanged) {
+      const update = {};
+      if (Object.keys(toUnset).length) update.$unset = toUnset;
+      if (episodesChanged) update.$set = { episodes };
+      try { await Content.updateOne({ extId }, update); } catch {}
+    }
+
+    let liked = false;
+    if (profileId) {
+      const likeDoc = await Like.findOne({ profileId, contentExtId: extId }).lean();
+      liked = !!likeDoc;
+    }
+    return res.json({ ok: true, item: { ...doc, videoPath: movieVideo, episodes, liked, cover: cover || doc.cover, imagePath: doc.imagePath || cover } });
+  } catch (err) {
+    console.error('GET /api/content/:extId error:', err);
+    await writeLog({ level: 'error', event: 'content_details', details: { error: err.message } });
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ====== Similar by Genres ======
+app.get('/api/similar', async (req, res) => {
+  try {
+    const extId = String(req.query.extId || '').trim();
+    const profileId = String(req.query.profileId || '').trim();
+    const limit = Math.min(Math.max(parseInt(req.query.limit || '12', 10) || 12, 1), 50);
+    if (!extId) return res.status(400).json({ ok: false, error: 'extId is required' });
+
+    const base = await Content.findOne({ extId }, 'genres').lean();
+    if (!base) return res.status(404).json({ ok: false, error: 'Base content not found' });
+    const genres = base.genres || [];
+    if (!genres.length) return res.json({ ok: true, items: [] });
+
+    let items = await Content.find({ extId: { $ne: extId }, genres: { $in: genres } })
+      .sort({ likes: -1, title: 1 })
+      .limit(limit)
+      .lean();
+
+    // Ensure valid covers
+    items = await Promise.all(items.map(async (i) => {
+      const cover = await resolveCoverForDoc(i);
+      return { ...i, cover: cover || i.cover, imagePath: i.imagePath || cover };
+    }));
+
+    if (!profileId) return res.json({ ok: true, items });
+
+    const liked = await Like.find({ profileId, contentExtId: { $in: items.map(i => i.extId) } }, 'contentExtId').lean();
+    const likedSet = new Set(liked.map(l => l.contentExtId));
+    const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
+    res.json({ ok: true, items: annotated });
+  } catch (err) {
+    console.error('GET /api/similar error:', err);
+    await writeLog({ level: 'error', event: 'similar', details: { error: err.message } });
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+// ====== Watch Progress ======
+app.get('/api/progress', async (req, res) => {
+  try {
+    const profileId = String(req.query.profileId || '').trim();
+    const contentExtId = String(req.query.contentExtId || '').trim();
+    if (!profileId || !contentExtId) return res.status(400).json({ ok: false, error: 'profileId and contentExtId are required' });
+
+    const docs = await WatchProgress.find({ profileId, contentExtId }).sort({ updatedAt: -1 }).lean();
+    const episodeProgress = docs
+      .filter(d => d.season != null || d.episode != null)
+      .map(d => ({
+        season: d.season,
+        episode: d.episode,
+        positionSec: d.positionSec,
+        durationSec: d.durationSec,
+        completed: !!d.completed,
+        updatedAt: d.updatedAt,
+      }));
+
+    let overall = docs.find(d => d.season == null && d.episode == null) || null;
+    let overallPercent = 0;
+    let lastPositionSec = 0;
+    let lastDurationSec = 0;
+    let lastEpisodeRef = null;
+
+    if (overall) {
+      overallPercent = overall.durationSec ? Math.min(100, Math.floor((overall.positionSec / overall.durationSec) * 100)) : 0;
+      lastPositionSec = overall.positionSec || 0;
+      lastDurationSec = overall.durationSec || 0;
+    }
+
+    if (!overall && episodeProgress.length) {
+      const latest = episodeProgress[0];
+      lastPositionSec = latest.positionSec || 0;
+      lastDurationSec = latest.durationSec || 0;
+      lastEpisodeRef = { season: latest.season, episode: latest.episode };
+      const percents = episodeProgress.map(e => e.durationSec ? Math.min(100, Math.floor((e.positionSec / e.durationSec) * 100)) : 0);
+      overallPercent = percents.length ? Math.max(...percents) : 0;
+    }
+
+    res.json({ ok: true, progress: {
+      percent: overallPercent,
+      lastPositionSec,
+      lastDurationSec,
+      lastEpisodeRef,
+      episodes: episodeProgress,
+    }});
+  } catch (err) {
+    console.error('GET /api/progress error:', err);
+    await writeLog({ level: 'error', event: 'progress_get', details: { error: err.message } });
+    res.status(500).json({ ok: false, error: 'Server error' });
+  }
+});
+
+app.post('/api/progress', async (req, res) => {
+  try {
+    const { profileId, contentExtId, season = null, episode = null, positionSec = 0, durationSec = 0, completed = false } = req.body || {};
+    if (!profileId || !contentExtId) return res.status(400).json({ ok: false, error: 'profileId and contentExtId are required' });
+
+    const filter = { profileId: String(profileId), contentExtId: String(contentExtId), season, episode };
+    const update = { $set: { positionSec: Number(positionSec)||0, durationSec: Number(durationSec)||0, completed: !!completed } };
+    const opts   = { upsert: true, new: true, setDefaultsOnInsert: true };
+
+    await WatchProgress.findOneAndUpdate(filter, update, opts);
+
+    await writeLog({ event: 'progress_set', profileId: String(profileId), details: { contentExtId: String(contentExtId), season, episode, positionSec, durationSec, completed } });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('POST /api/progress error:', err);
+    await writeLog({ level: 'error', event: 'progress_set', details: { error: err.message } });
+    res.status(500).json({ ok: false, error: 'Failed to update progress' });
+  }
+});
+
+app.delete('/api/progress', async (req, res) => {
+  try {
+    const profileId = String(req.query.profileId || '').trim();
+    const contentExtId = String(req.query.contentExtId || '').trim();
+    if (!profileId || !contentExtId) return res.status(400).json({ ok: false, error: 'profileId and contentExtId are required' });
+    const del = await WatchProgress.deleteMany({ profileId, contentExtId });
+    await writeLog({ event: 'progress_reset', profileId, details: { contentExtId, deleted: del.deletedCount } });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /api/progress error:', err);
+    await writeLog({ level: 'error', event: 'progress_reset', details: { error: err.message } });
+    res.status(500).json({ ok: false, error: 'Failed to reset progress' });
+  }
+});
+
 // ====== Recommendations ======
 app.get('/api/recommendations', async (req, res) => {
   try {
@@ -897,11 +1407,16 @@ app.get('/api/recommendations', async (req, res) => {
     const topGenres = [...freq.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5).map(([g])=>g);
 
     const baseFilter = topGenres.length ? { genres: { $in: topGenres } } : {};
-    const candidates = await Content.find({ ...baseFilter, extId: { $nin: likedIds } })
+    let candidates = await Content.find({ ...baseFilter, extId: { $nin: likedIds } })
       .sort({ likes: -1, title: 1 })
       .skip(offset)
       .limit(limit)
       .lean();
+    // ensure covers
+    candidates = await Promise.all(candidates.map(async (i) => {
+      const cover = await resolveCoverForDoc(i);
+      return { ...i, cover: cover || i.cover, imagePath: i.imagePath || cover };
+    }));
 
     const annotated = candidates.map(i => ({ ...i, liked: false }));
     await writeLog({ event: 'recommendations', profileId, details: { topGenres, out: annotated.length, offset } });
@@ -922,48 +1437,161 @@ app.post('/api/logout', async (req, res) => {
   });
 });
 
-// ====== Seed from content.json  ======
-async function seedContentIfNeeded() {
-  if (!SEED_CONTENT) return;
-  try {
-    const candidates = [
-      path.resolve(__dirname, 'content.json'),
-      path.resolve(process.cwd(), 'server/content.json'),
-      path.resolve(process.cwd(), 'content.json'),
-    ];
-
-    let raw = null, usedPath = null;
-    for (const p of candidates) {
-      try { raw = await fs.readFile(p, 'utf-8'); usedPath = p; break; } catch {}
+function unwrapContentJsonRoot(data) {
+  if (Array.isArray(data)) {
+    return {
+      items: data,
+      wrap: (items) => items,
+    };
+  }
+  if (data && typeof data === 'object') {
+    const preferredKeys = ['items', 'catalog', 'data'];
+    for (const key of preferredKeys) {
+      if (Array.isArray(data[key])) {
+        return {
+          items: data[key],
+          wrap: (items) => ({ ...data, [key]: items }),
+        };
+      }
     }
-    if (!raw) throw new Error('content.json not found in server/ or project root');
+    for (const key of Object.keys(data)) {
+      if (Array.isArray(data[key])) {
+        return {
+          items: data[key],
+          wrap: (items) => ({ ...data, [key]: items }),
+        };
+      }
+    }
+  }
+  throw new Error('content.json must be/contain an array');
+}
 
-    const data = JSON.parse(raw);
-    let arr =
-      Array.isArray(data) ? data :
-      (data && typeof data === 'object' && Array.isArray(data.items))   ? data.items   :
-      (data && typeof data === 'object' && Array.isArray(data.catalog)) ? data.catalog :
-      (data && typeof data === 'object' && Array.isArray(data.data))    ? data.data    :
-      (data && typeof data === 'object' ? Object.values(data).find(Array.isArray) : null);
+async function readContentJsonFile() {
+  let lastErr = null;
+  for (const candidate of CONTENT_JSON_CANDIDATES) {
+    try {
+      const raw = await fs.readFile(candidate, 'utf8');
+      const parsed = JSON.parse(raw);
+      const { items, wrap } = unwrapContentJsonRoot(parsed);
+      if (!Array.isArray(items)) {
+        throw new Error('content.json must be/contain an array');
+      }
+      return { items: items.slice(), wrap, usedPath: candidate };
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error('content.json not found');
+}
 
-    if (!Array.isArray(arr)) throw new Error('content.json must be/contain an array');
+async function writeContentJsonFile(targetPath, items, wrap) {
+  const payload = wrap(items);
+  const serialized = `${JSON.stringify(payload, null, 2)}\n`;
+  await fs.writeFile(targetPath, serialized, 'utf8');
+}
+
+function normalizeEpisodeRecord(ep) {
+  if (!ep) return null;
+  const seasonRaw = Number.parseInt(ep.season ?? ep.seasonNumber ?? '', 10);
+  const episodeRaw = Number.parseInt(ep.episode ?? ep.episodeNumber ?? '', 10);
+  if (!Number.isFinite(seasonRaw) || !Number.isFinite(episodeRaw)) return null;
+  const videoPathRaw = ep.videoPath || ep.path || ep.url;
+  if (!videoPathRaw) return null;
+  const durationRaw = Number.parseInt(ep.durationSec ?? ep.duration ?? '0', 10);
+  const normalized = {
+    season: seasonRaw,
+    episode: episodeRaw,
+    title: typeof ep.title === 'string' ? ep.title : '',
+    videoPath: String(videoPathRaw),
+    durationSec: Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : 0,
+  };
+  return normalized;
+}
+
+function buildJsonEntryFromDoc(doc, prevEntry = {}, { overrideEpisodes } = {}) {
+  const next = { ...prevEntry };
+  const extId = String(doc.extId || prevEntry.id || '').trim();
+  if (!extId) return prevEntry;
+  next.id = extId;
+
+  if (doc.title) next.title = doc.title;
+  if (doc.year != null) next.year = doc.year;
+  if (Array.isArray(doc.genres)) next.genres = doc.genres.slice();
+  if (doc.type) next.type = doc.type;
+
+  if (doc.cover) next.cover = doc.cover;
+  if (doc.imagePath) next.imagePath = doc.imagePath;
+  if (doc.videoPath) next.videoPath = doc.videoPath;
+
+  if (doc.plot) next.plot = doc.plot;
+  if (doc.director) next.director = doc.director;
+  if (Array.isArray(doc.actors)) next.actors = doc.actors.slice();
+  if (doc.rating) next.rating = doc.rating;
+  if (doc.ratingValue != null) next.ratingValue = doc.ratingValue;
+  if (doc.likes != null) next.likes = doc.likes;
+
+  const episodesSource = overrideEpisodes ?? doc.episodes;
+  if (episodesSource !== undefined) {
+    if (Array.isArray(episodesSource)) {
+      const normalized = episodesSource
+        .map(normalizeEpisodeRecord)
+        .filter((ep) => ep !== null);
+      const isSeries = /series/i.test(String(doc.type ?? prevEntry.type ?? ''));
+      if (normalized.length || isSeries) {
+        next.episodes = normalized;
+      } else {
+        delete next.episodes;
+      }
+    } else if (episodesSource === null) {
+      delete next.episodes;
+    }
+  }
+
+  return next;
+}
+
+async function syncContentJsonWithDoc(doc, options = {}) {
+  if (!doc?.extId) return;
+  const { items, wrap, usedPath } = await readContentJsonFile();
+  const targetId = String(doc.extId).trim();
+  const idx = items.findIndex((item) => {
+    const candidateId = String(item?.id ?? item?.extId ?? '').trim();
+    return candidateId === targetId;
+  });
+  const prev = idx >= 0 ? items[idx] : {};
+  const next = buildJsonEntryFromDoc(doc, prev, options);
+  if (next.likes == null) next.likes = prev.likes ?? doc.likes ?? 0;
+  if (idx >= 0) {
+    items[idx] = next;
+  } else {
+    items.push(next);
+  }
+  await writeContentJsonFile(usedPath, items, wrap);
+}
+
+// ====== Seed from content.json  ======
+async function seedContentIfNeeded({ force = false } = {}) {
+  if (!force && !SEED_CONTENT) return;
+  try {
+    const { items: arr, usedPath } = await readContentJsonFile();
 
     const toDoc = (it) => {
       const title = it.title || it.name || 'Untitled';
-      const extId = String(it.id ?? title).trim();
+      const extId = String(it.id ?? it.extId ?? title).trim();
       const genres = Array.isArray(it.genres) ? it.genres
-                    : Array.isArray(it.genre)  ? it.genre
-                    : (typeof it.genre === 'string'
-                        ? it.genre.split(',').map(s => s.trim()).filter(Boolean)
-                        : []);
+        : Array.isArray(it.genre) ? it.genre
+        : typeof it.genre === 'string'
+          ? it.genre.split(',').map((s) => s.trim()).filter(Boolean)
+          : [];
+      const cover = it.cover || it.poster || it.image || it.img || '';
       const doc = {
         extId,
         title,
         year: Number(it.year ?? it.releaseYear ?? '') || undefined,
         genres,
         likes: Number.isFinite(it.likes) ? Number(it.likes) : 0,
-        cover: it.cover || it.poster || it.image || it.img || '',
-        imagePath: it.cover || it.poster || it.image || it.img || '',
+        cover,
+        imagePath: cover,
         type: it.type || (it.seasons ? 'Series' : 'Movie'),
       };
 
@@ -984,6 +1612,12 @@ async function seedContentIfNeeded() {
         }
       }
       if (it.videoPath) doc.videoPath = String(it.videoPath);
+      if (Array.isArray(it.episodes)) {
+        const normalized = it.episodes
+          .map(normalizeEpisodeRecord)
+          .filter((ep) => ep !== null);
+        doc.episodes = normalized;
+      }
 
       return doc;
     };
@@ -1016,12 +1650,12 @@ async function seedContentIfNeeded() {
         if ('rating' in doc) baseUpdate.rating = doc.rating;
         if ('ratingValue' in doc) baseUpdate.ratingValue = doc.ratingValue;
         if ('videoPath' in doc) baseUpdate.videoPath = doc.videoPath;
+        if ('episodes' in doc) baseUpdate.episodes = doc.episodes;
 
         const updRes = await Content.updateOne(
           { extId: doc.extId },
           { $set: baseUpdate }
         );
-        inserted += 0;
         updated += (updRes.modifiedCount || 0);
       }
     }

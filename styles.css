@@ -780,6 +780,93 @@ a.nf-link:hover {
   }
 }
 
+/* ===== Player Overlay ===== */
+.player-wrap { position: relative; }
+
+.player-overlay-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.player-overlay-controls__cluster {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.player-overlay-controls__cluster--left { left: 10px; bottom: 96px; }
+.player-overlay-controls__cluster--right { right: 10px; bottom: 96px; }
+
+.player-wrap:hover .player-overlay-controls__cluster,
+.player-overlay-controls__cluster:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.player-ctrl {
+  pointer-events: auto;
+  background: rgba(0,0,0,.55);
+  border: 1px solid rgba(255,255,255,.15);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px;
+  line-height: 0;
+  cursor: pointer;
+}
+.player-ctrl:hover,
+.player-ctrl:focus { background: rgba(0,0,0,.7); outline: none; }
+
+.player-ctrl--seek { font-size: 14px; font-weight: 700; line-height: 1; }
+
+.player-ctrl--list { display:flex; align-items:center; justify-content:center; }
+.player-ctrl--list svg { display:block; }
+
+.player-ctrl--next { padding: 2px; border-radius: 6px; }
+.player-ctrl--next img {
+  display:block;
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.player-ctrl--close { border-radius: 50%; padding: 6px; }
+
+.player-episodes-drawer {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  bottom: 96px;
+  width: clamp(220px, 30%, 360px);
+  background: rgba(0,0,0,.8);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  padding: 10px;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 8px;
+  z-index: 3;
+}
+.player-episodes-drawer__head {
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  color:#fff; font-weight:700;
+}
+.player-episodes-drawer__list {
+  overflow:auto;
+}
+.player-episodes-drawer__list .is-current { background: rgba(255,255,255,.06); border-radius: 6px; padding: 8px; }
+.player-episodes-drawer__list .td-episodes__item { padding: 10px 0; }
+.player-episodes-drawer__list .td-progress { width: 120px; }
+
+@media (hover: none) and (pointer: coarse) {
+  .player-overlay-controls__cluster { opacity: 1; transform: none; }
+}
+
 /* ===== HERO ===== */
 
 .nf-hero {
@@ -884,6 +971,7 @@ a.nf-link:hover {
 
 .nf-row__scroller {
   display: flex;
+  color:#fff;
   gap: var(--row-gap);
   overflow: hidden;
   padding: 0 var(--arrow-pad);
@@ -1770,4 +1858,29 @@ body.modal-open {
     width: 16px;
     height: 16px;
   }
+}
+
+/* ===== TITLE PAGE OVERRIDES ===== */
+/* Ensure Title page sections render white, not muted grey */
+#episodesSection > h3,
+#similarSection > h3 {
+  color: #fff !important;
+}
+
+#episodesList,
+#episodesList .td-episodes__item,
+#episodesList .td-episodes__item > div:first-of-type,
+#episodesList .td-episodes__item > div:first-of-type *,
+#episodesList .td-episodes__item strong {
+  color: #fff !important;
+}
+
+/* ===== TITLE PAGE: CAST LINKS ===== */
+#actors a,
+#actors a:visited,
+#actors a:hover,
+#actors a:active {
+  color: #fff !important;
+  font-weight: 700;
+  text-decoration: underline;
 }

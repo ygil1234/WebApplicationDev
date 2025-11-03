@@ -26,24 +26,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
-  const greetEl = document.getElementById("greet");
-  if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
-  const avatarEl = document.getElementById("navAvatar");
-  if (avatarEl) { avatarEl.src = profileAvatar; avatarEl.alt = `${profileName} - Profile`; }
-
-  const logoutLink = document.getElementById("logoutLink");
-  if (logoutLink) {
-    logoutLink.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try { await fetch(`${API_BASE}/logout`, { method: "POST" }); } catch {}
-      ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
-      window.location.href = "login.html";
-    });
-  }
-
-  const profileMenuToggle = document.getElementById("profileMenuToggle");
-  const profileMenu = document.getElementById("profileMenu");
-  const changeProfileBtn = document.getElementById("changeProfileBtn");
+  // Shared nav wiring (works even if header injected later)
+  let profileMenuToggle;
+  let profileMenu;
+  let changeProfileBtn;
+  let navWired = false;
 
   function setProfileMenu(open) {
     if (!profileMenu || !profileMenuToggle) return;
@@ -58,28 +45,70 @@ document.addEventListener("DOMContentLoaded", async () => {
     setProfileMenu(profileMenu.hidden);
   }
 
-  if (profileMenuToggle && profileMenu) {
-    profileMenuToggle.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      toggleProfileMenu();
-    });
+  function wireNavOnce() {
+    if (navWired) return;
+    const header = document.querySelector('header.nf-nav');
+    if (!header) return;
+
+    // Greet + avatar
+    const greetEl = document.getElementById("greet");
+    if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
+    const avatarEl = document.getElementById("navAvatar");
+    if (avatarEl) { avatarEl.src = profileAvatar; avatarEl.alt = `${profileName} - Profile`; }
+
+    // Logout
+    const logoutLink = document.getElementById("logoutLink");
+    if (logoutLink && !logoutLink.dataset.wired) {
+      logoutLink.dataset.wired = '1';
+      logoutLink.addEventListener("click", async (e) => {
+        e.preventDefault();
+        try { await fetch(`${API_BASE}/logout`, { method: "POST" }); } catch {}
+        ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
+        window.location.href = "login.html";
+      });
+    }
+
+    // Profile menu
+    profileMenuToggle = document.getElementById("profileMenuToggle");
+    profileMenu = document.getElementById("profileMenu");
+    changeProfileBtn = document.getElementById("changeProfileBtn");
+
+    if (profileMenuToggle && profileMenu && !profileMenuToggle.dataset.wired) {
+      profileMenuToggle.dataset.wired = '1';
+      profileMenuToggle.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleProfileMenu();
+      });
+    }
+
+    if (changeProfileBtn && !changeProfileBtn.dataset.wired) {
+      changeProfileBtn.dataset.wired = '1';
+      changeProfileBtn.addEventListener("click", () => {
+        setProfileMenu(false);
+        ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
+        window.location.href = "profiles.html";
+      });
+    }
+
+    if (!document.body.dataset.navCloseWired) {
+      document.body.dataset.navCloseWired = '1';
+      document.addEventListener("click", (e) => {
+        if (!profileMenu || !profileMenuToggle) return;
+        if (profileMenu.hidden) return;
+        const within = profileMenu.contains(e.target) || profileMenuToggle.contains(e.target);
+        if (!within) setProfileMenu(false);
+      });
+    }
+
+    navWired = true;
   }
 
-  if (changeProfileBtn) {
-    changeProfileBtn.addEventListener("click", () => {
-      setProfileMenu(false);
-      ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
-      window.location.href = "profiles.html";
-    });
-  }
-
-  document.addEventListener("click", (e) => {
-    if (!profileMenu || !profileMenuToggle) return;
-    if (profileMenu.hidden) return;
-    const within = profileMenu.contains(e.target) || profileMenuToggle.contains(e.target);
-    if (!within) setProfileMenu(false);
-  });
+  // Initial attempt
+  wireNavOnce();
+  // Watch for late-inserted header (e.g., title.html injects it)
+  const mo = new MutationObserver(() => { if (!navWired) wireNavOnce(); });
+  mo.observe(document.body, { childList: true, subtree: true });
 
   // ===== 2) Local state
   let CURRENT_ITEMS = []; // last loaded list (feed or search)
@@ -101,6 +130,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ===== 3) API helpers
+  function normalizePath(p) {
+    const s = String(p || '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    return s.startsWith('/') ? s : ('/' + s);
+  }
   async function apiGet(url) {
     const res = await fetch(url, { credentials: "include" });
     if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
@@ -232,9 +267,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const count = Number(item.likes || 0);
     const liked = !!item.liked;
 
+    const coverSrc = normalizePath(item.cover || item.imagePath || '');
     card.innerHTML = `
       <div class="nf-card__cover">
-        <img src="${item.cover || ''}" alt="${item.title || ''}" loading="lazy"
+        <img src="${coverSrc}" alt="${item.title || ''}" loading="lazy"
              onerror="this.onerror=null;this.style.display='none';" />
         ${withProgress ? `<div class="nf-progress"><div class="nf-progress__bar" style="width:${prog}%"></div></div>` : ``}
       </div>
@@ -537,7 +573,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const hero = document.getElementById("hero");
     if (!hero || !items?.length) return;
     const featured = mostLiked(items) || items[0];
-    const heroImg = featured.backdrop || featured.cover || '';
+    const heroImg = normalizePath(featured.backdrop || featured.cover || featured.imagePath || '');
     hero.innerHTML = `
       <div class="nf-hero__bg" style="background-image:url('${heroImg}')"></div>
       <div class="nf-hero__meta" dir="rtl">
@@ -869,6 +905,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.removeAttribute("aria-busy");
       }
     }, false);
+  }
+
+  // ===== 6b) Card click -> title page
+  if (rowsRoot) {
+    rowsRoot.addEventListener('click', (e) => {
+      if (e.defaultPrevented) return;
+      // ignore clicks on interactive elements
+      if (e.target.closest('.like-btn, .nf-row__arrow, button, a, input, select, textarea')) return;
+      const card = e.target.closest('.nf-card');
+      if (!card) return;
+      const extId = String(card.dataset.extId || '');
+      if (!extId) return;
+      e.preventDefault();
+      window.location.href = `title.html?extId=${encodeURIComponent(extId)}`;
+    });
   }
 
   // ===== 7) Search UI + behavior (ENHANCED)
