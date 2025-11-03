@@ -30,6 +30,27 @@ document.addEventListener("DOMContentLoaded", () => {
     let selectedAvatar = 'IMG/profile1.jpg'; // Default selection
     let editSelectedAvatar = 'IMG/profile1.jpg';
 
+    // ======= Charts state (added) =======
+    const dailyViewsHint = document.getElementById('dailyViewsHint');
+    const genrePieHint = document.getElementById('genrePieHint');
+    let dailyViewsChart = null;
+    let genrePieChart = null;
+    let profilesCache = []; // used to map profile names when needed
+
+    // Chart settings
+    const statsSection = document.querySelector('.settings-stats');
+    const chartComputed = statsSection ? window.getComputedStyle(statsSection) : null;
+    const chartTextColorRaw = chartComputed?.getPropertyValue('--chart-text-color');
+    const chartGridColorRaw = chartComputed?.getPropertyValue('--chart-grid-color');
+    const chartLegendColorRaw = chartComputed?.getPropertyValue('--chart-legend-color');
+    const chartTextColor = chartTextColorRaw ? chartTextColorRaw.trim() : '#e5e5e5';
+    const chartGridColor = chartGridColorRaw ? chartGridColorRaw.trim() : 'rgba(255, 255, 255, 0.08)';
+    const chartLegendColor = chartLegendColorRaw ? chartLegendColorRaw.trim() : chartTextColor;
+    const chartBgOpacityRaw = Number.parseFloat(chartComputed?.getPropertyValue('--chart-bg-opacity'));
+    const chartBorderOpacityRaw = Number.parseFloat(chartComputed?.getPropertyValue('--chart-border-opacity'));
+    const chartBgOpacity = Number.isFinite(chartBgOpacityRaw) ? chartBgOpacityRaw : 0.65;
+    const chartBorderOpacity = Number.isFinite(chartBorderOpacityRaw) ? chartBorderOpacityRaw : 1;
+
     // Avatar selection handling for ADD form
     const avatarOptions = avatarGrid.querySelectorAll('.avatar-option');
     avatarOptions.forEach(option => {
@@ -67,7 +88,8 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             const profiles = await response.json();
-            displayProfiles(profiles);
+            profilesCache = Array.isArray(profiles) ? profiles : [];
+            displayProfiles(profilesCache);
         } catch (error) {
             console.error('Error loading profiles:', error);
         }
@@ -203,6 +225,9 @@ document.addEventListener("DOMContentLoaded", () => {
             await loadProfiles();
             showSuccess('Profile updated successfully!');
 
+            // Refresh charts so name/color updates reflect
+            loadStats();
+
         } catch (error) {
             console.error('Error updating profile:', error);
             showError(editProfileNameInput, editProfileNameError, error.message || 'Failed to update profile. Please try again.');
@@ -232,6 +257,9 @@ document.addEventListener("DOMContentLoaded", () => {
             // Success - reload profiles
             await loadProfiles();
             showSuccess('Profile deleted successfully!');
+
+            // Refresh charts
+            loadStats();
 
         } catch (error) {
             console.error('Error deleting profile:', error);
@@ -298,8 +326,9 @@ document.addEventListener("DOMContentLoaded", () => {
             avatarOptions[0].classList.add('selected');
             selectedAvatar = 'IMG/profile1.jpg';
 
-            // Reload profiles list
+            // Reload profiles list & charts
             await loadProfiles();
+            loadStats();
 
         } catch (error) {
             console.error('Error creating profile:', error);
@@ -332,7 +361,211 @@ document.addEventListener("DOMContentLoaded", () => {
             successMessage.classList.add('d-none');
         }, 3000);
     }
+    
+    // Statistics 
 
-    // Initial load of profiles
+    async function loadStats() {
+        // Clear hints
+        dailyViewsHint.textContent = '';
+        genrePieHint.textContent = '';
+
+        const userId = encodeURIComponent(loggedInUser);
+        try {
+            const [dailyRes, genreRes] = await Promise.all([
+                // Expected shape option A (records):
+                // [{date:'YYYY-MM-DD', profileId:'...', profileName:'Alice', views:3}, ...]
+                // Option B (series):
+                // { days: ['YYYY-MM-DD', ...], series: [{profileId, profileName, data:[..]}] }
+                fetch(`/api/stats/daily-views?userId=${userId}&days=7`),
+                // Expected shape: [{genre:'Action', views:40}, ...]
+                fetch(`/api/stats/genre-popularity?userId=${userId}`)
+            ]);
+
+            if (dailyRes.status === 401 || genreRes.status === 401) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            const [dailyData, genreData] = await Promise.all([dailyRes.json(), genreRes.json()]);
+
+            renderDailyViewsChart(dailyData);
+            renderGenrePieChart(genreData);
+        } catch (err) {
+            console.error('Failed to load statistics:', err);
+            dailyViewsHint.textContent = 'Unable to load daily views.';
+            genrePieHint.textContent = 'Unable to load genre popularity.';
+        }
+    }
+
+    function renderDailyViewsChart(raw) {
+        const ctx = document.getElementById('dailyViewsChart');
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        // Normalize to a single dataset with profiles on the X-axis
+        let labels = [];
+        let values = [];
+
+        if (raw && Array.isArray(raw.profiles)) {
+            labels = raw.profiles.map(p => p.profileName || findProfileName(p.profileId) || 'Unknown');
+            values = raw.profiles.map(p => Number(p.views || 0));
+        } else if (Array.isArray(raw)) {
+            // Fallback for legacy array payloads
+            const totals = new Map();
+            raw.forEach(item => {
+                if (!item) return;
+                const key = item.profileId || item.profileName || 'Unknown';
+                const label = item.profileName || findProfileName(item.profileId) || key;
+                totals.set(key, {
+                    label,
+                    views: (totals.get(key)?.views || 0) + Number(item.views || 0)
+                });
+            });
+            const aggregated = Array.from(totals.values());
+            labels = aggregated.map(entry => entry.label);
+            values = aggregated.map(entry => entry.views);
+        }
+
+        const totalViews = values.reduce((sum, val) => sum + val, 0);
+        dailyViewsHint.textContent = totalViews === 0
+            ? 'No views recorded for the selected period.'
+            : '';
+
+        if (dailyViewsChart) {
+            dailyViewsChart.destroy();
+        }
+
+        const colors = labels.map((_, idx) => colorForIndex(idx, chartBgOpacity));
+        const borderColors = labels.map((_, idx) => colorForIndex(idx, chartBorderOpacity));
+
+        dailyViewsChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Views (last 7 days)',
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: chartLegendColor } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: {
+                        stacked: false,
+                        ticks: { color: chartTextColor },
+                        grid: { color: chartGridColor }
+                    },
+                    y: {
+                        stacked: false,
+                        beginAtZero: true,
+                        ticks: {
+                            color: chartTextColor,
+                            stepSize: 1,
+                            callback: (value) => Number.isFinite(value) ? Math.round(value) : value
+                        },
+                        grid: { color: chartGridColor }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderGenrePieChart(raw) {
+        const ctx = document.getElementById('genrePieChart');
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        const labels = [];
+        const data = [];
+        if (Array.isArray(raw)) {
+            raw.forEach(r => {
+                if (!r) return;
+                labels.push(r.genre || 'Unknown');
+                data.push(Number(r.views || r.count || 0));
+            });
+        }
+
+        const total = data.reduce((a, v) => a + v, 0);
+        if (total === 0) {
+            genrePieHint.textContent = 'No popularity data available.';
+        } else {
+            genrePieHint.textContent = '';
+        }
+
+        const colors = labels.map((_, i) => colorForIndex(i, chartBgOpacity));
+        const borderColors = labels.map((_, i) => colorForIndex(i, chartBorderOpacity));
+
+        if (genrePieChart) {
+            genrePieChart.destroy();
+        }
+
+        genrePieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels,
+                datasets: [{
+                    data,
+                    backgroundColor: colors,
+                    borderColor: borderColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { color: chartLegendColor } },
+                    tooltip: { callbacks: {
+                        label: (ctx) => {
+                            const v = ctx.parsed || 0;
+                            const pct = total ? Math.round((v / total) * 100) : 0;
+                            return `${ctx.label}: ${v} (${pct}%)`;
+                        }
+                    }}
+                }
+            }
+        });
+    }
+
+    function findProfileName(profileId) {
+        const p = profilesCache.find(x => x.id === profileId);
+        return p?.name || null;
+    }
+
+    // Simple, consistent color generator (HSL -> rgba)
+    function colorForIndex(i, alpha = 1) {
+        const hue = (i * 57) % 360; // spread nicely
+        return `rgba(${hslToRgb(hue / 360, 0.62, 0.52).join(', ')}, ${alpha})`;
+    }
+    function hslToRgb(h, s, l) {
+        // returns [r,g,b] 0-255
+        let r, g, b;
+        if (s === 0) { r = g = b = l; }
+        else {
+            const hue2rgb = (p, q, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1/6) return p + (q - p) * 6 * t;
+                if (t < 1/2) return q;
+                if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                return p;
+            };
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1/3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1/3);
+        }
+        return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    }
+
+    // Initial load of profiles & stats
     loadProfiles();
+    loadStats();
 });
