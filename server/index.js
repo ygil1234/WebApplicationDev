@@ -263,6 +263,46 @@ async function writeLog({ level = 'info', event, userId = null, profileId = null
   catch (e) { console.warn('[log] skip:', e.message); }
 }
 
+function episodeKey(season, episode) {
+  const s = Number.isFinite(Number(season)) ? Number(season) : 0;
+  const e = Number.isFinite(Number(episode)) ? Number(episode) : 0;
+  return `${s}::${e}`;
+}
+function isContentWatched(contentDoc, progressDocs) {
+  if (!contentDoc) return false;
+  const episodes = Array.isArray(contentDoc.episodes) ? contentDoc.episodes.filter(Boolean) : [];
+  const docs = Array.isArray(progressDocs) ? progressDocs : [];
+  const hasEpisodes = episodes.length > 0;
+  if (!hasEpisodes) {
+    return docs.some((d) => d && d.season == null && d.episode == null && d.completed);
+  }
+  if (!docs.length) return false;
+  const completedSet = new Set();
+  docs.forEach((doc) => {
+    if (!doc || doc.season == null || doc.episode == null) return;
+    if (doc.completed) completedSet.add(episodeKey(doc.season, doc.episode));
+  });
+  if (!completedSet.size) return false;
+  return episodes.every((ep) => completedSet.has(episodeKey(ep?.season, ep?.episode)));
+}
+async function annotateItemsWithWatched(profileId, items = []) {
+  if (!profileId || !Array.isArray(items) || !items.length) return items;
+  const extIds = items.map((it) => it?.extId).filter(Boolean);
+  if (!extIds.length) return items;
+  const docs = await WatchProgress.find({ profileId, contentExtId: { $in: extIds } }).lean();
+  const byContent = new Map();
+  docs.forEach((doc) => {
+    const key = String(doc.contentExtId);
+    if (!byContent.has(key)) byContent.set(key, []);
+    byContent.get(key).push(doc);
+  });
+  return items.map((item) => {
+    if (!item?.extId) return item;
+    const watched = isContentWatched(item, byContent.get(item.extId) || []);
+    return { ...item, profileWatched: watched };
+  });
+}
+
 // ====== Seed content fallback cache (for missing cover/imagePath) ======
 let __seedCache = null; // Map extId -> item from server/content.json
 async function loadSeedCache() {
@@ -1015,7 +1055,8 @@ app.get('/api/feed', async (req, res) => {
     }, 'contentExtId').lean();
     
     const likedSet = new Set(liked.map(l => l.contentExtId));
-    const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
+    let annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
+    annotated = await annotateItemsWithWatched(profileId, annotated);
 
     await writeLog({ event: 'feed', profileId, details: { sort, limit, offset, count: annotated.length } });
     res.json({ ok: true, items: annotated });
@@ -1108,7 +1149,8 @@ app.get('/api/search', async (req, res) => {
     }, 'contentExtId').lean();
     
     const likedSet = new Set(liked.map(l => l.contentExtId));
-    const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
+    let annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
+    annotated = await annotateItemsWithWatched(profileId, annotated);
 
     await writeLog({ event: 'search', profileId, details: { q, type, genre, yFrom, yTo, sort, limit, offset, count: annotated.length } });
     res.json({ ok: true, query: { q, type, genre, year_from: yFrom, year_to: yTo, sort, limit, offset }, items: annotated });
@@ -1237,11 +1279,16 @@ app.get('/api/content/:extId', async (req, res) => {
     }
 
     let liked = false;
+    let profileWatched = false;
     if (profileId) {
-      const likeDoc = await Like.findOne({ profileId, contentExtId: extId }).lean();
+      const [likeDoc, progressDocs] = await Promise.all([
+        Like.findOne({ profileId, contentExtId: extId }).lean(),
+        WatchProgress.find({ profileId, contentExtId: extId }).lean(),
+      ]);
       liked = !!likeDoc;
+      profileWatched = isContentWatched({ ...doc, episodes }, progressDocs);
     }
-    return res.json({ ok: true, item: { ...doc, videoPath: movieVideo, episodes, liked, cover: cover || doc.cover, imagePath: doc.imagePath || cover } });
+    return res.json({ ok: true, item: { ...doc, videoPath: movieVideo, episodes, liked, cover: cover || doc.cover, imagePath: doc.imagePath || cover, profileWatched } });
   } catch (err) {
     console.error('GET /api/content/:extId error:', err);
     await writeLog({ level: 'error', event: 'content_details', details: { error: err.message } });
@@ -1277,7 +1324,8 @@ app.get('/api/similar', async (req, res) => {
 
     const liked = await Like.find({ profileId, contentExtId: { $in: items.map(i => i.extId) } }, 'contentExtId').lean();
     const likedSet = new Set(liked.map(l => l.contentExtId));
-    const annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
+    let annotated = items.map(i => ({ ...i, liked: likedSet.has(i.extId) }));
+    annotated = await annotateItemsWithWatched(profileId, annotated);
     res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/similar error:', err);
@@ -1293,7 +1341,10 @@ app.get('/api/progress', async (req, res) => {
     const contentExtId = String(req.query.contentExtId || '').trim();
     if (!profileId || !contentExtId) return res.status(400).json({ ok: false, error: 'profileId and contentExtId are required' });
 
-    const docs = await WatchProgress.find({ profileId, contentExtId }).sort({ updatedAt: -1 }).lean();
+    const [docs, contentDoc] = await Promise.all([
+      WatchProgress.find({ profileId, contentExtId }).sort({ updatedAt: -1 }).lean(),
+      Content.findOne({ extId: contentExtId }, 'extId episodes type').lean(),
+    ]);
     const episodeProgress = docs
       .filter(d => d.season != null || d.episode != null)
       .map(d => ({
@@ -1326,12 +1377,15 @@ app.get('/api/progress', async (req, res) => {
       overallPercent = percents.length ? Math.max(...percents) : 0;
     }
 
+    const watched = contentDoc ? isContentWatched(contentDoc, docs) : false;
+
     res.json({ ok: true, progress: {
       percent: overallPercent,
       lastPositionSec,
       lastDurationSec,
       lastEpisodeRef,
       episodes: episodeProgress,
+      watched,
     }});
   } catch (err) {
     console.error('GET /api/progress error:', err);
@@ -1345,14 +1399,22 @@ app.post('/api/progress', async (req, res) => {
     const { profileId, contentExtId, season = null, episode = null, positionSec = 0, durationSec = 0, completed = false } = req.body || {};
     if (!profileId || !contentExtId) return res.status(400).json({ ok: false, error: 'profileId and contentExtId are required' });
 
-    const filter = { profileId: String(profileId), contentExtId: String(contentExtId), season, episode };
+    const normalizedProfileId = String(profileId);
+    const normalizedContentId = String(contentExtId);
+    const filter = { profileId: normalizedProfileId, contentExtId: normalizedContentId, season, episode };
     const update = { $set: { positionSec: Number(positionSec)||0, durationSec: Number(durationSec)||0, completed: !!completed } };
     const opts   = { upsert: true, new: true, setDefaultsOnInsert: true };
 
     await WatchProgress.findOneAndUpdate(filter, update, opts);
 
-    await writeLog({ event: 'progress_set', profileId: String(profileId), details: { contentExtId: String(contentExtId), season, episode, positionSec, durationSec, completed } });
-    return res.json({ ok: true });
+    const [contentDoc, docs] = await Promise.all([
+      Content.findOne({ extId: normalizedContentId }, 'extId episodes type').lean(),
+      WatchProgress.find({ profileId: normalizedProfileId, contentExtId: normalizedContentId }).lean(),
+    ]);
+    const watched = contentDoc ? isContentWatched(contentDoc, docs) : false;
+
+    await writeLog({ event: 'progress_set', profileId: normalizedProfileId, details: { contentExtId: normalizedContentId, season, episode, positionSec, durationSec, completed, watched } });
+    return res.json({ ok: true, watched });
   } catch (err) {
     console.error('POST /api/progress error:', err);
     await writeLog({ level: 'error', event: 'progress_set', details: { error: err.message } });
@@ -1395,7 +1457,8 @@ app.get('/api/recommendations', async (req, res) => {
         .skip(offset)
         .limit(limit)
         .lean();
-      const annotated = popular.map(i => ({ ...i, liked: false }));
+      let annotated = popular.map(i => ({ ...i, liked: false }));
+      annotated = await annotateItemsWithWatched(profileId, annotated);
       await writeLog({ event: 'recommendations', profileId, details: { topGenres: [], out: annotated.length, offset, note: 'no_likes_yet' } });
       return res.json({ ok: true, items: annotated });
     }
@@ -1418,7 +1481,8 @@ app.get('/api/recommendations', async (req, res) => {
       return { ...i, cover: cover || i.cover, imagePath: i.imagePath || cover };
     }));
 
-    const annotated = candidates.map(i => ({ ...i, liked: false }));
+    let annotated = candidates.map(i => ({ ...i, liked: false }));
+    annotated = await annotateItemsWithWatched(profileId, annotated);
     await writeLog({ event: 'recommendations', profileId, details: { topGenres, out: annotated.length, offset } });
     res.json({ ok: true, items: annotated });
   } catch (err) {

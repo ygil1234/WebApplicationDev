@@ -258,7 +258,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===== 4) Rendering
   function createCard(item, withProgress = false) {
     const pid = String(item.extId || item.id);
-    const prog = progress[pid] || 0;
+    const watched = !!item.profileWatched;
+    if (watched) progress[pid] = 100;
+    const prog = watched ? 100 : (progress[pid] || 0);
+    const watchedBadge = watched ? '<span class="nf-card__watched">Watched</span>' : '';
 
     const card = document.createElement("article");
     card.className = "nf-card";
@@ -277,15 +280,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       <div class="nf-card__meta">
         <div class="nf-card__title" title="${item.title || ''}">${item.title || ''}</div>
         <div class="nf-card__sub">${[item.year, item.type].filter(Boolean).join(" • ")}</div>
-        <button class="btn btn-sm rounded-pill like-btn ${liked ? "liked" : ""}" type="button"
-                aria-pressed="${liked}" aria-label="${liked ? "Unlike" : "Like"} ${item.title || ''}">
-          <span class="heart" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" role="img">
-              <path d="M12 21s-6.716-4.555-9.193-7.032C.977 12.139.5 10.96.5 9.708.5 6.817 2.817 4.5 5.708 4.5c1.522 0 2.974.62 4.042 1.688L12 8.439l2.25-2.25A5.726 5.726 0 0 1 18.292 4.5c2.891 0 5.208 2.317 5.208 5.208 0 1.252-.477 2.431-2.307 4.26C18.716 16.445 12 21 12 21z"></path>
-            </svg>
-          </span>
-          <span class="like-count">${count}</span>
-        </button>
+        <div class="nf-card__actions">
+          ${watchedBadge}
+          <button class="btn btn-sm rounded-pill like-btn ${liked ? "liked" : ""}" type="button"
+                  aria-pressed="${liked}" aria-label="${liked ? "Unlike" : "Like"} ${item.title || ''}">
+            <span class="heart" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" role="img">
+                <path d="M12 21s-6.716-4.555-9.193-7.032C.977 12.139.5 10.96.5 9.708.5 6.817 2.817 4.5 5.708 4.5c1.522 0 2.974.62 4.042 1.688L12 8.439l2.25-2.25A5.726 5.726 0 0 1 18.292 4.5c2.891 0 5.208 2.317 5.208 5.208 0 1.252-.477 2.431-2.307 4.26C18.716 16.445 12 21 12 21z"></path>
+              </svg>
+            </span>
+            <span class="like-count">${count}</span>
+          </button>
+        </div>
       </div>
     `;
     return card;
