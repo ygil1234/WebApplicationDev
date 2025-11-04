@@ -7,7 +7,7 @@
       "Crime",
       "Drama"
     ],
-    "likes": 3,
+    "likes": 5401,
     "cover": "IMG/feed/godfather.jpg",
     "type": "Movie",
     "plot": "The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant son.",
@@ -27,7 +27,7 @@
       "Crime",
       "Drama"
     ],
-    "likes": 2,
+    "likes": 4600,
     "cover": "IMG/feed/godfather2.jpg",
     "type": "Movie",
     "plot": "The early life and career of Vito Corleone in 1920s New York City is portrayed, while his son, Michael, expands and tightens his grip on the family crime syndicate.",
@@ -46,7 +46,7 @@
     "genres": [
       "Drama"
     ],
-    "likes": 3,
+    "likes": 6200,
     "cover": "IMG/feed/shawshank.jpg",
     "type": "Movie",
     "plot": "A banker convicted of uxoricide forms a friendship over a quarter century with a hardened convict, while maintaining his innocence and trying to remain hopeful through simple compassion.",
@@ -66,7 +66,7 @@
       "Crime",
       "Drama"
     ],
-    "likes": 5,
+    "likes": 5100,
     "cover": "IMG/feed/pulpfiction.jpg",
     "type": "Movie",
     "plot": "The lives of two mob hitmen, a boxer, a gangster and his wife, and a pair of diner bandits intertwine in four tales of violence and redemption.",
@@ -86,7 +86,7 @@
       "Action",
       "Crime"
     ],
-    "likes": 3,
+    "likes": 7000,
     "cover": "IMG/feed/thedarlknight.jpg",
     "type": "Movie",
     "plot": "When a menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman, James Gordon and Harvey Dent must work together to put an end to the madness.",
@@ -107,7 +107,7 @@
       "Drama",
       "History"
     ],
-    "likes": 6,
+    "likes": 4300,
     "cover": "IMG/feed/schindlerlist.jpg",
     "type": "Movie",
     "plot": "In German-occupied Poland during World War II, industrialist Oskar Schindler gradually becomes concerned for his Jewish workforce after witnessing their persecution by the Nazis.",
@@ -127,7 +127,7 @@
       "Drama",
       "Thriller"
     ],
-    "likes": 5,
+    "likes": 3900,
     "cover": "IMG/feed/fightclub.jpg",
     "type": "Movie",
     "plot": "An insomniac office worker and a devil-may-care soap maker form an underground fight club that evolves into much more.",
@@ -147,7 +147,7 @@
       "Drama",
       "Romance"
     ],
-    "likes": 5,
+    "likes": 4800,
     "cover": "IMG/feed/forrestgump.jpg",
     "type": "Movie",
     "plot": "The history of the United States from the 1950s to the '70s unfolds from the perspective of an Alabama man with an IQ of 75, who yearns to be reunited with his childhood sweetheart.",
@@ -170,7 +170,7 @@
       "Sci-Fi",
       "Action"
     ],
-    "likes": 2,
+    "likes": 5200,
     "cover": "IMG/feed/thematrix.jpg",
     "type": "Movie",
     "plot": "When a beautiful stranger leads computer hacker Neo to a forbidding underworld, he discovers the shocking truth--the life he knows is the elaborate deception of an evil cyber-intelligence.",
@@ -190,7 +190,7 @@
       "Sci-Fi",
       "Adventure"
     ],
-    "likes": 2,
+    "likes": 5600,
     "cover": "IMG/feed/starwars.jpg",
     "type": "Movie"
   },
@@ -202,7 +202,7 @@
       "Sci-Fi",
       "Adventure"
     ],
-    "likes": 5,
+    "likes": 5300,
     "cover": "IMG/feed/starwars5.jpg",
     "type": "Movie",
     "plot": "After the Empire overpowers the Rebel Alliance, Luke Skywalker begins training with Jedi Master Yoda, while Darth Vader and bounty hunter Boba Fett pursue his friends across the galaxy.",
@@ -222,7 +222,7 @@
       "Adventure",
       "Sci-Fi"
     ],
-    "likes": 5,
+    "likes": 3600,
     "cover": "IMG/feed/backtothefuture.jpg",
     "type": "Movie",
     "plot": "Marty McFly, a 17-year-old high school student, is accidentally sent 30 years into the past in a time-traveling DeLorean invented by his close friend, the maverick scientist Doc Brown.",
@@ -242,7 +242,7 @@
       "Romance",
       "Drama"
     ],
-    "likes": 6,
+    "likes": 4700,
     "cover": "IMG/feed/titanic.jpg",
     "type": "Movie",
     "plot": "A seventeen-year-old aristocrat falls in love with a kind but poor artist aboard the luxurious, ill-fated R.M.S. Titanic.",
@@ -262,7 +262,7 @@
       "Adventure",
       "Sci-Fi"
     ],
-    "likes": 5,
+    "likes": 3900,
     "cover": "IMG/feed/jurassicpark.jpg",
     "type": "Movie",
     "plot": "An industrialist invites some experts to visit his theme park of cloned dinosaurs. After a power failure, the creatures run loose, putting everyone's lives, including his grandchildren's, in danger.",
@@ -282,7 +282,7 @@
       "Romance",
       "Drama"
     ],
-    "likes": 4,
+    "likes": 3200,
     "cover": "IMG/feed/casablanca.jpg",
     "type": "Movie",
     "plot": "A cynical expatriate American cafe owner struggles to decide whether or not to help his former lover and her fugitive husband escape the Nazis in French Morocco.",
@@ -302,7 +302,7 @@
       "Drama",
       "Mystery"
     ],
-    "likes": 4,
+    "likes": 2800,
     "cover": "IMG/feed/citizenkane.jpg",
     "type": "Movie",
     "plot": "Following the death of publishing tycoon Charles Foster Kane, reporters scramble to uncover the meaning of his final utterance: 'Rosebud.'",
@@ -322,7 +322,7 @@
       "Horror",
       "Thriller"
     ],
-    "likes": 4,
+    "likes": 3000,
     "cover": "IMG/feed/psycho.jpg",
     "type": "Movie",
     "plot": "A secretary on the run for embezzlement takes refuge at a secluded California motel owned by a repressed man and his overbearing mother.",
@@ -342,7 +342,7 @@
       "Fantasy",
       "Family"
     ],
-    "likes": 4,
+    "likes": 3100,
     "cover": "IMG/feed/wizardofoz.jpg",
     "type": "Movie",
     "plot": "Young Dorothy Gale and her dog Toto are swept away by a tornado from their Kansas farm to the magical Land of Oz and embark on a quest with three new friends to see the Wizard, who can return her to her home and fulfill the others...",
@@ -362,7 +362,7 @@
       "Adventure",
       "Fantasy"
     ],
-    "likes": 2,
+    "likes": 5200,
     "cover": "IMG/feed/lotr1.jpg",
     "type": "Movie"
   },
@@ -374,7 +374,7 @@
       "Crime",
       "Drama"
     ],
-    "likes": 5,
+    "likes": 3500,
     "cover": "IMG/feed/goodfellas.jpg",
     "type": "Movie",
     "plot": "The story of Henry Hill and his life in the mafia, covering his relationship with his wife Karen and his mob partners Jimmy Conway and Tommy DeVito.",
@@ -395,13 +395,13 @@
       "Adventure",
       "Drama"
     ],
-    "likes": 3,
+    "likes": 2600,
     "cover": "IMG/feed/sevensamurai.jpg",
     "type": "Movie",
     "plot": "Farmers from a village exploited by bandits hire a veteran samurai for protection, and he gathers six other samurai to join him.",
     "director": "Akira Kurosawa",
     "actors": [
-      "ToshirÃ´ Mifune",
+      "Toshirô Mifune",
       "Takashi Shimura",
       "Keiko Tsushima"
     ],
@@ -416,7 +416,7 @@
       "Fantasy",
       "Adventure"
     ],
-    "likes": 5,
+    "likes": 3400,
     "cover": "IMG/feed/spiritedaway.jpg",
     "type": "Movie",
     "plot": "During her family's move to the suburbs, a sullen 10-year-old girl wanders into a world ruled by gods, witches and spirits, and where humans are changed into beasts.",
@@ -436,7 +436,7 @@
       "Animation",
       "Family"
     ],
-    "likes": 6,
+    "likes": 4500,
     "cover": "IMG/feed/lionking.jpg",
     "type": "Movie",
     "plot": "Lion prince Simba and his father are targeted by his bitter uncle, who wants to ascend the throne himself.",
@@ -456,7 +456,7 @@
       "Drama",
       "War"
     ],
-    "likes": 4,
+    "likes": 2900,
     "cover": "IMG/feed/apocalypsenow.jpg",
     "type": "Movie",
     "plot": "A U.S. Army officer serving in Vietnam is tasked with assassinating a renegade Special Forces Colonel who sees himself as a god.",
@@ -477,7 +477,7 @@
       "Crime",
       "Horror"
     ],
-    "likes": 5,
+    "likes": 3800,
     "cover": "IMG/feed/silenceofthelambs.jpg",
     "type": "Movie",
     "plot": "A young F.B.I. cadet must receive the help of an incarcerated and manipulative cannibal killer to help catch another serial killer, a madman who skins his victims.",
@@ -497,7 +497,7 @@
       "Comedy",
       "Romance"
     ],
-    "likes": 3,
+    "likes": 7200,
     "cover": "IMG/feed/friends.jpg",
     "type": "Series",
     "plot": "The personal and professional lives of six friends living in the Manhattan borough of New York City.",
@@ -515,7 +515,7 @@
     "genres": [
       "Comedy"
     ],
-    "likes": 9,
+    "likes": 6900,
     "cover": "IMG/feed/theofficeus.jpg",
     "type": "Series"
   },
@@ -526,7 +526,7 @@
     "genres": [
       "Comedy"
     ],
-    "likes": 2,
+    "likes": 6100,
     "cover": "IMG/feed/seinfeld.jpg",
     "type": "Series",
     "plot": "The continuing misadventures of neurotic New York City stand-up comedian Jerry Seinfeld and his equally neurotic New York City friends.",
@@ -546,7 +546,7 @@
       "Comedy",
       "Family"
     ],
-    "likes": 2,
+    "likes": 6400,
     "cover": "IMG/feed/simpsons.jpg",
     "type": "Series",
     "plot": "The satiric half-hour adventures of a working-class family in the misfit city of Springfield.",
@@ -566,7 +566,7 @@
       "Drama",
       "Thriller"
     ],
-    "likes": 9,
+    "likes": 7801,
     "cover": "IMG/feed/breakingbad.jpg",
     "type": "Series",
     "plot": "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student to secure his family's future.",
@@ -612,7 +612,7 @@
       "Drama",
       "Adventure"
     ],
-    "likes": 9,
+    "likes": 7600,
     "cover": "IMG/feed/gameofthrones.jpg",
     "type": "Series",
     "plot": "Nine noble families fight for control over the lands of Westeros, while an ancient enemy returns after being dormant for millennia.",
@@ -632,7 +632,7 @@
       "Horror",
       "Drama"
     ],
-    "likes": 9,
+    "likes": 7300,
     "cover": "IMG/feed/strangerthings.jpg",
     "type": "Series",
     "plot": "In 1980s Indiana, a group of young friends witness supernatural forces and secret government exploits. As they search for answers, the children unravel a series of extraordinary mysteries.",
@@ -651,7 +651,7 @@
       "Crime",
       "Drama"
     ],
-    "likes": 2,
+    "likes": 6200,
     "cover": "IMG/feed/sopranos.jpg",
     "type": "Series",
     "plot": "New Jersey mob boss Tony Soprano deals with personal and professional issues in his home and business life that affect his mental state, leading him to seek professional psychiatric counseling.",
@@ -670,7 +670,7 @@
       "Crime",
       "Drama"
     ],
-    "likes": 2,
+    "likes": 5900,
     "cover": "IMG/feed/thewire.jpg",
     "type": "Series",
     "plot": "The Baltimore drug scene, as seen through the eyes of drug dealers and law enforcement.",
@@ -690,7 +690,7 @@
       "Mystery",
       "Drama"
     ],
-    "likes": 6,
+    "likes": 5600,
     "cover": "IMG/feed/sherlock.jpg",
     "type": "Series",
     "plot": "The quirky spin on Conan Doyle's iconic sleuth pitches him as a \"high-functioning sociopath\" in modern-day London. Assisting him in his investigations: Afghanistan War vet John Watson, who's introduced to Holmes by a mutual acquai...",
@@ -709,7 +709,7 @@
       "Drama",
       "Medical"
     ],
-    "likes": 6,
+    "likes": 5500,
     "cover": "IMG/feed/housemd.jpg",
     "type": "Series"
   },
@@ -722,7 +722,7 @@
       "Mystery",
       "Sci-Fi"
     ],
-    "likes": 7,
+    "likes": 5400,
     "cover": "IMG/feed/lost.jpg",
     "type": "Series",
     "plot": "The survivors of a plane crash are forced to work together in order to survive on a seemingly deserted tropical island.",
@@ -742,7 +742,7 @@
       "Drama",
       "Western"
     ],
-    "likes": 6,
+    "likes": 4800,
     "cover": "IMG/feed/westworld.jpg",
     "type": "Series",
     "plot": "At the intersection of the near future and the reimagined past, waits a world in which every human appetite can be indulged without consequence.",
@@ -762,7 +762,7 @@
       "Drama",
       "Mystery"
     ],
-    "likes": 7,
+    "likes": 5200,
     "cover": "IMG/feed/truedetective.jpg",
     "type": "Series",
     "plot": "Anthology series in which police investigations unearth the personal and professional secrets of those involved, both within and outside the law.",
@@ -782,14 +782,14 @@
       "History",
       "Mini-Series"
     ],
-    "likes": 7,
+    "likes": 5100,
     "cover": "IMG/feed/chernobyl.jpg",
     "type": "Series",
     "plot": "In April 1986, the city of Chernobyl in the Soviet Union suffers one of the worst nuclear disasters in the history of mankind. Consequently, many heroes put their lives on the line in the following days, weeks and months.",
     "actors": [
       "Jessie Buckley",
       "Jared Harris",
-      "Stellan SkarsgÃ¥rd"
+      "Stellan Skarsgård"
     ],
     "rating": "9.3/10 (IMDb)"
   },
@@ -801,7 +801,7 @@
       "Drama",
       "History"
     ],
-    "likes": 6,
+    "likes": 4700,
     "cover": "IMG/feed/thecrown.jpg",
     "type": "Series",
     "plot": "Follows the political rivalries and romances of Queen Elizabeth II's reign and the events that shaped Britain for the second half of the 20th century.",
@@ -819,7 +819,7 @@
     "genres": [
       "Drama"
     ],
-    "likes": 7,
+    "likes": 5000,
     "cover": "IMG/feed/madmen.jpg",
     "type": "Series",
     "plot": "A drama about one of New York's most prestigious ad agencies at the beginning of the 1960s, focusing on one of the firm's most mysterious but extremely talented ad executives, Donald Draper.",
@@ -838,7 +838,7 @@
       "Comedy",
       "Romance"
     ],
-    "likes": 8,
+    "likes": 5300,
     "cover": "IMG/feed/himym.jpg",
     "type": "Series",
     "plot": "A father recounts to his children the journey he and his four best friends took leading up to him meeting their mother.",
@@ -856,7 +856,7 @@
     "genres": [
       "Comedy"
     ],
-    "likes": 5,
+    "likes": 5600,
     "cover": "IMG/feed/bigbangtheory.jpg",
     "type": "Series",
     "plot": "Aspiring film actress Penny moves into a Pasadena apartment across the hall from brilliant, but socially awkward, physicists Sheldon Cooper and Leonard Hofstadter and shows them how little they know about life outside of the lab.",
@@ -876,7 +876,7 @@
       "Action",
       "Fantasy"
     ],
-    "likes": 2,
+    "likes": 5800,
     "cover": "IMG/feed/avatar.jpg",
     "type": "Series",
     "plot": "In a war-torn world of elemental powers, a young boy reawakens to undertake a dangerous mystic quest to fulfill his destiny as the Avatar, and bring peace to the world.",
@@ -896,7 +896,7 @@
       "Sci-Fi",
       "Comedy"
     ],
-    "likes": 2,
+    "likes": 6000,
     "cover": "IMG/feed/rickandmorty.jpg",
     "type": "Series",
     "plot": "The fractured domestic lives of a nihilistic mad scientist and his anxious grandson are further complicated by their inter-dimensional misadventures.",

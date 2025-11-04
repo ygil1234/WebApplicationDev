@@ -682,138 +682,6 @@ app.delete('/api/profiles/:id', requireAuth, async (req, res) => {
   }
 });
 
-// ====== Statistics ======
-app.get('/api/stats/daily-views', requireAuth, async (req, res) => {
-  try {
-    const resolvedUserId = await resolveUserId(req.query.userId, req.session);
-    if (!resolvedUserId) {
-      return res.status(400).json({ ok: false, error: 'User ID is required.' });
-    }
-
-    const daysParam = Number.parseInt(req.query.days, 10);
-    const days = Number.isFinite(daysParam) ? Math.min(Math.max(daysParam, 1), 30) : 7;
-    const dayMs = 24 * 60 * 60 * 1000;
-
-    const todayUtc = new Date();
-    todayUtc.setUTCHours(0, 0, 0, 0);
-    const rangeStart = new Date(todayUtc.getTime() - (days - 1) * dayMs);
-    const rangeEndExclusive = new Date(todayUtc.getTime() + dayMs);
-
-    const profiles = await Profile.find({ userId: resolvedUserId }, '_id name').sort({ createdAt: 1 }).lean();
-
-    if (!profiles.length) {
-      return res.json({
-        profiles: [],
-        range: {
-          days,
-          start: rangeStart.toISOString(),
-          end: todayUtc.toISOString(),
-        },
-      });
-    }
-
-    const profileIds = profiles.map((p) => String(p._id));
-
-    const aggregation = await WatchProgress.aggregate([
-      {
-        $match: {
-          profileId: { $in: profileIds },
-          completed: true,
-          updatedAt: { $gte: rangeStart, $lt: rangeEndExclusive },
-        },
-      },
-      {
-        $project: {
-          profileId: 1,
-        },
-      },
-      {
-        $group: {
-          _id: '$profileId',
-          views: { $sum: 1 },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          profileId: '$_id',
-          views: 1,
-        },
-      },
-    ]);
-
-    const countsByKey = new Map();
-    aggregation.forEach((row) => {
-      countsByKey.set(String(row.profileId), Number(row.views) || 0);
-    });
-
-    const payload = profiles.map((profile) => ({
-      profileId: String(profile._id),
-      profileName: profile.name,
-      views: countsByKey.get(String(profile._id)) || 0,
-    }));
-
-    return res.json({
-      profiles: payload,
-      range: {
-        days,
-        start: rangeStart.toISOString(),
-        end: todayUtc.toISOString(),
-      },
-    });
-  } catch (err) {
-    console.error('GET /api/stats/daily-views error:', err);
-    await writeLog({
-      level: 'error',
-      event: 'stats_daily_views',
-      details: { error: err.message },
-    });
-    return res.status(500).json({ error: 'Failed to load daily views statistics.' });
-  }
-});
-
-app.get('/api/stats/genre-popularity', requireAuth, async (req, res) => {
-  try {
-    const resolvedUserId = await resolveUserId(req.query.userId, req.session);
-    if (!resolvedUserId) {
-      return res.status(400).json({ ok: false, error: 'User ID is required.' });
-    }
-
-    const limitParam = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 3), 20) : 12;
-
-    const contents = await Content.find({}, 'genres likes').lean();
-    const genreTotals = new Map();
-
-    contents.forEach((doc) => {
-      const likes = Number(doc.likes) || 0;
-      const genres = Array.isArray(doc.genres) && doc.genres.length ? doc.genres : ['Unknown'];
-      genres.forEach((rawGenre) => {
-        const genre = String(rawGenre || '').trim() || 'Unknown';
-        genreTotals.set(genre, (genreTotals.get(genre) || 0) + likes);
-      });
-    });
-
-    const sorted = Array.from(genreTotals.entries())
-      .sort((a, b) => {
-        if (b[1] === a[1]) return a[0].localeCompare(b[0]);
-        return b[1] - a[1];
-      })
-      .slice(0, limit);
-
-    const payload = sorted.map(([genre, views]) => ({ genre, views }));
-    return res.json(payload);
-  } catch (err) {
-    console.error('GET /api/stats/genre-popularity error:', err);
-    await writeLog({
-      level: 'error',
-      event: 'stats_genre_popularity',
-      details: { error: err.message },
-    });
-    return res.status(500).json({ error: 'Failed to load genre popularity statistics.' });
-  }
-});
-
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     let dest;
@@ -1274,25 +1142,17 @@ app.post('/api/likes/toggle', async (req, res) => {
       if (created.upsertedCount === 1) {
         await Content.updateOne({ _id: content._id }, { $inc: { likes: 1 } });
       }
-      const updated = await Content.findById(content._id, 'extId likes').lean();
-      const likeCount = Math.max(0, Number(updated?.likes || 0));
-      if (updated) {
-        try { await syncContentJsonWithDoc(updated); } catch (syncErr) { console.warn('like sync error:', syncErr.message); }
-      }
+      const updated = await Content.findById(content._id, 'likes').lean();
       await writeLog({ event: 'like_toggle', profileId, details: { contentExtId, like: true } });
-      return res.json({ ok: true, liked: true, likes: likeCount });
+      return res.json({ ok: true, liked: true, likes: updated.likes });
     } else {
       const removed = await Like.deleteOne({ profileId, contentExtId });
       if (removed.deletedCount === 1) {
         await Content.updateOne({ _id: content._id }, { $inc: { likes: -1 } });
       }
-      const updated = await Content.findById(content._id, 'extId likes').lean();
-      const likeCount = Math.max(0, Number(updated?.likes || 0));
-      if (updated) {
-        try { await syncContentJsonWithDoc(updated); } catch (syncErr) { console.warn('like sync error:', syncErr.message); }
-      }
+      const updated = await Content.findById(content._id, 'likes').lean();
       await writeLog({ event: 'like_toggle', profileId, details: { contentExtId, like: false } });
-      return res.json({ ok: true, liked: false, likes: likeCount });
+      return res.json({ ok: true, liked: false, likes: Math.max(0, updated.likes) });
     }
   } catch (err) {
     console.error('POST /api/likes/toggle error:', err);
@@ -1787,7 +1647,6 @@ async function seedContentIfNeeded({ force = false } = {}) {
         if ('plot' in doc) baseUpdate.plot = doc.plot;
         if ('director' in doc) baseUpdate.director = doc.director;
         if ('actors' in doc) baseUpdate.actors = doc.actors;
-        if ('likes' in doc) baseUpdate.likes = doc.likes;
         if ('rating' in doc) baseUpdate.rating = doc.rating;
         if ('ratingValue' in doc) baseUpdate.ratingValue = doc.ratingValue;
         if ('videoPath' in doc) baseUpdate.videoPath = doc.videoPath;
