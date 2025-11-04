@@ -906,5 +906,21 @@
       "Sarah Chalke"
     ],
     "rating": "9.0/10 (IMDb)"
+  },
+  {
+    "id": "m90332",
+    "extId": "m90332",
+    "title": "asdfasdfasdf",
+    "year": 1998,
+    "genres": [
+      "kaki"
+    ],
+    "cover": "/uploads/images/imageFile-1762284242526-784850831.jpeg",
+    "image": "/uploads/images/imageFile-1762284242526-784850831.jpeg",
+    "ratingValue": null,
+    "actors": [],
+    "type": "Series",
+    "episodes": [],
+    "likes": 0
   }
 ]
