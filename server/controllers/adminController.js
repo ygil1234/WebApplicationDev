@@ -1,0 +1,317 @@
+const path = require('path');
+const fs = require('fs/promises');
+const axios = require('axios');
+
+const Content = require('../models/Video');
+const { writeLog, syncContentJsonWithDoc, seedContentIfNeeded } = require('../utils/helpers');
+const { OMDB_API_KEY, SERVER_DIR } = require('../config/config');
+
+async function createOrUpdateContent(req, res) {
+  try {
+    const { extId, title, year, genres, type } = req.body;
+
+    if (!extId || !title || !year || !genres || !type) {
+      return res.status(400).json({
+        ok: false,
+        error: 'All text fields are required (extId, title, year, genres, type).',
+      });
+    }
+
+    const imageFile = req.files?.imageFile?.[0];
+    const videoFile = req.files?.videoFile?.[0];
+
+    const existingContent = await Content.findOne({ extId }).lean();
+
+    if (!existingContent) {
+      const isMovie = /movie/i.test(String(type || ''));
+      if (!imageFile || (isMovie && !videoFile)) {
+        return res.status(400).json({
+          ok: false,
+          error: isMovie
+            ? 'Image and Video files are required when creating a Movie.'
+            : 'Image file is required when creating a Series.',
+        });
+      }
+    }
+
+    let omdbData = {};
+    if (OMDB_API_KEY) {
+      try {
+        const url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}&y=${year}`;
+        const response = await axios.get(url);
+        if (response.data && response.data.Response === 'True') {
+          const ratingRaw = Number.parseFloat(response.data.imdbRating);
+          const hasRating = Number.isFinite(ratingRaw);
+          omdbData = {
+            plot: response.data.Plot,
+            director: response.data.Director,
+            actors: response.data.Actors
+              ? response.data.Actors.split(',').map((s) => s.trim())
+              : [],
+            ...(hasRating ? { rating: `${response.data.imdbRating}/10 (IMDb)`, ratingValue: ratingRaw } : {}),
+          };
+          if (hasRating) {
+            console.log(`[OMDb] Fetched rating for ${title}: ${omdbData.rating}`);
+          } else {
+            console.warn(`[OMDb] Rating missing for ${title}`);
+          }
+        } else {
+          console.warn(`[OMDb] Could not find data for ${title} (${year})`);
+        }
+      } catch (err) {
+        console.error('[OMDb] Error fetching data:', err.message);
+      }
+    } else {
+      console.warn('[OMDb] OMDB_API_KEY is not set. Skipping rating fetch.');
+    }
+
+    const doc = {
+      extId,
+      title,
+      year: Number(year),
+      genres: Array.isArray(genres)
+        ? genres.filter(Boolean)
+        : String(genres)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      type,
+      ...omdbData,
+    };
+
+    if (imageFile) {
+      const assetPath = `/uploads/images/${imageFile.filename}`;
+      doc.imagePath = assetPath;
+      doc.cover = assetPath;
+    }
+
+    if (videoFile) {
+      const isMovie = /movie/i.test(String(type || ''));
+      if (isMovie) {
+        doc.videoPath = `/uploads/videos/${videoFile.filename}`;
+      }
+    }
+
+    const upsertRes = await Content.updateOne(
+      { extId: doc.extId },
+      {
+        $set: doc,
+        $setOnInsert: { likes: 0 },
+      },
+      { upsert: true }
+    );
+
+    const finalDoc = await Content.findOne({ extId: doc.extId }).lean();
+    if (!finalDoc) {
+      throw new Error('Content was saved but could not be reloaded');
+    }
+
+    try {
+      await syncContentJsonWithDoc(finalDoc);
+      await seedContentIfNeeded({ force: true });
+    } catch (syncErr) {
+      console.error('POST /api/admin/content sync error:', syncErr);
+      await writeLog({
+        level: 'error',
+        event: 'content_admin_sync',
+        userId: req.session.userId,
+        details: { error: syncErr.message, extId: doc.extId },
+      });
+      return res.status(500).json({
+        ok: false,
+        error: 'Content saved but failed to sync content.json. Please retry.',
+      });
+    }
+
+    const logDetails = { contentExtId: finalDoc.extId, title: finalDoc.title };
+
+    if (upsertRes.upsertedCount > 0) {
+      await writeLog({
+        event: 'content_create',
+        userId: req.session.userId,
+        details: logDetails,
+      });
+      return res.status(201).json({ ok: true, data: finalDoc, action: 'created' });
+    }
+
+    await writeLog({
+      event: 'content_update',
+      userId: req.session.userId,
+      details: logDetails,
+    });
+    return res.status(200).json({ ok: true, data: finalDoc, action: 'updated' });
+  } catch (err) {
+    console.error('POST /api/admin/content error:', err);
+    if (err?.code === 11000) {
+      return res.status(409).json({
+        ok: false,
+        error: 'A content item with this External ID already exists.',
+      });
+    }
+    await writeLog({
+      level: 'error',
+      event: 'content_admin_op',
+      userId: req.session.userId,
+      details: { error: err.message },
+    });
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
+}
+
+async function upsertEpisode(req, res) {
+  try {
+    const { seriesExtId, season, episode, title } = req.body || {};
+    const videoFile = req.files?.videoFile?.[0];
+    if (!seriesExtId || !season || !episode || !videoFile) {
+      return res.status(400).json({
+        ok: false,
+        error: 'seriesExtId, season, episode and videoFile are required',
+      });
+    }
+
+    const series = await Content.findOne({ extId: String(seriesExtId) });
+    if (!series) return res.status(404).json({ ok: false, error: 'Series not found' });
+    if (!/series/i.test(series.type || '')) {
+      return res.status(400).json({ ok: false, error: 'Target content is not a Series' });
+    }
+
+    const durationRaw = Number.parseInt(
+      (req.body && (req.body.durationSec ?? req.body.duration)) ?? '0',
+      10
+    );
+    const ep = {
+      season: Number(season),
+      episode: Number(episode),
+      title: String(title || `Episode ${episode}`),
+      videoPath: `/uploads/videos/${videoFile.filename}`,
+      durationSec: Number.isFinite(durationRaw) && durationRaw > 0 ? durationRaw : 0,
+    };
+
+    const filtered = (series.episodes || []).filter(
+      (e) => !(Number(e.season) === ep.season && Number(e.episode) === ep.episode)
+    );
+    filtered.push(ep);
+    filtered.sort((a, b) => a.season - b.season || a.episode - b.episode);
+    series.episodes = filtered;
+    await series.save();
+
+    const updatedSeries = await Content.findOne({ extId: String(seriesExtId) }).lean();
+    if (!updatedSeries) {
+      throw new Error('Series saved but could not be reloaded');
+    }
+
+    try {
+      await syncContentJsonWithDoc(updatedSeries, {
+        overrideEpisodes: updatedSeries.episodes || [],
+      });
+      await seedContentIfNeeded({ force: true });
+    } catch (syncErr) {
+      console.error('POST /api/admin/episodes sync error:', syncErr);
+      await writeLog({
+        level: 'error',
+        event: 'episode_admin_sync',
+        userId: req.session.userId,
+        details: { error: syncErr.message, seriesExtId },
+      });
+      return res.status(500).json({
+        ok: false,
+        error: 'Episode saved but failed to sync content.json. Please retry.',
+      });
+    }
+
+    await writeLog({
+      event: 'episode_upsert',
+      userId: req.session.userId,
+      details: { seriesExtId, season: ep.season, episode: ep.episode, title: ep.title },
+    });
+    return res.status(201).json({ ok: true, seriesExtId, episode: ep });
+  } catch (err) {
+    console.error('POST /api/admin/episodes error:', err);
+    await writeLog({
+      level: 'error',
+      event: 'episode_admin_op',
+      userId: req.session.userId,
+      details: { error: err.message },
+    });
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
+}
+
+async function repairMediaPaths(req, res) {
+  try {
+    const items = await Content.find({}).lean();
+    let cleaned = 0;
+    let episodePruned = 0;
+    let checked = 0;
+    const existsLocal = async (candidatePath) => {
+      try {
+        const rel = String(candidatePath || '').replace(/^\/+/g, '');
+        const fsRel = rel.replace(/^IMG\//i, 'img/');
+        const abs = path.join(SERVER_DIR, '..', 'public', fsRel);
+        await fs.access(abs);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    for (const it of items) {
+      checked++;
+      const unset = {};
+      const set = {};
+      if (it.videoPath && /^\/?uploads\//i.test(String(it.videoPath))) {
+        const ok = await existsLocal(it.videoPath);
+        if (!ok) {
+          unset.videoPath = '';
+          cleaned++;
+        }
+      }
+      if (it.imagePath && /^\/?uploads\//i.test(String(it.imagePath))) {
+        const ok = await existsLocal(it.imagePath);
+        if (!ok) {
+          unset.imagePath = '';
+          cleaned++;
+        }
+      }
+      if (it.cover && /^\/?uploads\//i.test(String(it.cover))) {
+        const ok = await existsLocal(it.cover);
+        if (!ok) {
+          unset.cover = '';
+          cleaned++;
+        }
+      }
+      if (Array.isArray(it.episodes) && it.episodes.length) {
+        const checks = await Promise.all(it.episodes.map((episode) => existsLocal(episode.videoPath)));
+        const filtered = it.episodes.filter((_, idx) => checks[idx]);
+        if (filtered.length !== it.episodes.length) {
+          set.episodes = filtered;
+          episodePruned += it.episodes.length - filtered.length;
+        }
+      }
+      if (Object.keys(unset).length || Object.keys(set).length) {
+        const update = {};
+        if (Object.keys(unset).length) update.$unset = unset;
+        if (Object.keys(set).length) update.$set = set;
+        await Content.updateOne({ _id: it._id }, update);
+      }
+    }
+    await writeLog({
+      event: 'admin_repair_media_paths',
+      details: { checked, cleaned, episodePruned },
+    });
+    return res.json({ ok: true, checked, cleaned, episodePruned });
+  } catch (err) {
+    console.error('POST /api/admin/repair-media-paths error:', err);
+    await writeLog({
+      level: 'error',
+      event: 'admin_repair_media_paths',
+      details: { error: err.message },
+    });
+    return res.status(500).json({ ok: false, error: 'Server error during repair' });
+  }
+}
+
+module.exports = {
+  createOrUpdateContent,
+  upsertEpisode,
+  repairMediaPaths,
+};

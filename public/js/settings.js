@@ -27,8 +27,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const editAvatarGrid = document.getElementById('editAvatarGrid');
     const updateProfileBtn = document.getElementById('updateProfileBtn');
 
-    let selectedAvatar = 'IMG/profile1.jpg'; // Default selection
-    let editSelectedAvatar = 'IMG/profile1.jpg';
+    let selectedAvatar = '/img/profile1.jpg'; // Default selection
+    let editSelectedAvatar = '/img/profile1.jpg';
 
     // ======= Charts state (added) =======
     const dailyViewsHint = document.getElementById('dailyViewsHint');
@@ -324,7 +324,7 @@ document.addEventListener("DOMContentLoaded", () => {
             profileNameInput.value = '';
             avatarOptions.forEach(opt => opt.classList.remove('selected'));
             avatarOptions[0].classList.add('selected');
-            selectedAvatar = 'IMG/profile1.jpg';
+            selectedAvatar = '/img/profile1.jpg';
 
             // Reload profiles list & charts
             await loadProfiles();

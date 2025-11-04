@@ -23,7 +23,7 @@ html, body {
 
 body {
   min-height: 100vh;
-  background: url("IMG/background.jpg") center center / cover no-repeat fixed #000;
+  background: url("/img/background.jpg") center center / cover no-repeat fixed #000;
   font-family: var(--nf-font);
   color: #fff;
   -webkit-font-smoothing: antialiased;

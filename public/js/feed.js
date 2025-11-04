@@ -324,6 +324,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   function makeRow({ id, title, items, withProgress = false, loadMore = null, pageSize = 0, initialOffset = 0, allowLoop = true }) {
+    const rowSeen = new Set();
+    const rawItems = Array.isArray(items) ? items : [];
+    const initialItems = dedupeByExtId(rawItems, rowSeen);
     const section = document.createElement("section");
     section.className = "nf-row";
     section.innerHTML = `
@@ -339,16 +342,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       </div>
     `;
     const scroller = section.querySelector(".nf-row__scroller");
-    (items || []).forEach(item => scroller.appendChild(createCard(item, withProgress)));
+    initialItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
 
     const left = section.querySelector(".nf-row__arrow--left");
     const right = section.querySelector(".nf-row__arrow--right");
-    const initialCount = Array.isArray(items) ? items.length : 0;
+    const initialCount = initialItems.length;
+    const initialCountRaw = rawItems.length;
     const canLoop = allowLoop && !loadMore && initialCount >= LOOP_MIN_ITEMS;
     const state = {
       loadMore,
       pageSize: pageSize > 0 ? pageSize : 0,
-      offset: initialOffset + initialCount,
+      offset: initialOffset + initialCountRaw,
       isFetching: false,
       exhausted: !loadMore,
       loop: canLoop,
@@ -447,17 +451,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       try {
         const params = { offset: state.offset };
         if (state.pageSize > 0) params.limit = state.pageSize;
-        const nextItems = await state.loadMore(params);
-        if (Array.isArray(nextItems) && nextItems.length) {
+        const fetched = await state.loadMore(params);
+        const fetchedList = Array.isArray(fetched) ? fetched : [];
+        const nextItems = dedupeByExtId(fetchedList, rowSeen);
+        if (nextItems.length) {
           state.loop = false;
           state.loopSeedCount = allowLoop ? Math.max(0, scroller.childElementCount + nextItems.length) : 0;
           state.loopBlocks = allowLoop ? 1 : 0;
           state.loopActivated = false;
           nextItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
-          collectIds(nextItems);
-          state.offset += nextItems.length;
-          if (state.pageSize > 0 && nextItems.length < state.pageSize) {
-            state.exhausted = true;
+        }
+
+        state.offset += fetchedList.length;
+
+        if (state.pageSize > 0 && fetchedList.length < state.pageSize) {
+          state.exhausted = true;
+          if (scroller.childElementCount > 0) {
             const total = scroller.childElementCount;
             const loopPossible = allowLoop && total >= LOOP_MIN_ITEMS;
             state.loop = loopPossible;
@@ -465,7 +474,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             state.loopBlocks = loopPossible ? 1 : 0;
             state.loopActivated = false;
           }
-        } else {
+        } else if (!nextItems.length && fetchedList.length) {
+          // All fetched items were duplicates already in the row; try again soon.
+          requestAnimationFrame(maybeLoadMore);
+        } else if (!nextItems.length) {
           state.exhausted = true;
           if (scroller.childElementCount > 0) {
             const total = scroller.childElementCount;
@@ -491,6 +503,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function maybeLoadMore() {
       if (!state.loadMore || state.exhausted || state.isFetching) return;
+      const maxScrollable = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+      if (maxScrollable <= 0) return; // nothing to scroll, no need to fetch more
       const remaining =
         Math.max(0, scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft);
       if (remaining <= scrollAmountPx() * 1.5) {
@@ -697,13 +711,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   let nextGenreIdx = 0;
   let isLoadingMore = false;
   let isInfiniteEnabled = false;
-  let loadedIds = new Set();
-
-  function collectIds(items=[]) {
-    items.forEach(i => loadedIds.add(String(i?.extId ?? i?.id ?? "")));
-  }
-  function filterNew(items=[]) {
-    return items.filter(i => !loadedIds.has(String(i?.extId ?? i?.id ?? "")));
+  function dedupeByExtId(items = [], seen = new Set()) {
+    const out = [];
+    items.forEach((item) => {
+      const key = String(item?.extId ?? item?.id ?? "");
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(item);
+    });
+    return out;
   }
 
   let sentinel = null;
@@ -737,7 +753,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             sort: sortForRow,
             limit: ROW_LIMIT
           });
-          const items = filterNew(itemsRaw);   // keep genre rows de-duped within this pass
+          const items = dedupeByExtId(itemsRaw);
           if (items.length) {
             batch.push({
               id: `row-${g}-${Date.now()}-${k}`,
@@ -747,7 +763,6 @@ document.addEventListener("DOMContentLoaded", async () => {
               loadMore: ({ offset = 0, limit = ROW_LIMIT } = {}) =>
                 searchContent({ profileId: selectedId, genre: g, sort: sortForRow, limit, offset }),
             });
-            collectIds(items);
           }
         }
         batch.forEach(r => rowsRoot.appendChild(makeRow(r)));
@@ -757,7 +772,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (nextGenreIdx >= GENRE_SEQ.length) {
         await appendHomeCycle(lastSort);
         nextGenreIdx = 0;           // restart genre loop
-        loadedIds = new Set();      // reset de-dupe so new genre pass can show items again
       }
     } catch (err) {
       console.error("Infinite scroll load error:", err);
@@ -793,17 +807,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     // reset paging state
     nextGenreIdx = 0;
     isLoadingMore = false;
-    loadedIds = new Set();
 
     try {
       const { popular, sciFi, drama, classics, recs, rows } = await loadHomeContent(sortMode);
 
       CURRENT_ITEMS = popular.slice();
-      collectIds(popular);
-      collectIds(sciFi);
-      collectIds(drama);
-      collectIds(classics);
-      collectIds(recs);
 
       displayFeatured(CURRENT_ITEMS);
 

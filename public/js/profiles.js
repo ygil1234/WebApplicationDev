@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Check if user is logged in
     const loggedInUser = sessionStorage.getItem('loggedInUser') || localStorage.getItem('loggedInUser');
     if (!loggedInUser) {
-        window.location.href = '../login.html';
+        window.location.href = '/login.html';
         return;
     }
 
@@ -21,7 +21,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (!response.ok) {
                 if (response.status === 401) {
                     // Unauthorized - redirect to login
-                    window.location.href = '../login.html';
+                    window.location.href = '/login.html';
                     return;
                 }
                 throw new Error('Failed to load profiles');
@@ -73,7 +73,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             
             // Redirect to settings page 
             addProfileItem.addEventListener('click', () => {
-                window.location.href = '../settings.html';
+                window.location.href = '/settings.html';
             });
             
             profilesGrid.appendChild(addProfileItem);
@@ -84,12 +84,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         localStorage.setItem('selectedProfileId', String(profile.id));
         localStorage.setItem('selectedProfileName', profile.name);
         localStorage.setItem('selectedProfileAvatar', profile.avatar);
-        window.location.href = '../feed.html';
+        window.location.href = '/feed.html';
     }
 
     // Manage Profiles button click handler
     manageProfilesBtn.addEventListener('click', () => {
-        window.location.href = '../settings.html';
+        window.location.href = '/settings.html';
     });
 
     // Initial load
