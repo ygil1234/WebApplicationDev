@@ -1274,25 +1274,17 @@ app.post('/api/likes/toggle', async (req, res) => {
       if (created.upsertedCount === 1) {
         await Content.updateOne({ _id: content._id }, { $inc: { likes: 1 } });
       }
-      const updated = await Content.findById(content._id, 'extId likes').lean();
-      const likeCount = Math.max(0, Number(updated?.likes || 0));
-      if (updated) {
-        try { await syncContentJsonWithDoc(updated); } catch (syncErr) { console.warn('like sync error:', syncErr.message); }
-      }
+      const updated = await Content.findById(content._id, 'likes').lean();
       await writeLog({ event: 'like_toggle', profileId, details: { contentExtId, like: true } });
-      return res.json({ ok: true, liked: true, likes: likeCount });
+      return res.json({ ok: true, liked: true, likes: updated.likes });
     } else {
       const removed = await Like.deleteOne({ profileId, contentExtId });
       if (removed.deletedCount === 1) {
         await Content.updateOne({ _id: content._id }, { $inc: { likes: -1 } });
       }
-      const updated = await Content.findById(content._id, 'extId likes').lean();
-      const likeCount = Math.max(0, Number(updated?.likes || 0));
-      if (updated) {
-        try { await syncContentJsonWithDoc(updated); } catch (syncErr) { console.warn('like sync error:', syncErr.message); }
-      }
+      const updated = await Content.findById(content._id, 'likes').lean();
       await writeLog({ event: 'like_toggle', profileId, details: { contentExtId, like: false } });
-      return res.json({ ok: true, liked: false, likes: likeCount });
+      return res.json({ ok: true, liked: false, likes: Math.max(0, updated.likes) });
     }
   } catch (err) {
     console.error('POST /api/likes/toggle error:', err);
