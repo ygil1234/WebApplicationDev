@@ -1779,7 +1779,6 @@ async function seedContentIfNeeded({ force = false } = {}) {
         if ('plot' in doc) baseUpdate.plot = doc.plot;
         if ('director' in doc) baseUpdate.director = doc.director;
         if ('actors' in doc) baseUpdate.actors = doc.actors;
-        if ('likes' in doc) baseUpdate.likes = doc.likes;
         if ('rating' in doc) baseUpdate.rating = doc.rating;
         if ('ratingValue' in doc) baseUpdate.ratingValue = doc.ratingValue;
         if ('videoPath' in doc) baseUpdate.videoPath = doc.videoPath;
