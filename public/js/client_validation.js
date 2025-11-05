@@ -1,18 +1,52 @@
 // JS/client_validation.js
 (function () {
   // ---------- DOM helpers ----------
+  function locateExistingErrorEl(input) {
+    if (input.__validationErrorEl && document.body.contains(input.__validationErrorEl)) {
+      return input.__validationErrorEl;
+    }
+    let candidate = input.nextElementSibling;
+    while (candidate && !(candidate.classList && candidate.classList.contains("login-error-message"))) {
+      candidate = candidate.nextElementSibling;
+    }
+    if (!candidate && input.id) {
+      const byId = document.getElementById(`${input.id}Error`) || document.getElementById(`${input.id}__error`);
+      if (byId && byId.classList.contains("login-error-message")) {
+        candidate = byId;
+      }
+    }
+    if (!candidate && input.parentNode) {
+      candidate = Array.from(input.parentNode.children).find((el) => {
+        if (!el.classList || !el.classList.contains("login-error-message")) return false;
+        if (!el.dataset.linkedInput) return true;
+        return el.dataset.linkedInput === input.id;
+      }) || null;
+    }
+    return candidate || null;
+  }
+
   function ensureErrorEl(input) {
-    let error = input.nextElementSibling;
-    if (!error || !error.classList.contains("login-error-message")) {
+    let error = locateExistingErrorEl(input);
+    if (!error) {
       error = document.createElement("div");
       error.classList.add("login-error-message");
       error.setAttribute("role", "alert");
       error.setAttribute("aria-live", "polite");
-      input.parentNode.appendChild(error);
+      const parent = input.parentNode || input.closest(".form-group") || input.parentElement;
+      if (parent) {
+        parent.insertBefore(error, input.nextSibling);
+      } else {
+        input.insertAdjacentElement("afterend", error);
+      }
     }
+
     if (!error.id) {
       error.id = input.id ? `${input.id}__error` : `err_${Math.random().toString(36).slice(2)}`;
     }
+    if (!error.dataset.linkedInput && input.id) {
+      error.dataset.linkedInput = input.id;
+    }
+
     if (input.getAttribute("aria-describedby")) {
       const ids = new Set(input.getAttribute("aria-describedby").split(/\s+/).filter(Boolean));
       ids.add(error.id);
@@ -20,6 +54,8 @@
     } else {
       input.setAttribute("aria-describedby", error.id);
     }
+
+    input.__validationErrorEl = error;
     return error;
   }
 
@@ -32,7 +68,7 @@
   }
 
   function clearError(input) {
-    const error = input.nextElementSibling;
+    const error = locateExistingErrorEl(input);
     if (error && error.classList.contains("login-error-message")) {
       error.textContent = "";
       error.classList.add("d-none");

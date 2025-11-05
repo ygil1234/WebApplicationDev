@@ -16,12 +16,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===== 1) Session / Navbar
   const API_BASE = "http://localhost:3000/api";
 
-  const selectedIdStr   = localStorage.getItem("selectedProfileId");
-  const selectedId      = selectedIdStr ? String(selectedIdStr) : "";
-  const profileName     = localStorage.getItem("selectedProfileName");
-  const profileAvatar   = localStorage.getItem("selectedProfileAvatar");
+  const loggedInUser = localStorage.getItem("loggedInUser");
+  const isAdminUser = loggedInUser === "admin";
 
-  if (!selectedId || !profileName || !profileAvatar) {
+  let selectedIdStr   = localStorage.getItem("selectedProfileId");
+  let selectedId      = selectedIdStr ? String(selectedIdStr) : "";
+  let profileName     = localStorage.getItem("selectedProfileName");
+  let profileAvatar   = localStorage.getItem("selectedProfileAvatar");
+
+  if (isAdminUser) {
+    selectedId = 'admin';
+    if (!profileName) profileName = 'Admin';
+    if (!profileAvatar) profileAvatar = '/img/profile1.jpg';
+    localStorage.setItem('selectedProfileId', selectedId);
+    localStorage.setItem('selectedProfileName', profileName);
+    localStorage.setItem('selectedProfileAvatar', profileAvatar);
+  }
+
+  if (!isAdminUser && (!selectedId || !profileName || !profileAvatar)) {
     window.location.href = "profiles.html";
     return;
   }
@@ -54,7 +66,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     const greetEl = document.getElementById("greet");
     if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
     const avatarEl = document.getElementById("navAvatar");
-    if (avatarEl) { avatarEl.src = profileAvatar; avatarEl.alt = `${profileName} - Profile`; }
+    const crownEl = document.getElementById("navAvatarCrown");
+    if (isAdminUser) {
+      if (avatarEl) avatarEl.classList.add("d-none");
+      if (crownEl) crownEl.classList.remove("d-none");
+    } else {
+      if (avatarEl) {
+        avatarEl.classList.remove("d-none");
+        avatarEl.src = profileAvatar;
+        avatarEl.alt = `${profileName} - Profile`;
+      }
+      if (crownEl) crownEl.classList.add("d-none");
+    }
 
     // Logout
     const logoutLink = document.getElementById("logoutLink");
@@ -82,7 +105,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    if (changeProfileBtn && !changeProfileBtn.dataset.wired) {
+    if (isAdminUser && changeProfileBtn && !changeProfileBtn.dataset.wired) {
+      changeProfileBtn.dataset.wired = '1';
+      changeProfileBtn.textContent = 'Edit Content';
+      changeProfileBtn.addEventListener('click', () => {
+        setProfileMenu(false);
+        window.location.href = 'admin.html';
+      });
+    } else if (!isAdminUser && changeProfileBtn && !changeProfileBtn.dataset.wired) {
       changeProfileBtn.dataset.wired = '1';
       changeProfileBtn.addEventListener("click", () => {
         setProfileMenu(false);
@@ -860,6 +890,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     rowsRoot.addEventListener("click", async (e) => {
       const btn = e.target.closest(".like-btn");
       if (!btn) return;
+      if (isAdminUser) {
+        e.preventDefault();
+        e.stopPropagation();
+        showAlert({
+          type: 'info',
+          title: 'Admin mode',
+          message: 'Admin accounts cannot like titles.',
+        });
+        return;
+      }
       e.preventDefault(); 
       e.stopPropagation();
       if (btn.dataset.busy === "1") return;
@@ -908,11 +948,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn.setAttribute("aria-pressed", String(wasLiked));
         if (countEl) countEl.textContent = String(prev);
         syncCardLikeState(extId, wasLiked, prev);
-        showAlert({ 
-          type: 'error', 
-          title: 'Like failed', 
-          message: err?.message || 'Error while updating like' 
-        });
+        if (err?.message?.includes('Admin is not allowed to like')) {
+          showAlert({
+            type: 'info',
+            title: 'Admin mode',
+            message: 'Admin accounts cannot like titles.',
+          });
+        } else {
+          showAlert({ 
+            type: 'error', 
+            title: 'Like failed', 
+            message: err?.message || 'Error while updating like' 
+          });
+        }
       } finally {
         delete btn.dataset.busy;
         btn.removeAttribute("aria-busy");

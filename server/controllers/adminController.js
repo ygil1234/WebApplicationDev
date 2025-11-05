@@ -6,21 +6,155 @@ const Content = require('../models/Video');
 const { writeLog, syncContentJsonWithDoc, seedContentIfNeeded } = require('../utils/helpers');
 const { OMDB_API_KEY, SERVER_DIR } = require('../config/config');
 
+function normalizeType(rawType) {
+  const value = String(rawType || '').trim();
+  if (/^movie$/i.test(value)) return 'Movie';
+  if (/^series$/i.test(value)) return 'Series';
+  return value;
+}
+
+async function computeNextExtIdForType(rawType) {
+  const normalizedType = normalizeType(rawType);
+  const isMovie = normalizedType === 'Movie';
+  const isSeries = normalizedType === 'Series';
+  if (!isMovie && !isSeries) {
+    throw new Error('Unsupported type for automatic ID assignment');
+  }
+  const prefix = isMovie ? 'm' : 's';
+  const regex = new RegExp(`^${prefix}(\\d+)$`, 'i');
+  const docs = await Content.find({ type: normalizedType }, { extId: 1 }).lean();
+  let maxNum = 0;
+  for (const doc of docs) {
+    const match = regex.exec(String(doc.extId || ''));
+    if (!match) continue;
+    const num = Number.parseInt(match[1], 10);
+    if (Number.isFinite(num) && num > maxNum) {
+      maxNum = num;
+    }
+  }
+  return `${prefix}${maxNum + 1}`;
+}
+
+async function listContentSummaries(req, res) {
+  try {
+    const filter = {};
+    const rawType = String(req.query.type || '').trim();
+    if (rawType) {
+      filter.type = normalizeType(rawType);
+    }
+
+    const docs = await Content.find(filter, { extId: 1, title: 1, type: 1 })
+      .sort({ title: 1, extId: 1 })
+      .lean();
+
+    return res.json({
+      ok: true,
+      data: docs.map((doc) => ({
+        extId: doc.extId,
+        title: doc.title,
+        type: doc.type,
+      })),
+    });
+  } catch (err) {
+    console.error('GET /api/admin/content error:', err);
+    await writeLog({
+      level: 'error',
+      event: 'content_admin_list',
+      userId: req.session.userId,
+      details: { error: err.message },
+    });
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
+}
+
+async function getContentByExtId(req, res) {
+  try {
+    const extId = String(req.params.extId || '').trim();
+    if (!extId) {
+      return res.status(400).json({ ok: false, error: 'extId parameter is required.' });
+    }
+
+    const doc = await Content.findOne({ extId }).lean();
+    if (!doc) {
+      return res.status(404).json({ ok: false, error: 'Content not found.' });
+    }
+
+    const sortedEpisodes = Array.isArray(doc.episodes)
+      ? [...doc.episodes].sort((a, b) => a.season - b.season || a.episode - b.episode)
+      : [];
+
+    return res.json({
+      ok: true,
+      data: {
+        extId: doc.extId,
+        title: doc.title,
+        year: doc.year,
+        genres: doc.genres,
+        type: doc.type,
+        cover: doc.cover || doc.imagePath || '',
+        imagePath: doc.imagePath || '',
+        videoPath: doc.videoPath || '',
+        plot: doc.plot || '',
+        director: doc.director || '',
+        actors: doc.actors || [],
+        rating: doc.rating || '',
+        episodes: sortedEpisodes.map((ep) => ({
+          season: ep.season,
+          episode: ep.episode,
+          title: ep.title,
+          videoPath: ep.videoPath,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('GET /api/admin/content/:extId error:', err);
+    await writeLog({
+      level: 'error',
+      event: 'content_admin_lookup',
+      userId: req.session.userId,
+      details: { error: err.message, extId: req.params.extId },
+    });
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
+}
+
 async function createOrUpdateContent(req, res) {
   try {
-    const { extId, title, year, genres, type } = req.body;
+    const { title, year, genres } = req.body;
+    const type = normalizeType(req.body.type);
+    const extIdInput = typeof req.body.extId === 'string' ? req.body.extId.trim() : '';
 
-    if (!extId || !title || !year || !genres || !type) {
+    if (!title || !year || !genres || !type) {
       return res.status(400).json({
         ok: false,
-        error: 'All text fields are required (extId, title, year, genres, type).',
+        error: 'All text fields are required (title, year, genres, type).',
       });
     }
 
     const imageFile = req.files?.imageFile?.[0];
     const videoFile = req.files?.videoFile?.[0];
 
-    const existingContent = await Content.findOne({ extId }).lean();
+    let extId = extIdInput;
+    let existingContent = null;
+    if (extId) {
+      existingContent = await Content.findOne({ extId }).lean();
+    }
+
+    const autoGenerateExtId = !extId;
+
+    if (autoGenerateExtId) {
+      try {
+        extId = await computeNextExtIdForType(type);
+      } catch (err) {
+        console.error('Auto ID generation failed:', err);
+        return res.status(400).json({
+          ok: false,
+          error: 'Unable to generate an External ID for this type.',
+        });
+      }
+    } else if (!existingContent) {
+      existingContent = await Content.findOne({ extId }).lean();
+    }
 
     if (!existingContent) {
       const isMovie = /movie/i.test(String(type || ''));
@@ -59,14 +193,19 @@ async function createOrUpdateContent(req, res) {
           console.warn(`[OMDb] Could not find data for ${title} (${year})`);
         }
       } catch (err) {
-        console.error('[OMDb] Error fetching data:', err.message);
+        const status = err?.response?.status;
+        if (status === 401) {
+          console.warn('[OMDb] Invalid or unauthorized API key – skipping metadata enrichment.');
+        } else {
+          console.error('[OMDb] Error fetching data:', err.message);
+        }
+        omdbData = {};
       }
     } else {
       console.warn('[OMDb] OMDB_API_KEY is not set. Skipping rating fetch.');
     }
 
     const doc = {
-      extId,
       title,
       year: Number(year),
       genres: Array.isArray(genres)
@@ -77,6 +216,7 @@ async function createOrUpdateContent(req, res) {
           .filter(Boolean),
       type,
       ...omdbData,
+      extId,
     };
 
     if (imageFile) {
@@ -92,14 +232,38 @@ async function createOrUpdateContent(req, res) {
       }
     }
 
-    const upsertRes = await Content.updateOne(
-      { extId: doc.extId },
-      {
-        $set: doc,
-        $setOnInsert: { likes: 0 },
-      },
-      { upsert: true }
-    );
+    const shouldRetryAutoId = autoGenerateExtId && !existingContent;
+    let upsertRes;
+    let attempts = 0;
+    const maxAttempts = 5;
+    let currentExtId = doc.extId;
+
+    while (attempts < maxAttempts) {
+      try {
+        doc.extId = currentExtId;
+        upsertRes = await Content.updateOne(
+          { extId: doc.extId },
+          {
+            $set: doc,
+            $setOnInsert: { likes: 0 },
+          },
+          { upsert: true }
+        );
+        extId = doc.extId;
+        break;
+      } catch (err) {
+        if (shouldRetryAutoId && err?.code === 11000) {
+          attempts += 1;
+          currentExtId = await computeNextExtIdForType(type);
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!upsertRes) {
+      throw new Error('Content could not be saved after multiple attempts.');
+    }
 
     const finalDoc = await Content.findOne({ extId: doc.extId }).lean();
     if (!finalDoc) {
@@ -311,6 +475,8 @@ async function repairMediaPaths(req, res) {
 }
 
 module.exports = {
+  listContentSummaries,
+  getContentByExtId,
   createOrUpdateContent,
   upsertEpisode,
   repairMediaPaths,
