@@ -186,6 +186,11 @@ async function toggleLike(req, res) {
         .json({ ok: false, error: 'profileId, contentExtId and like are required' });
     }
 
+    const adminProfiles = new Set(['admin', 'admin-user-id']);
+    if (adminProfiles.has(String(profileId))) {
+      return res.status(403).json({ ok: false, error: 'Admin is not allowed to like content.' });
+    }
+
     const content = await Content.findOne({ extId: contentExtId });
     if (!content) {
       return res.status(404).json({ ok: false, error: 'Content not found' });

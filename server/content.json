@@ -1,6 +1,6 @@
 [
   {
-    "id": "m7",
+    "id": "m1",
     "title": "The Godfather",
     "year": 1972,
     "genres": [
@@ -8,7 +8,7 @@
       "Drama"
     ],
     "likes": 3,
-    "cover": "IMG/feed/godfather.jpg",
+    "cover": "img/feed/godfather.jpg",
     "type": "Movie",
     "plot": "The aging patriarch of an organized crime dynasty transfers control of his clandestine empire to his reluctant son.",
     "director": "Francis Ford Coppola",
@@ -17,10 +17,10 @@
       "Al Pacino",
       "James Caan"
     ],
-    "rating": "9.2/10 (IMDb)"
+    "ratingValue": "9.2/10 (IMDb)"
   },
   {
-    "id": "m8",
+    "id": "m2",
     "title": "The Godfather Part II",
     "year": 1974,
     "genres": [
@@ -28,7 +28,7 @@
       "Drama"
     ],
     "likes": 2,
-    "cover": "IMG/feed/godfather2.jpg",
+    "cover": "img/feed/godfather2.jpg",
     "type": "Movie",
     "plot": "The early life and career of Vito Corleone in 1920s New York City is portrayed, while his son, Michael, expands and tightens his grip on the family crime syndicate.",
     "director": "Francis Ford Coppola",
@@ -37,17 +37,17 @@
       "Robert De Niro",
       "Robert Duvall"
     ],
-    "rating": "9.0/10 (IMDb)"
+    "ratingValue": "9.0/10 (IMDb)"
   },
   {
-    "id": "m9",
+    "id": "m3",
     "title": "The Shawshank Redemption",
     "year": 1994,
     "genres": [
       "Drama"
     ],
     "likes": 3,
-    "cover": "IMG/feed/shawshank.jpg",
+    "cover": "img/feed/shawshank.jpg",
     "type": "Movie",
     "plot": "A banker convicted of uxoricide forms a friendship over a quarter century with a hardened convict, while maintaining his innocence and trying to remain hopeful through simple compassion.",
     "director": "Frank Darabont",
@@ -56,10 +56,10 @@
       "Morgan Freeman",
       "Bob Gunton"
     ],
-    "rating": "9.3/10 (IMDb)"
+    "ratingValue": "9.3/10 (IMDb)"
   },
   {
-    "id": "m10",
+    "id": "m4",
     "title": "Pulp Fiction",
     "year": 1994,
     "genres": [
@@ -67,7 +67,7 @@
       "Drama"
     ],
     "likes": 5,
-    "cover": "IMG/feed/pulpfiction.jpg",
+    "cover": "img/feed/pulpfiction.jpg",
     "type": "Movie",
     "plot": "The lives of two mob hitmen, a boxer, a gangster and his wife, and a pair of diner bandits intertwine in four tales of violence and redemption.",
     "director": "Quentin Tarantino",
@@ -76,10 +76,10 @@
       "Uma Thurman",
       "Samuel L. Jackson"
     ],
-    "rating": "8.8/10 (IMDb)"
+    "ratingValue": "8.8/10 (IMDb)"
   },
   {
-    "id": "m11",
+    "id": "m5",
     "title": "The Dark Knight",
     "year": 2008,
     "genres": [
@@ -87,7 +87,7 @@
       "Crime"
     ],
     "likes": 3,
-    "cover": "IMG/feed/thedarlknight.jpg",
+    "cover": "img/feed/thedarlknight.jpg",
     "type": "Movie",
     "plot": "When a menace known as the Joker wreaks havoc and chaos on the people of Gotham, Batman, James Gordon and Harvey Dent must work together to put an end to the madness.",
     "director": "Christopher Nolan",
@@ -96,10 +96,10 @@
       "Heath Ledger",
       "Aaron Eckhart"
     ],
-    "rating": "9.1/10 (IMDb)"
+    "ratingValue": "9.1/10 (IMDb)"
   },
   {
-    "id": "m12",
+    "id": "m6",
     "title": "Schindler's List",
     "year": 1993,
     "genres": [
@@ -108,7 +108,7 @@
       "History"
     ],
     "likes": 6,
-    "cover": "IMG/feed/schindlerlist.jpg",
+    "cover": "img/feed/schindlerlist.jpg",
     "type": "Movie",
     "plot": "In German-occupied Poland during World War II, industrialist Oskar Schindler gradually becomes concerned for his Jewish workforce after witnessing their persecution by the Nazis.",
     "director": "Steven Spielberg",
@@ -117,10 +117,10 @@
       "Ralph Fiennes",
       "Ben Kingsley"
     ],
-    "rating": "9.0/10 (IMDb)"
+    "ratingValue": "9.0/10 (IMDb)"
   },
   {
-    "id": "m13",
+    "id": "m7",
     "title": "Fight Club",
     "year": 1999,
     "genres": [
@@ -128,7 +128,7 @@
       "Thriller"
     ],
     "likes": 5,
-    "cover": "IMG/feed/fightclub.jpg",
+    "cover": "img/feed/fightclub.jpg",
     "type": "Movie",
     "plot": "An insomniac office worker and a devil-may-care soap maker form an underground fight club that evolves into much more.",
     "director": "David Fincher",
@@ -137,10 +137,10 @@
       "Edward Norton",
       "Meat Loaf"
     ],
-    "rating": "8.8/10 (IMDb)"
+    "ratingValue": "8.8/10 (IMDb)"
   },
   {
-    "id": "m14",
+    "id": "m8",
     "title": "Forrest Gump",
     "year": 1994,
     "genres": [
@@ -148,7 +148,7 @@
       "Romance"
     ],
     "likes": 5,
-    "cover": "IMG/feed/forrestgump.jpg",
+    "cover": "img/feed/forrestgump.jpg",
     "type": "Movie",
     "plot": "The history of the United States from the 1950s to the '70s unfolds from the perspective of an Alabama man with an IQ of 75, who yearns to be reunited with his childhood sweetheart.",
     "director": "Robert Zemeckis",
@@ -157,13 +157,13 @@
       "Robin Wright",
       "Gary Sinise"
     ],
-    "rating": "8.8/10 (IMDb)",
-    "imagePath": "IMG/feed/forrestgump.jpg",
+    "ratingValue": "8.8/10 (IMDb)",
+    "imagePath": "img/feed/forrestgump.jpg",
     "videoPath": "/uploads/videos/videoFile-1762031760874-110576184.mp4",
-    "ratingValue": 8.8
+    "ratingValueValue": 8.8
   },
   {
-    "id": "m15",
+    "id": "m9",
     "title": "The Matrix",
     "year": 1999,
     "genres": [
@@ -171,7 +171,7 @@
       "Action"
     ],
     "likes": 2,
-    "cover": "IMG/feed/thematrix.jpg",
+    "cover": "img/feed/thematrix.jpg",
     "type": "Movie",
     "plot": "When a beautiful stranger leads computer hacker Neo to a forbidding underworld, he discovers the shocking truth--the life he knows is the elaborate deception of an evil cyber-intelligence.",
     "director": "Lana Wachowski, Lilly Wachowski",
@@ -180,10 +180,10 @@
       "Laurence Fishburne",
       "Carrie-Anne Moss"
     ],
-    "rating": "8.7/10 (IMDb)"
+    "ratingValue": "8.7/10 (IMDb)"
   },
   {
-    "id": "m16",
+    "id": "m10",
     "title": "Star Wars: A New Hope",
     "year": 1977,
     "genres": [
@@ -191,11 +191,11 @@
       "Adventure"
     ],
     "likes": 2,
-    "cover": "IMG/feed/starwars.jpg",
+    "cover": "img/feed/starwars.jpg",
     "type": "Movie"
   },
   {
-    "id": "m17",
+    "id": "m11",
     "title": "The Empire Strikes Back",
     "year": 1980,
     "genres": [
@@ -203,7 +203,7 @@
       "Adventure"
     ],
     "likes": 5,
-    "cover": "IMG/feed/starwars5.jpg",
+    "cover": "img/feed/starwars5.jpg",
     "type": "Movie",
     "plot": "After the Empire overpowers the Rebel Alliance, Luke Skywalker begins training with Jedi Master Yoda, while Darth Vader and bounty hunter Boba Fett pursue his friends across the galaxy.",
     "director": "Irvin Kershner",
@@ -212,10 +212,10 @@
       "Harrison Ford",
       "Carrie Fisher"
     ],
-    "rating": "8.7/10 (IMDb)"
+    "ratingValue": "8.7/10 (IMDb)"
   },
   {
-    "id": "m18",
+    "id": "m12",
     "title": "Back to the Future",
     "year": 1985,
     "genres": [
@@ -223,7 +223,7 @@
       "Sci-Fi"
     ],
     "likes": 5,
-    "cover": "IMG/feed/backtothefuture.jpg",
+    "cover": "img/feed/backtothefuture.jpg",
     "type": "Movie",
     "plot": "Marty McFly, a 17-year-old high school student, is accidentally sent 30 years into the past in a time-traveling DeLorean invented by his close friend, the maverick scientist Doc Brown.",
     "director": "Robert Zemeckis",
@@ -232,10 +232,10 @@
       "Christopher Lloyd",
       "Lea Thompson"
     ],
-    "rating": "8.5/10 (IMDb)"
+    "ratingValue": "8.5/10 (IMDb)"
   },
   {
-    "id": "m19",
+    "id": "m13",
     "title": "Titanic",
     "year": 1997,
     "genres": [
@@ -243,7 +243,7 @@
       "Drama"
     ],
     "likes": 6,
-    "cover": "IMG/feed/titanic.jpg",
+    "cover": "img/feed/titanic.jpg",
     "type": "Movie",
     "plot": "A seventeen-year-old aristocrat falls in love with a kind but poor artist aboard the luxurious, ill-fated R.M.S. Titanic.",
     "director": "James Cameron",
@@ -252,10 +252,10 @@
       "Kate Winslet",
       "Billy Zane"
     ],
-    "rating": "7.9/10 (IMDb)"
+    "ratingValue": "7.9/10 (IMDb)"
   },
   {
-    "id": "m20",
+    "id": "m14",
     "title": "Jurassic Park",
     "year": 1993,
     "genres": [
@@ -263,7 +263,7 @@
       "Sci-Fi"
     ],
     "likes": 5,
-    "cover": "IMG/feed/jurassicpark.jpg",
+    "cover": "img/feed/jurassicpark.jpg",
     "type": "Movie",
     "plot": "An industrialist invites some experts to visit his theme park of cloned dinosaurs. After a power failure, the creatures run loose, putting everyone's lives, including his grandchildren's, in danger.",
     "director": "Steven Spielberg",
@@ -272,10 +272,10 @@
       "Laura Dern",
       "Jeff Goldblum"
     ],
-    "rating": "8.2/10 (IMDb)"
+    "ratingValue": "8.2/10 (IMDb)"
   },
   {
-    "id": "m21",
+    "id": "m15",
     "title": "Casablanca",
     "year": 1942,
     "genres": [
@@ -283,7 +283,7 @@
       "Drama"
     ],
     "likes": 4,
-    "cover": "IMG/feed/casablanca.jpg",
+    "cover": "img/feed/casablanca.jpg",
     "type": "Movie",
     "plot": "A cynical expatriate American cafe owner struggles to decide whether or not to help his former lover and her fugitive husband escape the Nazis in French Morocco.",
     "director": "Michael Curtiz",
@@ -292,10 +292,10 @@
       "Ingrid Bergman",
       "Paul Henreid"
     ],
-    "rating": "8.5/10 (IMDb)"
+    "ratingValue": "8.5/10 (IMDb)"
   },
   {
-    "id": "m22",
+    "id": "m16",
     "title": "Citizen Kane",
     "year": 1941,
     "genres": [
@@ -303,7 +303,7 @@
       "Mystery"
     ],
     "likes": 4,
-    "cover": "IMG/feed/citizenkane.jpg",
+    "cover": "img/feed/citizenkane.jpg",
     "type": "Movie",
     "plot": "Following the death of publishing tycoon Charles Foster Kane, reporters scramble to uncover the meaning of his final utterance: 'Rosebud.'",
     "director": "Orson Welles",
@@ -312,10 +312,10 @@
       "Joseph Cotten",
       "Dorothy Comingore"
     ],
-    "rating": "8.2/10 (IMDb)"
+    "ratingValue": "8.2/10 (IMDb)"
   },
   {
-    "id": "m23",
+    "id": "m17",
     "title": "Psycho",
     "year": 1960,
     "genres": [
@@ -323,7 +323,7 @@
       "Thriller"
     ],
     "likes": 4,
-    "cover": "IMG/feed/psycho.jpg",
+    "cover": "img/feed/psycho.jpg",
     "type": "Movie",
     "plot": "A secretary on the run for embezzlement takes refuge at a secluded California motel owned by a repressed man and his overbearing mother.",
     "director": "Alfred Hitchcock",
@@ -332,10 +332,10 @@
       "Janet Leigh",
       "Vera Miles"
     ],
-    "rating": "8.5/10 (IMDb)"
+    "ratingValue": "8.5/10 (IMDb)"
   },
   {
-    "id": "m24",
+    "id": "m18",
     "title": "The Wizard of Oz",
     "year": 1939,
     "genres": [
@@ -343,7 +343,7 @@
       "Family"
     ],
     "likes": 4,
-    "cover": "IMG/feed/wizardofoz.jpg",
+    "cover": "img/feed/wizardofoz.jpg",
     "type": "Movie",
     "plot": "Young Dorothy Gale and her dog Toto are swept away by a tornado from their Kansas farm to the magical Land of Oz and embark on a quest with three new friends to see the Wizard, who can return her to her home and fulfill the others...",
     "director": "Victor Fleming, George Cukor, Norman Taurog",
@@ -352,10 +352,10 @@
       "Frank Morgan",
       "Ray Bolger"
     ],
-    "rating": "8.1/10 (IMDb)"
+    "ratingValue": "8.1/10 (IMDb)"
   },
   {
-    "id": "m25",
+    "id": "m19",
     "title": "LOTR: The Fellowship of the Ring",
     "year": 2001,
     "genres": [
@@ -363,11 +363,11 @@
       "Fantasy"
     ],
     "likes": 2,
-    "cover": "IMG/feed/lotr1.jpg",
+    "cover": "img/feed/lotr1.jpg",
     "type": "Movie"
   },
   {
-    "id": "m26",
+    "id": "m20",
     "title": "Goodfellas",
     "year": 1990,
     "genres": [
@@ -375,7 +375,7 @@
       "Drama"
     ],
     "likes": 5,
-    "cover": "IMG/feed/goodfellas.jpg",
+    "cover": "img/feed/goodfellas.jpg",
     "type": "Movie",
     "plot": "The story of Henry Hill and his life in the mafia, covering his relationship with his wife Karen and his mob partners Jimmy Conway and Tommy DeVito.",
     "director": "Martin Scorsese",
@@ -384,10 +384,10 @@
       "Ray Liotta",
       "Joe Pesci"
     ],
-    "rating": "8.7/10 (IMDb)"
+    "ratingValue": "8.7/10 (IMDb)"
   },
   {
-    "id": "m27",
+    "id": "m21",
     "title": "Seven Samurai",
     "year": 1954,
     "genres": [
@@ -396,19 +396,19 @@
       "Drama"
     ],
     "likes": 3,
-    "cover": "IMG/feed/sevensamurai.jpg",
+    "cover": "img/feed/sevensamurai.jpg",
     "type": "Movie",
     "plot": "Farmers from a village exploited by bandits hire a veteran samurai for protection, and he gathers six other samurai to join him.",
     "director": "Akira Kurosawa",
     "actors": [
-      "ToshirÃ´ Mifune",
+      "Toshirō Mifune",
       "Takashi Shimura",
       "Keiko Tsushima"
     ],
-    "rating": "8.6/10 (IMDb)"
+    "ratingValue": "8.6/10 (IMDb)"
   },
   {
-    "id": "m28",
+    "id": "m22",
     "title": "Spirited Away",
     "year": 2001,
     "genres": [
@@ -417,7 +417,7 @@
       "Adventure"
     ],
     "likes": 5,
-    "cover": "IMG/feed/spiritedaway.jpg",
+    "cover": "img/feed/spiritedaway.jpg",
     "type": "Movie",
     "plot": "During her family's move to the suburbs, a sullen 10-year-old girl wanders into a world ruled by gods, witches and spirits, and where humans are changed into beasts.",
     "director": "Hayao Miyazaki",
@@ -426,10 +426,10 @@
       "Suzanne Pleshette",
       "Miyu Irino"
     ],
-    "rating": "8.6/10 (IMDb)"
+    "ratingValue": "8.6/10 (IMDb)"
   },
   {
-    "id": "m29",
+    "id": "m23",
     "title": "The Lion King",
     "year": 1994,
     "genres": [
@@ -437,7 +437,7 @@
       "Family"
     ],
     "likes": 6,
-    "cover": "IMG/feed/lionking.jpg",
+    "cover": "img/feed/lionking.jpg",
     "type": "Movie",
     "plot": "Lion prince Simba and his father are targeted by his bitter uncle, who wants to ascend the throne himself.",
     "director": "Roger Allers, Rob Minkoff",
@@ -446,10 +446,10 @@
       "Jeremy Irons",
       "James Earl Jones"
     ],
-    "rating": "8.5/10 (IMDb)"
+    "ratingValue": "8.5/10 (IMDb)"
   },
   {
-    "id": "m30",
+    "id": "m24",
     "title": "Apocalypse Now",
     "year": 1979,
     "genres": [
@@ -457,7 +457,7 @@
       "War"
     ],
     "likes": 4,
-    "cover": "IMG/feed/apocalypsenow.jpg",
+    "cover": "img/feed/apocalypsenow.jpg",
     "type": "Movie",
     "plot": "A U.S. Army officer serving in Vietnam is tasked with assassinating a renegade Special Forces Colonel who sees himself as a god.",
     "director": "Francis Ford Coppola",
@@ -466,10 +466,13 @@
       "Marlon Brando",
       "Robert Duvall"
     ],
-    "rating": "8.4/10 (IMDb)"
+    "ratingValue": "8.4/10 (IMDb)",
+    "extId": "m24",
+    "image": "img/feed/apocalypsenow.jpg",
+    "ratingValueValue": 8.4
   },
   {
-    "id": "m31",
+    "id": "m25",
     "title": "The Silence of the Lambs",
     "year": 1991,
     "genres": [
@@ -478,7 +481,7 @@
       "Horror"
     ],
     "likes": 5,
-    "cover": "IMG/feed/silenceofthelambs.jpg",
+    "cover": "img/feed/silenceofthelambs.jpg",
     "type": "Movie",
     "plot": "A young F.B.I. cadet must receive the help of an incarcerated and manipulative cannibal killer to help catch another serial killer, a madman who skins his victims.",
     "director": "Jonathan Demme",
@@ -487,7 +490,7 @@
       "Anthony Hopkins",
       "Scott Glenn"
     ],
-    "rating": "8.6/10 (IMDb)"
+    "ratingValue": "8.6/10 (IMDb)"
   },
   {
     "id": "s1",
@@ -498,7 +501,7 @@
       "Romance"
     ],
     "likes": 3,
-    "cover": "IMG/feed/friends.jpg",
+    "cover": "img/feed/friends.jpg",
     "type": "Series",
     "plot": "The personal and professional lives of six friends living in the Manhattan borough of New York City.",
     "actors": [
@@ -506,7 +509,7 @@
       "Courteney Cox",
       "Lisa Kudrow"
     ],
-    "rating": "8.9/10 (IMDb)"
+    "ratingValue": "8.9/10 (IMDb)"
   },
   {
     "id": "s2",
@@ -516,7 +519,7 @@
       "Comedy"
     ],
     "likes": 9,
-    "cover": "IMG/feed/theofficeus.jpg",
+    "cover": "img/feed/theofficeus.jpg",
     "type": "Series"
   },
   {
@@ -527,7 +530,7 @@
       "Comedy"
     ],
     "likes": 2,
-    "cover": "IMG/feed/seinfeld.jpg",
+    "cover": "img/feed/seinfeld.jpg",
     "type": "Series",
     "plot": "The continuing misadventures of neurotic New York City stand-up comedian Jerry Seinfeld and his equally neurotic New York City friends.",
     "actors": [
@@ -535,7 +538,7 @@
       "Julia Louis-Dreyfus",
       "Michael Richards"
     ],
-    "rating": "8.9/10 (IMDb)"
+    "ratingValue": "8.9/10 (IMDb)"
   },
   {
     "id": "s4",
@@ -547,7 +550,7 @@
       "Family"
     ],
     "likes": 2,
-    "cover": "IMG/feed/simpsons.jpg",
+    "cover": "img/feed/simpsons.jpg",
     "type": "Series",
     "plot": "The satiric half-hour adventures of a working-class family in the misfit city of Springfield.",
     "actors": [
@@ -555,7 +558,7 @@
       "Nancy Cartwright",
       "Julie Kavner"
     ],
-    "rating": "8.6/10 (IMDb)"
+    "ratingValue": "8.6/10 (IMDb)"
   },
   {
     "id": "s5",
@@ -567,7 +570,7 @@
       "Thriller"
     ],
     "likes": 9,
-    "cover": "IMG/feed/breakingbad.jpg",
+    "cover": "img/feed/breakingbad.jpg",
     "type": "Series",
     "plot": "A chemistry teacher diagnosed with inoperable lung cancer turns to manufacturing and selling methamphetamine with a former student to secure his family's future.",
     "actors": [
@@ -575,10 +578,10 @@
       "Aaron Paul",
       "Anna Gunn"
     ],
-    "rating": "9.5/10 (IMDb)",
-    "imagePath": "IMG/feed/breakingbad.jpg",
+    "ratingValue": "9.5/10 (IMDb)",
+    "imagePath": "img/feed/breakingbad.jpg",
     "director": "N/A",
-    "ratingValue": 9.5,
+    "ratingValueValue": 9.5,
     "episodes": [
       {
         "season": 1,
@@ -613,7 +616,7 @@
       "Adventure"
     ],
     "likes": 9,
-    "cover": "IMG/feed/gameofthrones.jpg",
+    "cover": "img/feed/gameofthrones.jpg",
     "type": "Series",
     "plot": "Nine noble families fight for control over the lands of Westeros, while an ancient enemy returns after being dormant for millennia.",
     "actors": [
@@ -621,7 +624,7 @@
       "Peter Dinklage",
       "Kit Harington"
     ],
-    "rating": "9.2/10 (IMDb)"
+    "ratingValue": "9.2/10 (IMDb)"
   },
   {
     "id": "s7",
@@ -633,7 +636,7 @@
       "Drama"
     ],
     "likes": 9,
-    "cover": "IMG/feed/strangerthings.jpg",
+    "cover": "img/feed/strangerthings.jpg",
     "type": "Series",
     "plot": "In 1980s Indiana, a group of young friends witness supernatural forces and secret government exploits. As they search for answers, the children unravel a series of extraordinary mysteries.",
     "actors": [
@@ -641,7 +644,7 @@
       "Finn Wolfhard",
       "Winona Ryder"
     ],
-    "rating": "8.6/10 (IMDb)"
+    "ratingValue": "8.6/10 (IMDb)"
   },
   {
     "id": "s8",
@@ -652,7 +655,7 @@
       "Drama"
     ],
     "likes": 2,
-    "cover": "IMG/feed/sopranos.jpg",
+    "cover": "img/feed/sopranos.jpg",
     "type": "Series",
     "plot": "New Jersey mob boss Tony Soprano deals with personal and professional issues in his home and business life that affect his mental state, leading him to seek professional psychiatric counseling.",
     "actors": [
@@ -660,7 +663,7 @@
       "Lorraine Bracco",
       "Edie Falco"
     ],
-    "rating": "9.2/10 (IMDb)"
+    "ratingValue": "9.2/10 (IMDb)"
   },
   {
     "id": "s9",
@@ -671,7 +674,7 @@
       "Drama"
     ],
     "likes": 2,
-    "cover": "IMG/feed/thewire.jpg",
+    "cover": "img/feed/thewire.jpg",
     "type": "Series",
     "plot": "The Baltimore drug scene, as seen through the eyes of drug dealers and law enforcement.",
     "actors": [
@@ -679,7 +682,7 @@
       "Lance Reddick",
       "Sonja Sohn"
     ],
-    "rating": "9.3/10 (IMDb)"
+    "ratingValue": "9.3/10 (IMDb)"
   },
   {
     "id": "s10",
@@ -691,7 +694,7 @@
       "Drama"
     ],
     "likes": 6,
-    "cover": "IMG/feed/sherlock.jpg",
+    "cover": "img/feed/sherlock.jpg",
     "type": "Series",
     "plot": "The quirky spin on Conan Doyle's iconic sleuth pitches him as a \"high-functioning sociopath\" in modern-day London. Assisting him in his investigations: Afghanistan War vet John Watson, who's introduced to Holmes by a mutual acquai...",
     "actors": [
@@ -699,7 +702,7 @@
       "Martin Freeman",
       "Una Stubbs"
     ],
-    "rating": "9.0/10 (IMDb)"
+    "ratingValue": "9.0/10 (IMDb)"
   },
   {
     "id": "s11",
@@ -710,7 +713,7 @@
       "Medical"
     ],
     "likes": 6,
-    "cover": "IMG/feed/housemd.jpg",
+    "cover": "img/feed/housemd.jpg",
     "type": "Series"
   },
   {
@@ -723,7 +726,7 @@
       "Sci-Fi"
     ],
     "likes": 7,
-    "cover": "IMG/feed/lost.jpg",
+    "cover": "img/feed/lost.jpg",
     "type": "Series",
     "plot": "The survivors of a plane crash are forced to work together in order to survive on a seemingly deserted tropical island.",
     "actors": [
@@ -731,7 +734,7 @@
       "Josh Holloway",
       "Yunjin Kim"
     ],
-    "rating": "8.3/10 (IMDb)"
+    "ratingValue": "8.3/10 (IMDb)"
   },
   {
     "id": "s13",
@@ -743,7 +746,7 @@
       "Western"
     ],
     "likes": 6,
-    "cover": "IMG/feed/westworld.jpg",
+    "cover": "img/feed/westworld.jpg",
     "type": "Series",
     "plot": "At the intersection of the near future and the reimagined past, waits a world in which every human appetite can be indulged without consequence.",
     "actors": [
@@ -751,7 +754,7 @@
       "Jeffrey Wright",
       "Ed Harris"
     ],
-    "rating": "8.4/10 (IMDb)"
+    "ratingValue": "8.4/10 (IMDb)"
   },
   {
     "id": "s14",
@@ -763,7 +766,7 @@
       "Mystery"
     ],
     "likes": 7,
-    "cover": "IMG/feed/truedetective.jpg",
+    "cover": "img/feed/truedetective.jpg",
     "type": "Series",
     "plot": "Anthology series in which police investigations unearth the personal and professional secrets of those involved, both within and outside the law.",
     "actors": [
@@ -771,7 +774,7 @@
       "Colin Farrell",
       "Rachel McAdams"
     ],
-    "rating": "8.9/10 (IMDb)"
+    "ratingValue": "8.9/10 (IMDb)"
   },
   {
     "id": "s15",
@@ -783,15 +786,15 @@
       "Mini-Series"
     ],
     "likes": 7,
-    "cover": "IMG/feed/chernobyl.jpg",
+    "cover": "img/feed/chernobyl.jpg",
     "type": "Series",
     "plot": "In April 1986, the city of Chernobyl in the Soviet Union suffers one of the worst nuclear disasters in the history of mankind. Consequently, many heroes put their lives on the line in the following days, weeks and months.",
     "actors": [
       "Jessie Buckley",
       "Jared Harris",
-      "Stellan SkarsgÃ¥rd"
+      "Stellan Skarsgård"
     ],
-    "rating": "9.3/10 (IMDb)"
+    "ratingValue": "9.3/10 (IMDb)"
   },
   {
     "id": "s16",
@@ -802,7 +805,7 @@
       "History"
     ],
     "likes": 6,
-    "cover": "IMG/feed/thecrown.jpg",
+    "cover": "img/feed/thecrown.jpg",
     "type": "Series",
     "plot": "Follows the political rivalries and romances of Queen Elizabeth II's reign and the events that shaped Britain for the second half of the 20th century.",
     "actors": [
@@ -810,7 +813,7 @@
       "Olivia Colman",
       "Imelda Staunton"
     ],
-    "rating": "8.6/10 (IMDb)"
+    "ratingValue": "8.6/10 (IMDb)"
   },
   {
     "id": "s17",
@@ -820,7 +823,7 @@
       "Drama"
     ],
     "likes": 7,
-    "cover": "IMG/feed/madmen.jpg",
+    "cover": "img/feed/madmen.jpg",
     "type": "Series",
     "plot": "A drama about one of New York's most prestigious ad agencies at the beginning of the 1960s, focusing on one of the firm's most mysterious but extremely talented ad executives, Donald Draper.",
     "actors": [
@@ -828,7 +831,7 @@
       "Elisabeth Moss",
       "Vincent Kartheiser"
     ],
-    "rating": "8.7/10 (IMDb)"
+    "ratingValue": "8.7/10 (IMDb)"
   },
   {
     "id": "s18",
@@ -839,7 +842,7 @@
       "Romance"
     ],
     "likes": 8,
-    "cover": "IMG/feed/himym.jpg",
+    "cover": "img/feed/himym.jpg",
     "type": "Series",
     "plot": "A father recounts to his children the journey he and his four best friends took leading up to him meeting their mother.",
     "actors": [
@@ -847,7 +850,12 @@
       "Jason Segel",
       "Cobie Smulders"
     ],
-    "rating": "8.3/10 (IMDb)"
+    "ratingValue": "8.3/10 (IMDb)",
+    "extId": "s18",
+    "image": "img/feed/himym.jpg",
+    "ratingValueValue": 8.3,
+    "director": "N/A",
+    "episodes": []
   },
   {
     "id": "s19",
@@ -857,7 +865,7 @@
       "Comedy"
     ],
     "likes": 5,
-    "cover": "IMG/feed/bigbangtheory.jpg",
+    "cover": "img/feed/bigbangtheory.jpg",
     "type": "Series",
     "plot": "Aspiring film actress Penny moves into a Pasadena apartment across the hall from brilliant, but socially awkward, physicists Sheldon Cooper and Leonard Hofstadter and shows them how little they know about life outside of the lab.",
     "actors": [
@@ -865,7 +873,7 @@
       "Jim Parsons",
       "Kaley Cuoco"
     ],
-    "rating": "8.1/10 (IMDb)"
+    "ratingValue": "8.1/10 (IMDb)"
   },
   {
     "id": "s20",
@@ -877,7 +885,7 @@
       "Fantasy"
     ],
     "likes": 2,
-    "cover": "IMG/feed/avatar.jpg",
+    "cover": "img/feed/avatar.jpg",
     "type": "Series",
     "plot": "In a war-torn world of elemental powers, a young boy reawakens to undertake a dangerous mystic quest to fulfill his destiny as the Avatar, and bring peace to the world.",
     "actors": [
@@ -885,7 +893,7 @@
       "Zach Tyler Eisen",
       "Mae Whitman"
     ],
-    "rating": "9.3/10 (IMDb)"
+    "ratingValue": "9.3/10 (IMDb)"
   },
   {
     "id": "s21",
@@ -897,7 +905,7 @@
       "Comedy"
     ],
     "likes": 2,
-    "cover": "IMG/feed/rickandmorty.jpg",
+    "cover": "img/feed/rickandmorty.jpg",
     "type": "Series",
     "plot": "The fractured domestic lives of a nihilistic mad scientist and his anxious grandson are further complicated by their inter-dimensional misadventures.",
     "actors": [
@@ -905,22 +913,6 @@
       "Spencer Grammer",
       "Sarah Chalke"
     ],
-    "rating": "9.0/10 (IMDb)"
-  },
-  {
-    "id": "m90332",
-    "extId": "m90332",
-    "title": "asdfasdfasdf",
-    "year": 1998,
-    "genres": [
-      "kaki"
-    ],
-    "cover": "/uploads/images/imageFile-1762284242526-784850831.jpeg",
-    "image": "/uploads/images/imageFile-1762284242526-784850831.jpeg",
-    "ratingValue": null,
-    "actors": [],
-    "type": "Series",
-    "episodes": [],
-    "likes": 0
+    "ratingValue": "9.0/10 (IMDb)"
   }
 ]

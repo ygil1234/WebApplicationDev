@@ -88,15 +88,46 @@
   }
 
   function setNavbarProfile() {
-    const { id, name, avatar } = getProfile();
+    const loggedInUser = localStorage.getItem('loggedInUser');
+    let { id, name, avatar } = getProfile();
+
+    if (loggedInUser === 'admin') {
+      if (!id) id = 'admin';
+      if (!name) name = 'Admin';
+      if (!avatar) avatar = '/img/profile1.jpg';
+      localStorage.setItem('selectedProfileId', id);
+      localStorage.setItem('selectedProfileName', name);
+      localStorage.setItem('selectedProfileAvatar', avatar);
+    }
+
     if (!id || !name || !avatar) {
       window.location.href = 'profiles.html';
       return false;
     }
+
     const greetEl = document.getElementById('greet');
     if (greetEl) greetEl.textContent = `Hello, ${name}`;
+
     const avatarEl = document.getElementById('navAvatar');
-    if (avatarEl) { avatarEl.src = avatar; avatarEl.alt = `${name} - Profile`; }
+    const crownEl = document.getElementById('navAvatarCrown');
+
+    if (loggedInUser === 'admin') {
+      if (avatarEl) avatarEl.classList.add('d-none');
+      if (crownEl) crownEl.classList.remove('d-none');
+      const changeBtn = document.getElementById('changeProfileBtn');
+      if (changeBtn) {
+        changeBtn.textContent = 'Edit Content';
+        changeBtn.onclick = () => { window.location.href = 'admin.html'; };
+      }
+    } else {
+      if (avatarEl) {
+        avatarEl.classList.remove('d-none');
+        avatarEl.src = avatar;
+        avatarEl.alt = `${name} - Profile`;
+      }
+      if (crownEl) crownEl.classList.add('d-none');
+    }
+
     return true;
   }
 
