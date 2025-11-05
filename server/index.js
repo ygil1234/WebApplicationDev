@@ -115,14 +115,32 @@ function sendStaticHtml(res, relativePath) {
   res.sendFile(path.join(viewsDir, relativePath));
 }
 
+function isAdminSession(req) {
+  return req.session?.username === 'admin';
+}
+
+function redirectAdminToFeed(req, res, next) {
+  if (isAdminSession(req)) {
+    return res.redirect('/feed.html');
+  }
+  return next();
+}
+
+function requireAdminPage(req, res, next) {
+  if (isAdminSession(req)) {
+    return next();
+  }
+  return res.redirect('/login.html');
+}
+
 app.get('/', (_req, res) => sendStaticHtml(res, path.join('user', 'feed.html')));
 app.get('/feed.html', (_req, res) => sendStaticHtml(res, path.join('user', 'feed.html')));
-app.get('/login.html', (_req, res) => sendStaticHtml(res, path.join('auth', 'login.html')));
-app.get('/signup.html', (_req, res) => sendStaticHtml(res, path.join('auth', 'signup.html')));
-app.get('/profiles.html', (_req, res) => sendStaticHtml(res, path.join('user', 'profiles.html')));
-app.get('/settings.html', (_req, res) => sendStaticHtml(res, path.join('user', 'settings.html')));
+app.get('/login.html', redirectAdminToFeed, (_req, res) => sendStaticHtml(res, path.join('auth', 'login.html')));
+app.get('/signup.html', redirectAdminToFeed, (_req, res) => sendStaticHtml(res, path.join('auth', 'signup.html')));
+app.get('/profiles.html', redirectAdminToFeed, (_req, res) => sendStaticHtml(res, path.join('user', 'profiles.html')));
+app.get('/settings.html', redirectAdminToFeed, (_req, res) => sendStaticHtml(res, path.join('user', 'settings.html')));
 app.get('/title.html', (_req, res) => sendStaticHtml(res, path.join('user', 'title.html')));
-app.get('/admin.html', (_req, res) => sendStaticHtml(res, path.join('admin', 'admin.html')));
+app.get('/admin.html', requireAdminPage, (_req, res) => sendStaticHtml(res, path.join('admin', 'admin.html')));
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT} [${NODE_ENV}]`);

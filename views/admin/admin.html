@@ -14,15 +14,56 @@
   </a>
 
   <div class="signin-wrap d-flex align-items-center justify-content-center">
-    <main class="signin-card" style="max-width: 500px;">
-      <h1 class="mb-4">Add/Update Content</h1>
+    <main class="signin-card" style="max-width: 560px;">
+      <h1 class="mb-4">Content Admin</h1>
 
       <form id="contentForm" novalidate enctype="multipart/form-data">
-        
         <div class="mb-3">
-          <label for="extId" class="form-label nf-label">External ID (e.g., m32, s22)</label>
-          <input type="text" class="form-control nf-input" id="extId" placeholder="Unique ID" required/>
-          <div class="login-error-message d-none" id="extIdError"></div>
+          <label class="form-label nf-label" for="contentMode">Action</label>
+          <select class="form-select nf-input" id="contentMode">
+            <option value="" disabled selected>Select an option...</option>
+            <option value="existing">Update an existing movie or series</option>
+            <option value="new">Add brand new content</option>
+          </select>
+          <div class="login-error-message d-none" id="contentModeError"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="type" class="form-label nf-label">Select the content type</label>
+          <select class="form-select nf-input" id="type" required disabled>
+            <option value="" disabled selected>Select type...</option>
+            <option value="Movie">Movie</option>
+            <option value="Series">Series</option>
+          </select>
+          <div class="login-error-message d-none" id="typeError"></div>
+        </div>
+
+        <div class="mb-3">
+          <label for="extIdInput" class="form-label nf-label">External ID (automatically assigned for new titles)</label>
+          <div id="extIdNewGroup">
+          <input type="text" class="form-control nf-input" id="extIdInput" placeholder="Will be assigned automatically" readonly tabindex="-1" aria-readonly="true"/>
+          <div class="login-error-message d-none" id="extIdInputError"></div>
+          </div>
+          <div id="extIdExistingGroup" class="d-none">
+            <select class="form-select nf-input" id="extIdSelect" disabled>
+              <option value="" disabled selected>Select an existing title...</option>
+            </select>
+            <div class="login-error-message d-none" id="extIdSelectError"></div>
+          </div>
+          <input type="hidden" id="extIdHidden" />
+        </div>
+
+        <div id="existingContentDetails" class="card bg-light border-0 mb-3 d-none">
+          <div class="card-body p-3">
+            <div class="d-flex gap-3">
+              <img id="existingContentCover" class="rounded shadow-sm d-none" alt="Current cover" style="max-width: 120px;"/>
+              <div class="flex-grow-1">
+                <p class="mb-1 fw-semibold" id="existingContentSummary"></p>
+                <p class="mb-2 small text-muted" id="existingContentMeta"></p>
+                <div class="small" id="existingContentEpisodes"></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="mb-3">
@@ -43,21 +84,10 @@
           <div class="login-error-message d-none" id="genresError"></div>
         </div>
 
-        <div class="mb-3">
-            <label for="type" class="form-label nf-label">Type</label>
-            <select class="form-select nf-input" id="type" required>
-                <option value="" disabled selected>Select type...</option>
-                <option value="Movie">Movie</option>
-                <option value="Series">Series</option>
-            </select>
-            <div class="login-error-message d-none" id="typeError"></div>
-        </div>
-
         <!-- Episode details (optional for Series). If filled with a video file, an episode will be added. -->
         <div id="seriesEpisodeFields" class="border rounded p-3 mb-3 d-none">
           <div class="mb-2">
-            <strong>Optional: Add an Episode (for Series)</strong>
-            <div class="small text-muted">If you enter season and episode and choose a video, the episode will be uploaded after the series is saved.</div>
+            <strong>Add or update an episode</strong>
           </div>
           <div class="row g-2">
             <div class="col-6">
@@ -75,23 +105,19 @@
             <label for="episodeTitle" class="form-label nf-label">Episode Title (optional)</label>
             <input type="text" class="form-control nf-input" id="episodeTitle" placeholder="Optional"/>
           </div>
-          <div class="small text-muted">Note: The episode video uses the "Video File" field below.</div>
         </div>
 
         <div class="mb-3">
           <label for="imageFile" class="form-label nf-label">Cover Image (JPG/PNG)</label>
           <input type="file" class="form-control nf-input" id="imageFile" accept="image/png, image/jpeg" />
           <div class="login-error-message d-none" id="imageFileError"></div>
-          <small class="form-text text-muted">For Movies: required for new items. For Series: required only when adding an episode now.</small>
         </div>
 
         <div class="mb-3">
           <label for="videoFile" class="form-label nf-label">Video File (MP4)</label>
           <input type="file" class="form-control nf-input" id="videoFile" accept="video/mp4" />
           <div class="login-error-message d-none" id="videoFileError"></div>
-          <small class="form-text text-muted">Required for new content. Can be omitted when updating.</small>
         </div>
-
 
         <div class="d-grid mt-4">
           <button type="submit" class="btn btn-nf-primary" id="submitBtn">Submit Content</button>
@@ -106,44 +132,6 @@
       <div class="mt-4 subtext">
           <a href="feed.html" class="nf-link">← Back to Feed</a>
       </div>
-      <hr class="my-4"/>
-      <h2 class="mb-3 d-none">Add Episode to Series</h2>
-      <form id="episodeForm" class="d-none" novalidate enctype="multipart/form-data">
-        <div class="mb-3">
-          <label for="seriesExtId" class="form-label nf-label">Series External ID (e.g., s5 for Breaking Bad)</label>
-          <input type="text" class="form-control nf-input" id="seriesExtId" placeholder="Series extId" required/>
-          <div class="login-error-message d-none" id="seriesExtIdError"></div>
-        </div>
-        <div class="row g-2">
-          <div class="col-6">
-            <label for="seasonNum" class="form-label nf-label">Season</label>
-            <input type="number" class="form-control nf-input" id="seasonNum" required min="1" value="1"/>
-            <div class="login-error-message d-none" id="seasonNumError"></div>
-          </div>
-          <div class="col-6">
-            <label for="episodeNum" class="form-label nf-label">Episode</label>
-            <input type="number" class="form-control nf-input" id="episodeNum" required min="1" value="1"/>
-            <div class="login-error-message d-none" id="episodeNumError"></div>
-          </div>
-        </div>
-        <div class="mb-3 mt-2">
-          <label for="episodeTitle" class="form-label nf-label">Episode Title</label>
-          <input type="text" class="form-control nf-input" id="episodeTitle" placeholder="Optional"/>
-        </div>
-        <div class="mb-3">
-          <label for="episodeVideo" class="form-label nf-label">Episode Video (MP4)</label>
-          <input type="file" class="form-control nf-input" id="episodeVideo" accept="video/mp4" required/>
-          <div class="login-error-message d-none" id="episodeVideoError"></div>
-        </div>
-        <div class="d-grid mt-3">
-          <button type="submit" class="btn btn-nf-primary" id="episodeSubmitBtn">Upload Episode</button>
-        </div>
-      </form>
-      <div class="mt-3 d-none">
-        <div class="alert alert-success d-none" id="episodeSuccess"></div>
-        <div class="alert alert-danger d-none" id="episodeError"></div>
-      </div>
-
     </main>
   </div>
 

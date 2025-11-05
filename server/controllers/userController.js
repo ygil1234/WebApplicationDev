@@ -132,7 +132,7 @@ async function genrePopularity(req, res) {
     }
 
     const limitParam = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 3), 20) : 12;
+    const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 3), 30) : 13;
 
     const contents = await Content.find({}, 'genres likes').lean();
     const genreTotals = new Map();
@@ -146,14 +146,20 @@ async function genrePopularity(req, res) {
       });
     });
 
-    const sorted = Array.from(genreTotals.entries())
-      .sort((a, b) => {
-        if (b[1] === a[1]) return a[0].localeCompare(b[0]);
-        return b[1] - a[1];
-      })
-      .slice(0, limit);
+    const sorted = Array.from(genreTotals.entries()).sort((a, b) => {
+      if (b[1] === a[1]) return a[0].localeCompare(b[0]);
+      return b[1] - a[1];
+    });
 
-    const payload = sorted.map(([genre, views]) => ({ genre, views }));
+    const top = sorted.slice(0, limit);
+    const others = sorted.slice(limit);
+    const otherTotal = others.reduce((sum, [, views]) => sum + views, 0);
+
+    const payload = top.map(([genre, views]) => ({ genre, views }));
+    if (otherTotal > 0) {
+      payload.push({ genre: 'Other', views: otherTotal });
+    }
+
     return res.json(payload);
   } catch (err) {
     console.error('GET /api/stats/genre-popularity error:', err);
