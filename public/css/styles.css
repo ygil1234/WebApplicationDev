@@ -1374,6 +1374,24 @@ body.modal-open {
   margin-top: -2px;
 }
 
+.nf-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.nf-tag {
+  background: rgba(229, 9, 20, 0.2);
+  border: 1px solid rgba(229, 9, 20, 0.65);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* ===== LIKE BUTTON ===== */
 
 .like-btn {

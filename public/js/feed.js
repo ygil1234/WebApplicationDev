@@ -298,6 +298,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     const liked = !!item.liked;
 
     const coverSrc = normalizePath(item.cover || item.imagePath || '');
+    const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
+    const tagsHtml = tags.length
+      ? `<div class="nf-card__tags">${tags.map((tag) => `<span class="nf-tag">${tag}</span>`).join('')}</div>`
+      : '';
     card.innerHTML = `
       <div class="nf-card__cover">
         <img src="${coverSrc}" alt="${item.title || ''}" loading="lazy"
@@ -307,6 +311,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       <div class="nf-card__meta">
         <div class="nf-card__title" title="${item.title || ''}">${item.title || ''}</div>
         <div class="nf-card__sub">${[item.year, item.type].filter(Boolean).join(" • ")}</div>
+        ${tagsHtml}
         <button class="btn btn-sm rounded-pill like-btn ${liked ? "liked" : ""}" type="button"
                 aria-pressed="${liked}" aria-label="${liked ? "Unlike" : "Like"} ${item.title || ''}">
           <span class="heart" aria-hidden="true">

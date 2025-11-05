@@ -12,6 +12,75 @@ const {
   resolveCoverForDoc,
 } = require('../utils/helpers');
 
+async function annotateWatchedTags(items, profileId) {
+  if (!profileId) return;
+  const ids = items
+    .map((item) => (item && typeof item.extId === 'string' ? item.extId : null))
+    .filter(Boolean);
+  if (!ids.length) return;
+
+  const uniqueIds = [...new Set(ids)];
+  const stats = await WatchProgress.aggregate([
+    {
+      $match: {
+        profileId,
+        contentExtId: { $in: uniqueIds },
+        completed: true,
+      },
+    },
+    {
+      $group: {
+        _id: '$contentExtId',
+        episodesCompleted: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ['$season', null] },
+                  { $ne: ['$episode', null] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        overallCompleted: {
+          $max: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ['$season', null] },
+                  { $eq: ['$episode', null] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+  const statsById = new Map(stats.map((row) => [row._id, row]));
+  items.forEach((item) => {
+    if (!item || !item.extId) return;
+    const stat = statsById.get(item.extId);
+    if (!stat) return;
+    const episodesCount = Array.isArray(item.episodes) ? item.episodes.length : 0;
+    const watched = episodesCount > 0
+      ? stat.episodesCompleted >= episodesCount
+      : stat.overallCompleted > 0;
+    if (!watched) return;
+    if (Array.isArray(item.tags)) {
+      if (!item.tags.includes('watched')) item.tags.push('watched');
+    } else {
+      item.tags = ['watched'];
+    }
+  });
+}
+
 async function getFeed(req, res) {
   try {
     const profileId = String(req.query.profileId || '').trim();
@@ -45,6 +114,7 @@ async function getFeed(req, res) {
       return res.json({ ok: true, items });
     }
 
+    await annotateWatchedTags(items, profileId);
     const liked = await Like.find(
       {
         profileId,
@@ -148,6 +218,7 @@ async function searchContent(req, res) {
       });
     }
 
+    await annotateWatchedTags(items, profileId);
     const liked = await Like.find(
       {
         profileId,
@@ -308,17 +379,16 @@ async function getContentDetails(req, res) {
       const likeDoc = await Like.findOne({ profileId, contentExtId: extId }).lean();
       liked = !!likeDoc;
     }
-    return res.json({
-      ok: true,
-      item: {
-        ...doc,
-        videoPath: movieVideo,
-        episodes,
-        liked,
-        cover: cover || doc.cover,
-        imagePath: doc.imagePath || cover,
-      },
-    });
+    const item = {
+      ...doc,
+      videoPath: movieVideo,
+      episodes,
+      liked,
+      cover: cover || doc.cover,
+      imagePath: doc.imagePath || cover,
+    };
+    await annotateWatchedTags([item], profileId);
+    return res.json({ ok: true, item });
   } catch (err) {
     console.error('GET /api/content/:extId error:', err);
     await writeLog({ level: 'error', event: 'content_details', details: { error: err.message } });
@@ -352,6 +422,7 @@ async function getSimilar(req, res) {
 
     if (!profileId) return res.json({ ok: true, items });
 
+    await annotateWatchedTags(items, profileId);
     const liked = await Like.find(
       { profileId, contentExtId: { $in: items.map((i) => i.extId) } },
       'contentExtId'
@@ -517,6 +588,7 @@ async function getRecommendations(req, res) {
         .skip(offset)
         .limit(limit)
         .lean();
+      await annotateWatchedTags(popular, profileId);
       const annotated = popular.map((item) => ({ ...item, liked: false }));
       await writeLog({
         event: 'recommendations',
@@ -554,6 +626,7 @@ async function getRecommendations(req, res) {
       })
     );
 
+    await annotateWatchedTags(candidates, profileId);
     const annotated = candidates.map((item) => ({ ...item, liked: false }));
     await writeLog({
       event: 'recommendations',
