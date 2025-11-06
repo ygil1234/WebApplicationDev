@@ -628,18 +628,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       <div class="nf-hero__meta" dir="rtl">
         <h1 class="nf-hero__title">${featured.title}</h1>
         <div class="nf-hero__sub">${[featured.year, (featured.genres||[]).join(" • "), featured.type].filter(Boolean).join(" • ")}</div>
-        <div class="nf-hero__actions">
-          <button class="nf-cta nf-cta--play" id="btnPlay" type="button" aria-label="Play">
-            <svg viewBox="0 0 24 24" class="nf-cta__icon" aria-hidden="true"><path d="M6 4l14 8-14 8z"></path></svg>
-            <span>Play</span>
-          </button>
-          <button class="nf-cta nf-cta--info" id="btnInfo" type="button" aria-haspopup="dialog" aria-controls="infoDialog" aria-label="More Info">
-            <svg viewBox="0 0 24 24" width="24" height="24" class="nf-cta__icon" aria-hidden="true" fill="none" role="img">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm1 8v8h-2v-8h2Zm-1-1.5A1.5 1.5 0 1 0 12 6a1.5 1.5 0 0 0 0 3Z" fill="currentColor"></path>
-            </svg>
-            <span>More Info</span>
-          </button>
-        </div>
       </div>
     `;
   }
