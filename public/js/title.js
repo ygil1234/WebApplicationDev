@@ -88,44 +88,31 @@
   }
 
   function setNavbarProfile() {
-    const loggedInUser = localStorage.getItem('loggedInUser');
-    let { id, name, avatar } = getProfile();
-
-    if (loggedInUser === 'admin') {
-      if (!id) id = 'admin';
-      if (!name) name = 'Admin';
-      if (!avatar) avatar = '/img/profile1.jpg';
-      localStorage.setItem('selectedProfileId', id);
-      localStorage.setItem('selectedProfileName', name);
-      localStorage.setItem('selectedProfileAvatar', avatar);
-    }
-
+    const { id, name, avatar } = getProfile(); // Pull the viewer context stored on the client.
     if (!id || !name || !avatar) {
-      window.location.href = 'profiles.html';
+      window.location.href = 'profiles.html'; // Force a profile selection if any details are missing.
       return false;
     }
 
     const greetEl = document.getElementById('greet');
-    if (greetEl) greetEl.textContent = `Hello, ${name}`;
+    if (greetEl) greetEl.textContent = `Hello, ${name}`; // Update the greeting text with the active profile.
 
     const avatarEl = document.getElementById('navAvatar');
+    if (avatarEl) {
+      avatarEl.classList.remove('d-none');
+      avatarEl.src = avatar; // Swap the navbar avatar to the chosen profile picture.
+      avatarEl.alt = `${name} - Profile`; // Keep the avatar alt text accurate for screen readers.
+    }
     const crownEl = document.getElementById('navAvatarCrown');
+    if (crownEl) crownEl.classList.add('d-none'); // Hide the admin-only crown on regular title pages.
 
-    if (loggedInUser === 'admin') {
-      if (avatarEl) avatarEl.classList.add('d-none');
-      if (crownEl) crownEl.classList.remove('d-none');
-      const changeBtn = document.getElementById('changeProfileBtn');
-      if (changeBtn) {
-        changeBtn.textContent = 'Edit Content';
-        changeBtn.onclick = () => { window.location.href = 'admin.html'; };
-      }
-    } else {
-      if (avatarEl) {
-        avatarEl.classList.remove('d-none');
-        avatarEl.src = avatar;
-        avatarEl.alt = `${name} - Profile`;
-      }
-      if (crownEl) crownEl.classList.add('d-none');
+    const changeBtn = document.getElementById('changeProfileBtn');
+    if (changeBtn) {
+      changeBtn.textContent = 'Change Profile'; // Label the action consistently with the feed.
+      changeBtn.onclick = () => {
+        ['selectedProfileId', 'selectedProfileName', 'selectedProfileAvatar'].forEach((key) => localStorage.removeItem(key)); // Clear saved profile details before navigating away.
+        window.location.href = 'profiles.html'; // Return the viewer to the profile picker.
+      };
     }
 
     return true;
@@ -313,7 +300,24 @@
     const actorsBox = document.getElementById('actors');
     const similarRow = document.getElementById('similarRow');
 
-    let content = await loadDetails(extId, profileId);
+    let content;
+    try {
+      content = await loadDetails(extId, profileId); // Fetch the title details for this profile.
+    } catch (err) {
+      const message = String(err?.message || '');
+      if (message.includes('404')) {
+        window.location.href = '/404.html'; // Redirect when the server reports a missing title.
+        return;
+      }
+      console.error('Failed to load title details:', err);
+      window.location.href = '/404.html'; // Treat unexpected failures as missing content and bail out.
+      return;
+    }
+
+    if (!content) {
+      window.location.href = '/404.html'; // Guard against empty payloads that indicate missing records.
+      return;
+    }
     let progress = await loadProgress(extId, profileId).catch(() => ({ percent: 0, episodes: [] }));
     const similarItems = await loadSimilar(extId, profileId, 12).catch(() => []);
 

@@ -195,7 +195,7 @@ async function createOrUpdateContent(req, res) {
       } catch (err) {
         const status = err?.response?.status;
         if (status === 401) {
-          console.warn('[OMDb] Invalid or unauthorized API key – skipping metadata enrichment.');
+          console.warn('[OMDb] Invalid or unauthorized API key - skipping metadata enrichment.');
         } else {
           console.error('[OMDb] Error fetching data:', err.message);
         }

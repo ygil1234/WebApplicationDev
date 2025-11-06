@@ -5,7 +5,7 @@
   const MODE_NEW = "new";
 
   // 1. Admin-only Check
-  const loggedInUser = localStorage.getItem("loggedInUser");
+  const loggedInUser = sessionStorage.getItem("loggedInUser") || localStorage.getItem("loggedInUser"); // Accept either storage namespace when validating the admin session.
   if (loggedInUser !== "admin") {
     alert("Access Denied. You must be logged in as 'admin' to view this page.");
     window.location.href = "login.html";
@@ -36,6 +36,7 @@
   const imageFileHelpEl = document.getElementById("imageFileHelp");
   const videoFileEl = document.getElementById("videoFile");
   const videoFileHelpEl = document.getElementById("videoFileHelp");
+  const logoutLink = document.getElementById("adminLogoutLink"); // Locate the new logout anchor in the admin footer.
 
   const existingDetails = document.getElementById("existingContentDetails");
   const existingCoverImg = document.getElementById("existingContentCover");
@@ -51,13 +52,30 @@
   const successBox = document.getElementById("contentSuccess");
   const generalErr = document.getElementById("contentGeneralError");
 
-  const { validators, attach, showError, clearError } = window.Validation;
+  const { validators, attach, showError, clearError } = window.Validation; // Destructure client-side validation helpers.
 
   const contentSummariesCache = new Map(); // type -> array of summaries
   let summariesLoading = null;
   let loadedContent = null;
   let autoExtIdRequestId = 0;
-  const defaultAutoNote = extIdAutoNote ? extIdAutoNote.textContent : "";
+  const defaultAutoNote = extIdAutoNote ? extIdAutoNote.textContent : ""; // Cache the default auto-assignment hint for reuse.
+
+  if (logoutLink && !logoutLink.dataset.bound) {
+    logoutLink.dataset.bound = "1"; // Avoid wiring the logout handler more than once.
+    logoutLink.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        await fetch("/api/logout", { method: "POST", credentials: "include" }); // Ask the server to terminate the current session.
+      } catch (err) {
+        console.warn("Logout request failed:", err); // Log (but ignore) network errors during logout.
+      }
+      ["loggedInUser", "selectedProfileId", "selectedProfileName", "selectedProfileAvatar"].forEach((key) => {
+        localStorage.removeItem(key); // Clear persistent client state tied to the user selection.
+        sessionStorage.removeItem(key); // Clear session-based storage mirrors as well.
+      });
+      window.location.href = "login.html"; // Return the admin to the login screen after logout.
+    });
+  }
 
   // ---------- Helpers ----------
   function getSelectedMode() {
@@ -147,7 +165,7 @@
     if (existingSummaryEl) {
       const title = content.title || content.extId;
       const year = content.year ? ` (${content.year})` : "";
-      const typeLabel = content.type ? ` – ${content.type}` : "";
+      const typeLabel = content.type ? ` - ${content.type}` : "";
       existingSummaryEl.textContent = `${title}${year}${typeLabel}`;
     }
 
@@ -175,7 +193,7 @@
         } else {
           episodes.forEach((ep) => {
             const li = document.createElement("li");
-            const titleSuffix = ep.title ? ` – ${ep.title}` : "";
+            const titleSuffix = ep.title ? ` - ${ep.title}` : "";
             li.textContent = `S${ep.season}E${ep.episode}${titleSuffix}`;
             list.appendChild(li);
           });
@@ -620,10 +638,28 @@
     episodeNumEl.addEventListener("input", () => clearError(episodeNumEl));
   }
   if (imageFileEl) {
-    imageFileEl.addEventListener("change", () => clearError(imageFileEl));
+    imageFileEl.addEventListener("change", () => {
+      clearError(imageFileEl); // Remove any previous validation message before re-checking.
+      const file = imageFileEl.files?.[0];
+      if (!file) return;
+      const allowedTypes = ["image/jpeg", "image/png"]; // List the image MIME types the backend accepts.
+      if (!allowedTypes.includes(file.type)) {
+        imageFileEl.value = ""; // Reset the file input so an invalid file is not submitted.
+        showError(imageFileEl, "Unsupported image file. Please upload a JPG or PNG."); // Explain the allowed formats to the admin.
+      }
+    });
   }
   if (videoFileEl) {
-    videoFileEl.addEventListener("change", () => clearError(videoFileEl));
+    videoFileEl.addEventListener("change", () => {
+      clearError(videoFileEl); // Remove any previous validation message before re-checking.
+      const file = videoFileEl.files?.[0];
+      if (!file) return;
+      const allowedTypes = ["video/mp4"]; // Restrict video uploads to the MP4 format handled on the server.
+      if (!allowedTypes.includes(file.type)) {
+        videoFileEl.value = ""; // Reset the selected file so it cannot be submitted accidentally.
+        showError(videoFileEl, "Unsupported video file. Please upload an MP4 video."); // Tell the admin which format is required.
+      }
+    });
   }
 
   // ---------- Validation + Submit ----------
