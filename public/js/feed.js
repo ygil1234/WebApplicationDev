@@ -16,25 +16,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   // ===== 1) Session / Navbar
   const API_BASE = "http://localhost:3000/api";
 
-  const loggedInUser = localStorage.getItem("loggedInUser");
-  const isAdminUser = loggedInUser === "admin";
-
   let selectedIdStr   = localStorage.getItem("selectedProfileId");
   let selectedId      = selectedIdStr ? String(selectedIdStr) : "";
   let profileName     = localStorage.getItem("selectedProfileName");
   let profileAvatar   = localStorage.getItem("selectedProfileAvatar");
 
-  if (isAdminUser) {
-    selectedId = 'admin';
-    if (!profileName) profileName = 'Admin';
-    if (!profileAvatar) profileAvatar = '/img/profile1.jpg';
-    localStorage.setItem('selectedProfileId', selectedId);
-    localStorage.setItem('selectedProfileName', profileName);
-    localStorage.setItem('selectedProfileAvatar', profileAvatar);
-  }
-
-  if (!isAdminUser && (!selectedId || !profileName || !profileAvatar)) {
-    window.location.href = "profiles.html";
+  if (!selectedId || !profileName || !profileAvatar) {
+    window.location.href = "profiles.html"; // Redirect visitors who have not selected a profile yet.
     return;
   }
 
@@ -64,20 +52,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Greet + avatar
     const greetEl = document.getElementById("greet");
-    if (greetEl) greetEl.textContent = `Hello, ${profileName}`;
+    if (greetEl) greetEl.textContent = `Hello, ${profileName}`; // Personalize the greeting with the active profile.
     const avatarEl = document.getElementById("navAvatar");
-    const crownEl = document.getElementById("navAvatarCrown");
-    if (isAdminUser) {
-      if (avatarEl) avatarEl.classList.add("d-none");
-      if (crownEl) crownEl.classList.remove("d-none");
-    } else {
-      if (avatarEl) {
-        avatarEl.classList.remove("d-none");
-        avatarEl.src = profileAvatar;
-        avatarEl.alt = `${profileName} - Profile`;
-      }
-      if (crownEl) crownEl.classList.add("d-none");
+    if (avatarEl) {
+      avatarEl.classList.remove("d-none");
+      avatarEl.src = profileAvatar; // Swap the avatar to the chosen profile picture.
+      avatarEl.alt = `${profileName} - Profile`; // Keep alt text accurate for accessibility.
     }
+    const crownEl = document.getElementById("navAvatarCrown");
+    if (crownEl) crownEl.classList.add("d-none"); // Hide the admin crown because only end-users load this page.
 
     // Logout
     const logoutLink = document.getElementById("logoutLink");
@@ -105,19 +88,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    if (isAdminUser && changeProfileBtn && !changeProfileBtn.dataset.wired) {
-      changeProfileBtn.dataset.wired = '1';
-      changeProfileBtn.textContent = 'Edit Content';
-      changeProfileBtn.addEventListener('click', () => {
-        setProfileMenu(false);
-        window.location.href = 'admin.html';
-      });
-    } else if (!isAdminUser && changeProfileBtn && !changeProfileBtn.dataset.wired) {
-      changeProfileBtn.dataset.wired = '1';
+    if (changeProfileBtn && !changeProfileBtn.dataset.wired) {
+      changeProfileBtn.dataset.wired = '1'; // Ensure the handler only binds once.
+      changeProfileBtn.textContent = 'Change Profile'; // Present the user profile switcher label.
       changeProfileBtn.addEventListener("click", () => {
-        setProfileMenu(false);
-        ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
-        window.location.href = "profiles.html";
+        setProfileMenu(false); // Close the profile menu before navigating away.
+        ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k)); // Clear the remembered profile so the user must pick again.
+        window.location.href = "profiles.html"; // Send the viewer to the profile selection page.
       });
     }
 
@@ -878,16 +855,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     rowsRoot.addEventListener("click", async (e) => {
       const btn = e.target.closest(".like-btn");
       if (!btn) return;
-      if (isAdminUser) {
-        e.preventDefault();
-        e.stopPropagation();
-        showAlert({
-          type: 'info',
-          title: 'Admin mode',
-          message: 'Admin accounts cannot like titles.',
-        });
-        return;
-      }
       e.preventDefault(); 
       e.stopPropagation();
       if (btn.dataset.busy === "1") return;
