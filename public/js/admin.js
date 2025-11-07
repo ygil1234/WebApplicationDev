@@ -60,20 +60,18 @@
   let autoExtIdRequestId = 0;
   const defaultAutoNote = extIdAutoNote ? extIdAutoNote.textContent : ""; // Cache the default auto-assignment hint for reuse.
 
-  if (logoutLink && !logoutLink.dataset.bound) {
-    logoutLink.dataset.bound = "1"; // Avoid wiring the logout handler more than once.
+  if (logoutLink && !logoutLink.dataset.bound) { // Ensure we only attach one handler to the logout button.
+    logoutLink.dataset.bound = "1"; // Mark the button as wired.
     logoutLink.addEventListener("click", async (e) => {
-      e.preventDefault();
+      e.preventDefault(); // Stop the button from submitting anything.
       try {
-        await fetch("/api/logout", { method: "POST", credentials: "include" }); // Ask the server to terminate the current session.
+        await fetch("/api/logout", { method: "POST", credentials: "include" }); // Tell the backend to end the session.
       } catch (err) {
-        console.warn("Logout request failed:", err); // Log (but ignore) network errors during logout.
+        console.warn("Logout request failed:", err); // Log failures so we know if the network is down.
       }
-      ["loggedInUser", "selectedProfileId", "selectedProfileName", "selectedProfileAvatar"].forEach((key) => {
-        localStorage.removeItem(key); // Clear persistent client state tied to the user selection.
-        sessionStorage.removeItem(key); // Clear session-based storage mirrors as well.
-      });
-      window.location.href = "login.html"; // Return the admin to the login screen after logout.
+      localStorage.clear(); // Purge any admin/user metadata stored locally.
+      sessionStorage.clear(); // Clear sessionStorage in tandem to avoid inconsistent state.
+      window.location.replace("login.html"); // Send the admin back to the login page in a clean state.
     });
   }
 

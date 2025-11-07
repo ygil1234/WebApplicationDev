@@ -64,13 +64,18 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Logout
     const logoutLink = document.getElementById("logoutLink");
-    if (logoutLink && !logoutLink.dataset.wired) {
-      logoutLink.dataset.wired = '1';
+    if (logoutLink && !logoutLink.dataset.wired) { // Only bind the handler once per page load.
+      logoutLink.dataset.wired = '1'; // Flag the element so we don't double-bind.
       logoutLink.addEventListener("click", async (e) => {
-        e.preventDefault();
-        try { await fetch(`${API_BASE}/logout`, { method: "POST" }); } catch {}
-        ["selectedProfileId","selectedProfileName","selectedProfileAvatar"].forEach(k => localStorage.removeItem(k));
-        window.location.href = "login.html";
+        e.preventDefault(); // Prevent the anchor from navigating before we log out.
+        try {
+          await fetch(`${API_BASE}/logout`, { method: "POST" }); // Ask the server to tear down the session cookie.
+        } catch (err) {
+          console.warn("Logout failed:", err); // Log (but don't surface) network hiccups so logout still clears local state.
+        }
+        localStorage.clear(); // Drop all persisted client data (profiles, user markers, etc.).
+        sessionStorage.clear(); // Mirror the cleanup for session storage to avoid stale data.
+        window.location.replace("login.html"); // Redirect cleanly to login so the user can sign in again.
       });
     }
 
