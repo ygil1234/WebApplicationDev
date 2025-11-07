@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   }, true);
 
   // ===== 1) Session / Navbar
-  const API_BASE = "http://localhost:3000/api";
+  const API_BASE = `${window.location.origin.replace(/\/$/, '')}/api`; // Use the current host so mobile devices hitting the LAN server don't call their own localhost.
 
   let selectedIdStr   = localStorage.getItem("selectedProfileId");
   let selectedId      = selectedIdStr ? String(selectedIdStr) : "";

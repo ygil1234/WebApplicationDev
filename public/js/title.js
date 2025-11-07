@@ -1,6 +1,6 @@
 // JS/title.js
 (function () {
-  const API_BASE = "http://localhost:3000/api";
+  const API_BASE = `${window.location.origin.replace(/\/$/, '')}/api`; // Match the active origin so mobile browsers talk to the right server.
 
   function qs(name) {
     const u = new URL(window.location.href);
