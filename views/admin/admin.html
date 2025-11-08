@@ -18,6 +18,14 @@
     <main class="signin-card" style="max-width: 560px;">
       <h1 class="mb-4">Content Admin</h1>
 
+      <div class="mb-4">
+        <label class="form-label nf-label" for="adminAction">What would you like to do?</label>
+        <select class="form-select nf-input" id="adminAction">
+          <option value="manage" selected>Add or update content</option>
+          <option value="delete">Delete content</option>
+        </select>
+      </div>
+
       <form id="contentForm" novalidate enctype="multipart/form-data">
         <div class="mb-3">
           <label class="form-label nf-label" for="contentMode">Action</label>
@@ -122,6 +130,45 @@
 
         <div class="d-grid mt-4">
           <button type="submit" class="btn btn-nf-primary" id="submitBtn">Submit Content</button>
+        </div>
+      </form>
+
+      <form id="deleteForm" class="d-none mt-4" novalidate>
+        <div class="mb-3">
+          <label for="deleteType" class="form-label nf-label">Select the content type</label>
+          <select class="form-select nf-input" id="deleteType" required>
+            <option value="" disabled selected>Select type...</option>
+            <option value="Movie">Movie</option>
+            <option value="Series">Series</option>
+          </select>
+          <div class="login-error-message d-none" id="deleteTypeError"></div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label nf-label">Choose what to search by</label>
+          <div class="btn-group w-100" role="group" aria-label="Delete content options">
+            <input type="radio" class="btn-check" name="deleteBy" id="deleteByExtId" value="extId" autocomplete="off" checked>
+            <label class="btn btn-outline-danger" for="deleteByExtId">External ID</label>
+
+            <input type="radio" class="btn-check" name="deleteBy" id="deleteByTitle" value="title" autocomplete="off">
+            <label class="btn btn-outline-danger" for="deleteByTitle">Title</label>
+          </div>
+        </div>
+
+        <div class="mb-3" id="deleteExtIdGroup">
+          <label for="deleteExtId" class="form-label nf-label">External ID</label>
+          <input type="text" class="form-control nf-input" id="deleteExtId" placeholder="e.g., m12"/>
+          <div class="login-error-message d-none" id="deleteExtIdError"></div>
+        </div>
+
+        <div class="mb-3 d-none" id="deleteTitleGroup">
+          <label for="deleteTitle" class="form-label nf-label">Exact title</label>
+          <input type="text" class="form-control nf-input" id="deleteTitle" placeholder="e.g., The Matrix"/>
+          <div class="login-error-message d-none" id="deleteTitleError"></div>
+        </div>
+
+        <div class="d-grid mt-3">
+          <button type="submit" class="btn btn-danger" id="deleteSubmitBtn">Delete Content</button>
         </div>
       </form>
 

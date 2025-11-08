@@ -3,6 +3,8 @@
 (function () {
   const MODE_EXISTING = "existing";
   const MODE_NEW = "new";
+  const ACTION_MANAGE = "manage";
+  const ACTION_DELETE = "delete";
 
   // 1. Admin-only Check
   const loggedInUser = sessionStorage.getItem("loggedInUser") || localStorage.getItem("loggedInUser"); // Accept either storage namespace when validating the admin session.
@@ -13,6 +15,7 @@
   }
 
   // 2. Get DOM Elements
+  const adminActionSelect = document.getElementById("adminAction");
   const form = document.getElementById("contentForm");
   const submitBtn = document.getElementById("submitBtn");
   const modeSelect = document.getElementById("contentMode");
@@ -51,6 +54,14 @@
 
   const successBox = document.getElementById("contentSuccess");
   const generalErr = document.getElementById("contentGeneralError");
+  const deleteForm = document.getElementById("deleteForm");
+  const deleteTypeEl = document.getElementById("deleteType");
+  const deleteExtIdGroup = document.getElementById("deleteExtIdGroup");
+  const deleteTitleGroup = document.getElementById("deleteTitleGroup");
+  const deleteExtIdEl = document.getElementById("deleteExtId");
+  const deleteTitleEl = document.getElementById("deleteTitle");
+  const deleteSubmitBtn = document.getElementById("deleteSubmitBtn");
+  const deleteByRadios = document.querySelectorAll('input[name="deleteBy"]');
 
   const { validators, attach, showError, clearError } = window.Validation; // Destructure client-side validation helpers.
 
@@ -111,6 +122,47 @@
   function setAutoNoteText(text) {
     if (!extIdAutoNote) return;
     extIdAutoNote.textContent = text;
+  }
+
+  function getSelectedAction() {
+    const value = adminActionSelect ? String(adminActionSelect.value || "") : ACTION_MANAGE;
+    return value === ACTION_DELETE ? ACTION_DELETE : ACTION_MANAGE;
+  }
+
+  function isDeleteAction() {
+    return getSelectedAction() === ACTION_DELETE;
+  }
+
+  function getDeleteIdentifierMode() {
+    const radios = deleteByRadios ? Array.from(deleteByRadios) : [];
+    const selected = radios.find((radio) => radio.checked && radio.value);
+    return selected ? selected.value : "extId";
+  }
+
+  function syncDeleteIdentifierUI() {
+    if (!deleteForm) return;
+    const mode = getDeleteIdentifierMode();
+    const useExtId = mode !== "title";
+    if (deleteExtIdGroup) deleteExtIdGroup.classList.toggle("d-none", !useExtId);
+    if (deleteTitleGroup) deleteTitleGroup.classList.toggle("d-none", useExtId);
+    if (useExtId && deleteTitleEl) {
+      deleteTitleEl.value = "";
+      clearError(deleteTitleEl);
+    } else if (!useExtId && deleteExtIdEl) {
+      deleteExtIdEl.value = "";
+      clearError(deleteExtIdEl);
+    }
+  }
+
+  function clearDeleteErrors() {
+    [deleteTypeEl, deleteExtIdEl, deleteTitleEl].forEach((el) => {
+      if (el) clearError(el);
+    });
+  }
+
+  function syncActionUI() {
+    if (form) form.classList.toggle("d-none", isDeleteAction());
+    if (deleteForm) deleteForm.classList.toggle("d-none", !isDeleteAction());
   }
 
   function resetEpisodeFields() {
@@ -581,10 +633,33 @@
   }
 
   // ---------- Event wiring ----------
-  if (!form || !modeSelect || !typeEl || !titleEl || !yearEl || !genresEl) {
+  if (
+    !form
+    || !modeSelect
+    || !typeEl
+    || !titleEl
+    || !yearEl
+    || !genresEl
+    || !adminActionSelect
+    || !deleteForm
+    || !deleteTypeEl
+    || !deleteExtIdEl
+    || !deleteTitleEl
+    || !deleteSubmitBtn
+  ) {
     console.error("Admin form is missing required elements.");
     return;
   }
+
+  adminActionSelect.addEventListener("change", () => {
+    syncActionUI();
+    if (!isDeleteAction()) {
+      updateModeUI();
+    }
+    clearDeleteErrors();
+    if (successBox) successBox.classList.add("d-none");
+    if (generalErr) generalErr.classList.add("d-none");
+  });
 
   modeSelect.addEventListener("change", () => {
     clearError(modeSelect);
@@ -836,8 +911,114 @@
     }
   );
 
+  deleteTypeEl.addEventListener("change", () => clearError(deleteTypeEl));
+  deleteExtIdEl.addEventListener("input", () => clearError(deleteExtIdEl));
+  deleteTitleEl.addEventListener("input", () => clearError(deleteTitleEl));
+
+  if (deleteByRadios && deleteByRadios.length) {
+    deleteByRadios.forEach((radio) => {
+      radio.addEventListener("change", () => {
+        syncDeleteIdentifierUI();
+        clearDeleteErrors();
+      });
+    });
+  }
+
+  deleteForm.addEventListener(
+    "submit",
+    async (event) => {
+      event.preventDefault();
+      if (!isDeleteAction()) {
+        adminActionSelect.value = ACTION_DELETE;
+        syncActionUI();
+      }
+      clearDeleteErrors();
+      if (successBox) successBox.classList.add("d-none");
+      if (generalErr) generalErr.classList.add("d-none");
+
+      const typeValue = deleteTypeEl.value;
+      if (!typeValue) {
+        showError(deleteTypeEl, "Select a type to delete.");
+        return;
+      }
+
+      const identifierMode = getDeleteIdentifierMode();
+      const payload = { type: typeValue };
+      if (identifierMode === "extId") {
+        const extIdValue = deleteExtIdEl.value.trim();
+        if (!extIdValue) {
+          showError(deleteExtIdEl, "External ID is required.");
+          return;
+        }
+        payload.extId = extIdValue;
+      } else if (identifierMode === "title") {
+        const titleValue = deleteTitleEl.value.trim();
+        if (!titleValue) {
+          showError(deleteTitleEl, "Title is required.");
+          return;
+        }
+        payload.title = titleValue;
+      } else {
+        if (generalErr) {
+          generalErr.classList.remove("d-none");
+          generalErr.textContent = "Choose how to identify the content to delete.";
+        }
+        return;
+      }
+
+      const prevBtnText = deleteSubmitBtn.textContent;
+      deleteSubmitBtn.disabled = true;
+      deleteSubmitBtn.textContent = "Deleting...";
+
+      try {
+        const response = await fetch("/api/admin/content", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const msg = `[${response.status}] ${data?.error || "Unable to delete content."}`;
+          if (generalErr) {
+            generalErr.classList.remove("d-none");
+            generalErr.textContent = msg;
+          }
+          return;
+        }
+
+        contentSummariesCache.delete(typeValue);
+        contentSummariesCache.delete("__all__");
+        if (isExistingMode() && getSelectedType() === typeValue) {
+          await populateExistingOptions();
+        }
+
+        deleteForm.reset();
+        syncDeleteIdentifierUI();
+
+        if (successBox) {
+          const deletedTitle = data?.data?.title || data?.data?.extId || "Selected content";
+          const deletedExtId = data?.data?.extId ? ` (${data.data.extId})` : "";
+          successBox.classList.remove("d-none");
+          successBox.textContent = `Deleted '${deletedTitle}'${deletedExtId}.`;
+        }
+      } catch (err) {
+        console.error("delete content error:", err);
+        if (generalErr) {
+          generalErr.classList.remove("d-none");
+          generalErr.textContent = "Unable to delete content right now.";
+        }
+      } finally {
+        deleteSubmitBtn.disabled = false;
+        deleteSubmitBtn.textContent = prevBtnText;
+      }
+    }
+  );
+
   // Initial UI sync
   ensurePlaceholderOption(extIdSelect, "Select step 1 to see existing titles.");
   if (extIdSelect) extIdSelect.disabled = true;
   updateModeUI();
+  syncDeleteIdentifierUI();
+  syncActionUI();
 })();
