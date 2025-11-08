@@ -261,6 +261,8 @@ SESSION_SECRET=a_very_strong_and_random_secret_key
 SEED_CONTENT=1
 OMDB_API_KEY=your_omdb_key_here
 NODE_ENV=development
+ADMIN_USER=a_very_strong_and_random_user
+ADMIN_PASSWORD=a_very_strong_and_random_password
 ```
 
 ### 📦 Installation
