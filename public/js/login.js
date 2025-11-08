@@ -1,5 +1,11 @@
 // JS/login.js
 (function () {
+  const activeUser = localStorage.getItem("loggedInUser") || sessionStorage.getItem("loggedInUser"); // Look for an existing user marker in either storage bucket.
+  if (activeUser) { // If a session already exists, keep the visitor away from the login form.
+    const destination = activeUser.toLowerCase() === "admin" ? "admin.html" : "feed.html"; // Admins head to their dashboard; everyone else hits the feed.
+    window.location.replace(destination); // Replace history with the target page so back button won't re-open login.
+    return; // Stop wiring the login form since we're leaving the page.
+  }
   const form = document.getElementById("signinForm");
   const emailInput = document.getElementById("emailPhone");
   const passwordInput = document.getElementById("password");

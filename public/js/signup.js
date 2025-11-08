@@ -1,6 +1,12 @@
 // JS/signup.js
 
 (function () {
+  const activeUser = localStorage.getItem("loggedInUser") || sessionStorage.getItem("loggedInUser"); // Check both storage areas for an existing session.
+  if (activeUser) { // If the visitor is already signed in, keep them off the signup view.
+    const destination = activeUser.toLowerCase() === "admin" ? "admin.html" : "feed.html"; // Route admins differently from regular users.
+    window.location.replace(destination); // Swap the current page so the browser history doesn't land back on signup.
+    return; // Abort further initialization because the page is no longer relevant.
+  }
   const form   = document.getElementById("signupForm");
   const emailEl = document.getElementById("email");
   const userEl  = document.getElementById("username");
