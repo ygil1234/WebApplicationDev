@@ -1,29 +1,296 @@
-# WebApplicationDev
+# 🎬 Netflix Clone — Technical R&D Documentation
 
-Netflix Clone - Technical R&D Documentation1. Project OverviewThis document provides a technical overview of the full-stack Netflix Clone application. The project is built with a Node.js/Express/MongoDB backend (the "server") and a static-file-based frontend using vanilla JavaScript, HTML, and Bootstrap (in the "views" and "public" directories).Technical StackBackend: Node.js, Express.jsDatabase: MongoDB with Mongoose (ODM)Authentication: express-session with connect-mongo for persistent sessions. Passwords are hashed using bcryptjs.API: RESTful API providing JSON data to the frontend.File Uploads: multer for handling image and video uploads from the admin panel, stored locally in public/uploads.Frontend: Vanilla JavaScript (ES6+), HTML5, Bootstrap 5.Data Seeding: A content.json file is used to seed the database on startup.Frontend-Backend Communication: The frontend uses fetch to make calls to the backend API.2. System ArchitectureBackend (server/)The backend is an Express application (server/index.js) responsible for all business logic, data persistence, and authentication.Configuration (server/config/config.js): Centralized configuration loaded via dotenv from a .env file. Manages PORT, MONGODB_URI, SESSION_SECRET, and OMDB_API_KEY.Routing (server/routes/): API routes are modularized.authRoutes.js: User/admin signup and login.profileRoutes.js: CRUD for user profiles.videoRoutes.js: All content-browsing endpoints (feed, search, details, likes, progress).adminRoutes.js: Secure endpoints for content management.userRoutes.js: Statistics and health-check endpoints.Controllers (server/controllers/): Contain the business logic for each route (e.g., videoController.js, adminController.js).Models (server/models/): Define the Mongoose schemas for all database collections.Middleware (server/middlewares/):auth.js: requireAuth and requireAdmin checks for securing endpoints.upload.js: Configures multer for file uploads.validation.js: Server-side validation helpers.Frontend (views/ & public/)The frontend is served as static HTML files from the views/ directory. All client-side interactivity is powered by JavaScript files in public/js/.HTML (views/): Separate HTML files for each page (login.html, feed.html, admin.html, etc.).Client JS (public/js/):client_validation.js: Shared frontend validation logic.feed.js: Powers the main content browsing page, including row rendering, search, and likes.title.js: Manages the detail page, including video playback and progress tracking.admin.js: Powers the admin panel for creating/updating content.settings.js: Manages profile CRUD and renders statistics charts using Chart.js.3. Data Models (Mongoose Schemas)Located in server/models/.User.js:email (String, unique): User's email.username (String, unique): User's public username.password (String): Hashed using bcryptjs.Profile.js:userId (ObjectId, ref: User): Links to the parent user account.name (String): Name of the profile (e.g., "Mom", "Kids").avatar (String): File path to the avatar image.Video.js (Content Model):extId (String, unique): External ID for content (e.g., "m1", "s5").title (String): Title of the movie/series.year (Number): Release year.genres ([String]): Array of genres.likes (Number): Like counter.type (String): "Movie" or "Series".plot (String): Synopsis.videoPath (String): Path to the movie file (for type: "Movie").episodes ([EpisodeSchema]): Array of episode sub-documents.season (Number)episode (Number)title (String)videoPath (String)Like.js (Junction between Profile and Content):profileId (String, index): The profile that liked the content.contentExtId (String, index): The extId of the content that was liked.WatchProgress.js (Junction with details):profileId (String, index): The profile watching.contentExtId (String, index): The content being watched.season (Number): null for movies.episode (Number): null for movies.positionSec (Number): Last watched timestamp.durationSec (Number): Total duration of the video.completed (Boolean): If the content was finished.Log.js:Used by the writeLog helper to log application events to the database.4. API Endpoint ReferenceAll routes are prefixed with /api.Auth (authRoutes.js)POST /signup: Creates a new user account.POST /login: Logs in a regular user and creates a session.POST /admin-login: Special login for the admin ("admin", "admin").POST /logout: Destroys the user session.Profiles (profileRoutes.js) - Requires AuthGET /profiles: Lists all profiles for the logged-in user.POST /profiles: Creates a new profile (max 5).PUT /profiles/:id: Updates a profile's name or avatar.DELETE /profiles/:id: Deletes a profile.Video/Content (videoRoutes.js) - Public/AuthGET /feed: Gets content for the main feed. (Public, but enhanced with profileId).GET /search: Searches content. (Public, but enhanced with profileId).GET /content/:extId: Gets details for a single title. (Public, but enhanced with profileId).GET /similar: Gets content similar to an extId. (Public, but enhanced with profileId).GET /recommendations: Gets recommendations for a profileId (requires auth).POST /likes/toggle: Toggles a like for a profileId (requires auth).GET /progress: Gets watch progress for a profileId and contentExtId (requires auth).POST /progress: Sets watch progress (requires auth).DELETE /progress: Deletes/resets watch progress (requires auth).User/Stats (userRoutes.js)GET /health: Public health check of the server and DB.GET /config: Public endpoint for frontend config (e.g., scroll step).GET /stats/daily-views: Gets data for the daily views chart (requires auth).GET /stats/genre-popularity: Gets data for the genre popularity chart (requires auth).Admin (adminRoutes.js) - Requires Admin AuthGET /admin/content: Lists content summaries for the admin UI.GET /admin/content/:extId: Gets full, un-sanitized details for one item.POST /admin/content: Creates new content or updates existing. Handles imageFile and videoFile (for movies) uploads.POST /admin/episodes: Adds or updates an episode for a series. Handles videoFile upload.POST /admin/repair-media-paths: A utility endpoint to clean up broken file paths in the DB.5. Setup & RunningPrerequisitesNode.js (v16+)npmA running MongoDB instance (local or cloud)ConfigurationNavigate to the server/ directory.Create a file named .env.Add the following variables:# Port to run the server on
+![Node.js](https://img.shields.io/badge/Node.js-16+-green?logo=node.js)
+![Express](https://img.shields.io/badge/Express.js-Backend-blue)
+![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-success?logo=mongodb)
+![Bootstrap](https://img.shields.io/badge/Frontend-Bootstrap%205-orange)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
+---
+
+## 📑 Table of Contents
+
+1. [Project Overview](#1-project-overview)  
+2. [System Architecture](#2-system-architecture)  
+3. [Data Models](#3-data-models)  
+4. [API Reference](#4-api-reference)  
+5. [Setup & Running](#5-setup--running)  
+6. [Admin Access](#6-admin-access)  
+7. [Future Improvements](#7-future-improvements)  
+8. [Author](#8-author)
+
+---
+
+## 1. Project Overview
+
+This project is a **full-stack Netflix Clone** designed for R&D and educational purposes.  
+It combines a **Node.js / Express / MongoDB backend** with a **vanilla JavaScript + HTML + Bootstrap** frontend.
+
+### 🧰 Tech Stack
+
+| Layer | Technology |
+|-------|-------------|
+| **Backend** | Node.js, Express.js |
+| **Database** | MongoDB (via Mongoose ODM) |
+| **Authentication** | `express-session` + `connect-mongo` (persistent sessions) |
+| **Password Hashing** | `bcryptjs` |
+| **File Uploads** | `multer` (image/video uploads to `public/uploads`) |
+| **Frontend** | Vanilla JavaScript (ES6+), HTML5, Bootstrap 5 |
+| **Data Seeding** | `content.json` seeded on startup |
+| **Communication** | RESTful API via `fetch()` |
+
+---
+
+## 2. System Architecture
+
+### 🖥️ Backend (`server/`)
+
+The backend is an **Express.js application** (`server/index.js`) responsible for:
+- Business logic
+- Data persistence
+- Authentication
+- API management
+
+#### Configuration
+- File: `server/config/config.js`
+- Loaded via `dotenv`  
+- Key environment variables:
+  - `PORT`
+  - `MONGODB_URI`
+  - `SESSION_SECRET`
+  - `OMDB_API_KEY`
+
+#### Routing (`server/routes/`)
+
+| File | Description |
+|------|--------------|
+| `authRoutes.js` | User/admin signup, login, logout |
+| `profileRoutes.js` | CRUD operations for profiles |
+| `videoRoutes.js` | Feed, search, likes, progress |
+| `adminRoutes.js` | Secure content management |
+| `userRoutes.js` | Statistics and health checks |
+
+#### Controllers (`server/controllers/`)
+Contain business logic for each route:
+- `videoController.js`
+- `adminController.js`
+- `authController.js`
+
+#### Models (`server/models/`)
+Define Mongoose schemas for:
+- `User`
+- `Profile`
+- `Video`
+- `Like`
+- `WatchProgress`
+- `Log`
+
+#### Middleware (`server/middlewares/`)
+- `auth.js` → Authentication / authorization checks  
+- `upload.js` → Configures Multer for file uploads  
+- `validation.js` → Server-side data validation
+
+---
+
+### 🎨 Frontend (`views/` & `public/`)
+
+The frontend is served as **static HTML pages** from `views/`, with interactivity handled via JS in `public/js/`.
+
+| Directory | Purpose |
+|------------|----------|
+| `views/` | Page templates (`login.html`, `feed.html`, `admin.html`, etc.) |
+| `public/js/` | Frontend logic scripts |
+
+#### Key Client Scripts
+- `client_validation.js` — shared input validation  
+- `feed.js` — content browsing, search, likes  
+- `title.js` — detail page, playback & progress tracking  
+- `admin.js` — admin dashboard for content CRUD  
+- `settings.js` — profile management, statistics (Chart.js)
+
+---
+
+## 3. Data Models (Mongoose Schemas)
+
+Located in `server/models/`.
+
+### 🧑 User
+```js
+{
+  email: { type: String, unique: true },
+  username: { type: String, unique: true },
+  password: String // bcrypt-hashed
+}
+````
+
+### 👤 Profile
+
+```js
+{
+  userId: { type: ObjectId, ref: "User" },
+  name: String,
+  avatar: String
+}
+```
+
+### 🎥 Video (Content)
+
+```js
+{
+  extId: { type: String, unique: true },
+  title: String,
+  year: Number,
+  genres: [String],
+  likes: Number,
+  type: String, // "Movie" or "Series"
+  plot: String,
+  videoPath: String,
+  episodes: [
+    {
+      season: Number,
+      episode: Number,
+      title: String,
+      videoPath: String
+    }
+  ]
+}
+```
+
+### ❤️ Like
+
+```js
+{
+  profileId: String,
+  contentExtId: String
+}
+```
+
+### ⏯️ WatchProgress
+
+```js
+{
+  profileId: String,
+  contentExtId: String,
+  season: Number,
+  episode: Number,
+  positionSec: Number,
+  durationSec: Number,
+  completed: Boolean
+}
+```
+
+### 🧾 Log
+
+Used for internal app event tracking via `writeLog()`.
+
+---
+
+## 4. API Reference
+
+> All API routes are prefixed with `/api`.
+
+### 🔐 Auth
+
+| Method | Endpoint       | Description                |
+| ------ | -------------- | -------------------------- |
+| `POST` | `/signup`      | Create new user account    |
+| `POST` | `/login`       | Login as regular user      |
+| `POST` | `/admin-login` | Login as admin             |
+| `POST` | `/logout`      | Logout and destroy session |
+
+### 👥 Profiles *(Requires Auth)*
+
+| Method   | Endpoint        | Description            |
+| -------- | --------------- | ---------------------- |
+| `GET`    | `/profiles`     | Get all profiles       |
+| `POST`   | `/profiles`     | Create profile (max 5) |
+| `PUT`    | `/profiles/:id` | Update name/avatar     |
+| `DELETE` | `/profiles/:id` | Delete profile         |
+
+### 🎬 Video / Content
+
+| Method   | Endpoint           | Description                  |
+| -------- | ------------------ | ---------------------------- |
+| `GET`    | `/feed`            | Get feed content             |
+| `GET`    | `/search`          | Search by title/genre        |
+| `GET`    | `/content/:extId`  | Get single title details     |
+| `GET`    | `/similar`         | Get similar content          |
+| `GET`    | `/recommendations` | Personalized recommendations |
+| `POST`   | `/likes/toggle`    | Like/unlike content          |
+| `GET`    | `/progress`        | Fetch watch progress         |
+| `POST`   | `/progress`        | Update progress              |
+| `DELETE` | `/progress`        | Reset progress               |
+
+### 📊 User & Stats
+
+| Method | Endpoint                  | Description              |
+| ------ | ------------------------- | ------------------------ |
+| `GET`  | `/health`                 | Server & DB health check |
+| `GET`  | `/config`                 | Frontend config          |
+| `GET`  | `/stats/daily-views`      | Daily view statistics    |
+| `GET`  | `/stats/genre-popularity` | Genre popularity chart   |
+
+### 🛠️ Admin *(Requires Admin Auth)*
+
+| Method | Endpoint                    | Description                            |
+| ------ | --------------------------- | -------------------------------------- |
+| `GET`  | `/admin/content`            | List all content                       |
+| `GET`  | `/admin/content/:extId`     | Get full item details                  |
+| `POST` | `/admin/content`            | Create/update content (upload support) |
+| `POST` | `/admin/episodes`           | Add or update series episode           |
+| `POST` | `/admin/repair-media-paths` | Fix broken media paths                 |
+
+---
+
+## 5. Setup & Running
+
+### ⚙️ Prerequisites
+
+* Node.js ≥ 16
+* npm
+* MongoDB (local or Atlas cloud)
+
+### 🔧 Configuration
+
+Create a `.env` file in `server/`:
+
+```bash
 PORT=3000
-
-# Your MongoDB connection string
-# Example: mongodb://127.0.0.1:27017/netflix_feed
-MONGODB_URI=your_mongodb_connection_string
-
-# A strong, random string for signing session cookies
+MONGODB_URI=mongodb://127.0.0.1:27017/netflix_feed
 SESSION_SECRET=a_very_strong_and_random_secret_key
-
-# [Optional] Set to 1 to seed the database from content.json on first run
 SEED_CONTENT=1
-
-# [Optional] OMDb API Key ([http://www.omdbapi.com/](http://www.omdbapi.com/))
-# Used by the admin panel to fetch plot, actors, and ratings automatically
 OMDB_API_KEY=your_omdb_key_here
-
-# [Optional] Set to 'production' when deploying
 NODE_ENV=development
-Installation# Navigate to the server directory
-cd server
+```
 
-# Install backend dependencies
+### 📦 Installation
+
+```bash
+cd server
 npm install
-Running the Application# From the server/ directory
+```
+
+### 🚀 Run the Application
+
+```bash
 npm start
-The server will start on the port specified in your .env file (default: 3000). You can access the application at http://localhost:3000.Admin AccessURL: http://localhost:3000/login.htmlUsername: adminPassword: admin(This is handled by authController.js's adminLogin function and bypasses the User model).
+```
+
+Access at: **[http://localhost:3000](http://localhost:3000)**
+
+---
+
+## 6. Admin Access (Default)
+
+**URL:** [http://localhost:3000/login.html](http://localhost:3000/login.html)
+**Username:** `admin`
+**Password:** `admin`
+
+> This login is handled by `authController.js → adminLogin()` and bypasses the standard `User` model.
+
+---
+
+
+### 📝 License
+
+MIT License © 2025 Rotem Fisher
