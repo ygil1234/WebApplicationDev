@@ -13,6 +13,10 @@ function normalizeType(rawType) {
   return value;
 }
 
+function escapeRegExp(str = '') {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function computeNextExtIdForType(rawType) {
   const normalizedType = normalizeType(rawType);
   const isMovie = normalizedType === 'Movie';
@@ -322,6 +326,64 @@ async function createOrUpdateContent(req, res) {
   }
 }
 
+async function deleteContent(req, res) {
+  try {
+    const type = normalizeType(req.body.type);
+    const extIdRaw = typeof req.body.extId === 'string' ? req.body.extId.trim() : '';
+    const titleRaw = typeof req.body.title === 'string' ? req.body.title.trim() : '';
+
+    if (!type) {
+      return res.status(400).json({ ok: false, error: 'Type is required (Movie or Series).' });
+    }
+
+    const hasExtId = Boolean(extIdRaw);
+    const hasTitle = Boolean(titleRaw);
+    if (!hasExtId && !hasTitle) {
+      return res.status(400).json({ ok: false, error: 'Provide either an External ID or a title.' });
+    }
+    if (hasExtId && hasTitle) {
+      return res.status(400).json({ ok: false, error: 'Choose only one identifier: title or External ID.' });
+    }
+
+    const query = { type };
+    if (hasExtId) {
+      query.extId = extIdRaw;
+    } else if (hasTitle) {
+      query.title = { $regex: new RegExp(`^${escapeRegExp(titleRaw)}$`, 'i') };
+    }
+
+    const deleted = await Content.findOneAndDelete(query).lean();
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: 'No matching content found.' });
+    }
+
+    await writeLog({
+      level: 'info',
+      event: 'content_admin_delete',
+      userId: req.session.userId,
+      details: { type, extId: deleted.extId, title: deleted.title },
+    });
+
+    return res.json({
+      ok: true,
+      data: {
+        extId: deleted.extId,
+        title: deleted.title,
+        type: deleted.type,
+      },
+    });
+  } catch (err) {
+    console.error('DELETE /api/admin/content error:', err);
+    await writeLog({
+      level: 'error',
+      event: 'content_admin_delete_fail',
+      userId: req.session.userId,
+      details: { error: err.message },
+    });
+    return res.status(500).json({ ok: false, error: 'Server error' });
+  }
+}
+
 async function upsertEpisode(req, res) {
   try {
     const { seriesExtId, season, episode, title } = req.body || {};
@@ -478,6 +540,7 @@ module.exports = {
   listContentSummaries,
   getContentByExtId,
   createOrUpdateContent,
+  deleteContent,
   upsertEpisode,
   repairMediaPaths,
 };
