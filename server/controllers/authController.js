@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const { writeLog, sanitizeRegex } = require('../utils/helpers');
 const { validEmail, validUsername, validPassword } = require('../middlewares/validation');
+const {ADMIN_USER, ADMIN_PASSWORD} = require("../config/config");
 
 async function signup(req, res) {
   try {
@@ -69,7 +70,7 @@ async function adminLogin(req, res) {
     const email = String(req.body?.email || '').trim();
     const password = String(req.body?.password || '');
 
-    if (email === 'admin' && password === 'admin') {
+    if (email === ADMIN_USER && password === ADMIN_PASSWORD) {
       req.session.userId = 'admin-user-id';
       req.session.username = 'admin';
 

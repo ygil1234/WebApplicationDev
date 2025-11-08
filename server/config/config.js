@@ -20,6 +20,8 @@ module.exports = {
   SEED_CONTENT: process.env.SEED_CONTENT === '1',
   ROW_SCROLL_STEP,
   OMDB_API_KEY: process.env.OMDB_API_KEY,
+  ADMIN_USER: process.env.ADMIN_USER,
+  ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
   CONTENT_JSON_CANDIDATES: [
     path.resolve(serverDir, 'content.json'),
     path.resolve(projectRoot, 'server/content.json'),
