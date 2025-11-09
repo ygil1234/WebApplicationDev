@@ -26,12 +26,8 @@
         el: passEl,  
         rules: [
           { 
-            test: (passValue) => {
-              const userVal = userEl.value.trim().toLowerCase();
-              if (userVal === 'admin' && passValue === 'admin') return true;
-              return validators.minLength(6)(passValue);
-            }, 
-            message: "Password must be at least 6 characters (or 'admin' for admin)." 
+            test: validators.minLength(6),
+            message: "Password must be at least 6 characters." 
           }
         ] 
       }

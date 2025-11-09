@@ -1,3 +1,5 @@
+const { ADMIN_USER, ADMIN_PASSWORD } = require("../config/config");
+
 const EMAIL_RX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
 function validEmail(value) {
@@ -5,7 +7,7 @@ function validEmail(value) {
 }
 
 function validPassword(password, username = '') {
-  if (String(username).toLowerCase() === 'admin' && password === 'admin') return true;
+  if (String(username).toLowerCase() === ADMIN_USER && password === ADMIN_PASSWORD) return true;
   return typeof password === 'string' && password.trim().length >= 6;
 }
 
