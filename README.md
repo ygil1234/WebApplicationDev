@@ -194,7 +194,6 @@ Located in `server/models/`.
 
 | Method | Endpoint                  | Description              |
 | ------ | ------------------------- | ------------------------ |
-| `GET`  | `/health`                 | Server & DB health check |
 | `GET`  | `/config`                 | Frontend config          |
 | `GET`  | `/stats/genre-popularity` | Genre popularity chart   |
 
