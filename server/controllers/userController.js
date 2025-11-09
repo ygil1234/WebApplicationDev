@@ -3,28 +3,8 @@ const mongoose = require('mongoose');
 const Profile = require('../models/Profile');
 const WatchProgress = require('../models/WatchProgress');
 const Content = require('../models/Video');
-const { NODE_ENV, ROW_SCROLL_STEP } = require('../config/config');
+const { ROW_SCROLL_STEP } = require('../config/config');
 const { resolveUserId, writeLog } = require('../utils/helpers');
-
-function health(req, res) {
-  res.json({
-    ok: true,
-    env: NODE_ENV,
-    mongo: mongoose.connection.readyState,
-    hasSession: Boolean(req.session),
-    sessionUser: req.session?.userId || null,
-  });
-}
-
-function sessionDebug(req, res) {
-  res.json({
-    hasSession: Boolean(req.session),
-    userId: req.session?.userId,
-    username: req.session?.username,
-    sessionID: req.sessionID,
-    cookies: req.headers.cookie,
-  });
-}
 
 function appConfig(req, res) {
   res.json({
@@ -173,8 +153,6 @@ async function genrePopularity(req, res) {
 }
 
 module.exports = {
-  health,
-  sessionDebug,
   appConfig,
   dailyViews,
   genrePopularity,
