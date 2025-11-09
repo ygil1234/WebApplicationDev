@@ -58,10 +58,10 @@ The backend is an **Express.js application** (`server/index.js`) responsible for
 | `userRoutes.js` | Statistics and health checks |
 
 #### Controllers (`server/controllers/`)
-Contain business logic for each route:
+Contain business logic for each route
 
 #### Models (`server/models/`)
-Define Mongoose schemas for:
+Define Mongoose schemas
 
 #### Middleware (`server/middlewares/`)
 - Authentication / authorization checks  
