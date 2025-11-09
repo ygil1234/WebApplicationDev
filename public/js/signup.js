@@ -1,7 +1,5 @@
 // JS/signup.js
 
-const { ADMIN_USER, ADMIN_PASSWORD } = require("../../server/config/config");
-
 (function () {
   const activeUser = localStorage.getItem("loggedInUser") || sessionStorage.getItem("loggedInUser"); // Check both storage areas for an existing session.
   if (activeUser) { // If the visitor is already signed in, keep them off the signup view.
@@ -28,12 +26,8 @@ const { ADMIN_USER, ADMIN_PASSWORD } = require("../../server/config/config");
         el: passEl,  
         rules: [
           { 
-            test: (passValue) => {
-              const userVal = userEl.value.trim().toLowerCase();
-              if (userVal === ADMIN_USER && passValue === ADMIN_PASSWORD) return true;
-              return validators.minLength(6)(passValue);
-            }, 
-            message: "Password must be at least 6 characters (or 'admin' for admin)." 
+            test: validators.minLength(6),
+            message: "Password must be at least 6 characters." 
           }
         ] 
       }
