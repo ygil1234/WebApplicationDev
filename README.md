@@ -8,19 +8,6 @@
 
 ---
 
-## 📑 Table of Contents
-
-1. [Project Overview](#1-project-overview)  
-2. [System Architecture](#2-system-architecture)  
-3. [Data Models](#3-data-models)  
-4. [API Reference](#4-api-reference)  
-5. [Setup & Running](#5-setup--running)  
-6. [Admin Access](#6-admin-access)  
-7. [Future Improvements](#7-future-improvements)  
-8. [Author](#8-author)
-
----
-
 ## 1. Project Overview
 
 This project is a **full-stack Netflix Clone** designed for R&D and educational purposes.  
@@ -91,15 +78,6 @@ Define Mongoose schemas for:
 - `validation.js` → Server-side data validation
 
 ---
-
-### 🎨 Frontend (`views/` & `public/`)
-
-The frontend is served as **static HTML pages** from `views/`, with interactivity handled via JS in `public/js/`.
-
-| Directory | Purpose |
-|------------|----------|
-| `views/` | Page templates (`login.html`, `feed.html`, `admin.html`, etc.) |
-| `public/js/` | Frontend logic scripts |
 
 #### Key Client Scripts
 - `client_validation.js` — shared input validation  
@@ -179,15 +157,9 @@ Located in `server/models/`.
 }
 ```
 
-### 🧾 Log
-
-Used for internal app event tracking via `writeLog()`.
-
 ---
 
 ## 4. API Reference
-
-> All API routes are prefixed with `/api`.
 
 ### 🔐 Auth
 
@@ -198,7 +170,7 @@ Used for internal app event tracking via `writeLog()`.
 | `POST` | `/admin-login` | Login as admin             |
 | `POST` | `/logout`      | Logout and destroy session |
 
-### 👥 Profiles *(Requires Auth)*
+### 👥 Profiles *
 
 | Method   | Endpoint        | Description            |
 | -------- | --------------- | ---------------------- |
@@ -217,9 +189,6 @@ Used for internal app event tracking via `writeLog()`.
 | `GET`    | `/similar`         | Get similar content          |
 | `GET`    | `/recommendations` | Personalized recommendations |
 | `POST`   | `/likes/toggle`    | Like/unlike content          |
-| `GET`    | `/progress`        | Fetch watch progress         |
-| `POST`   | `/progress`        | Update progress              |
-| `DELETE` | `/progress`        | Reset progress               |
 
 ### 📊 User & Stats
 
@@ -227,7 +196,6 @@ Used for internal app event tracking via `writeLog()`.
 | ------ | ------------------------- | ------------------------ |
 | `GET`  | `/health`                 | Server & DB health check |
 | `GET`  | `/config`                 | Frontend config          |
-| `GET`  | `/stats/daily-views`      | Daily view statistics    |
 | `GET`  | `/stats/genre-popularity` | Genre popularity chart   |
 
 ### 🛠️ Admin *(Requires Admin Auth)*
@@ -236,9 +204,6 @@ Used for internal app event tracking via `writeLog()`.
 | ------ | --------------------------- | -------------------------------------- |
 | `GET`  | `/admin/content`            | List all content                       |
 | `GET`  | `/admin/content/:extId`     | Get full item details                  |
-| `POST` | `/admin/content`            | Create/update content (upload support) |
-| `POST` | `/admin/episodes`           | Add or update series episode           |
-| `POST` | `/admin/repair-media-paths` | Fix broken media paths                 |
 
 ---
 
@@ -246,9 +211,9 @@ Used for internal app event tracking via `writeLog()`.
 
 ### ⚙️ Prerequisites
 
-* Node.js ≥ 16
+* Node.js 
 * npm
-* MongoDB (local or Atlas cloud)
+* MongoDB 
 
 ### 🔧 Configuration
 
@@ -279,20 +244,3 @@ npm start
 ```
 
 Access at: **[http://localhost:3000](http://localhost:3000)**
-
----
-
-## 6. Admin Access (Default)
-
-**URL:** [http://localhost:3000/login.html](http://localhost:3000/login.html)
-**Username:** `admin`
-**Password:** `admin`
-
-> This login is handled by `authController.js → adminLogin()` and bypasses the standard `User` model.
-
----
-
-
-### 📝 License
-
-MIT License © 2025 Rotem Fisher
