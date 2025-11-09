@@ -6,7 +6,6 @@ const {
   createOrUpdateContent,
   deleteContent,
   upsertEpisode,
-  repairMediaPaths,
 } = require('../controllers/adminController');
 const { requireAuth, requireAdmin } = require('../middlewares/auth');
 const { upload } = require('../middlewares/upload');
@@ -24,6 +23,5 @@ router.get('/admin/content/:extId', requireAuth, requireAdmin, getContentByExtId
 router.post('/admin/content', requireAuth, requireAdmin, contentUpload, createOrUpdateContent);
 router.delete('/admin/content', requireAuth, requireAdmin, deleteContent);
 router.post('/admin/episodes', requireAuth, requireAdmin, episodeUpload, upsertEpisode);
-router.post('/admin/repair-media-paths', requireAuth, requireAdmin, repairMediaPaths);
 
 module.exports = router;

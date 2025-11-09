@@ -1,10 +1,8 @@
-const path = require('path');
-const fs = require('fs/promises');
 const axios = require('axios');
 
 const Content = require('../models/Video');
 const { writeLog, syncContentJsonWithDoc, seedContentIfNeeded } = require('../utils/helpers');
-const { OMDB_API_KEY, SERVER_DIR } = require('../config/config');
+const { OMDB_API_KEY } = require('../config/config');
 
 function normalizeType(rawType) {
   const value = String(rawType || '').trim();
@@ -463,84 +461,10 @@ async function upsertEpisode(req, res) {
   }
 }
 
-async function repairMediaPaths(req, res) {
-  try {
-    const items = await Content.find({}).lean();
-    let cleaned = 0;
-    let episodePruned = 0;
-    let checked = 0;
-    const existsLocal = async (candidatePath) => {
-      try {
-        const rel = String(candidatePath || '').replace(/^\/+/g, '');
-        const fsRel = rel.replace(/^IMG\//i, 'img/');
-        const abs = path.join(SERVER_DIR, '..', 'public', fsRel);
-        await fs.access(abs);
-        return true;
-      } catch {
-        return false;
-      }
-    };
-    for (const it of items) {
-      checked++;
-      const unset = {};
-      const set = {};
-      if (it.videoPath && /^\/?uploads\//i.test(String(it.videoPath))) {
-        const ok = await existsLocal(it.videoPath);
-        if (!ok) {
-          unset.videoPath = '';
-          cleaned++;
-        }
-      }
-      if (it.imagePath && /^\/?uploads\//i.test(String(it.imagePath))) {
-        const ok = await existsLocal(it.imagePath);
-        if (!ok) {
-          unset.imagePath = '';
-          cleaned++;
-        }
-      }
-      if (it.cover && /^\/?uploads\//i.test(String(it.cover))) {
-        const ok = await existsLocal(it.cover);
-        if (!ok) {
-          unset.cover = '';
-          cleaned++;
-        }
-      }
-      if (Array.isArray(it.episodes) && it.episodes.length) {
-        const checks = await Promise.all(it.episodes.map((episode) => existsLocal(episode.videoPath)));
-        const filtered = it.episodes.filter((_, idx) => checks[idx]);
-        if (filtered.length !== it.episodes.length) {
-          set.episodes = filtered;
-          episodePruned += it.episodes.length - filtered.length;
-        }
-      }
-      if (Object.keys(unset).length || Object.keys(set).length) {
-        const update = {};
-        if (Object.keys(unset).length) update.$unset = unset;
-        if (Object.keys(set).length) update.$set = set;
-        await Content.updateOne({ _id: it._id }, update);
-      }
-    }
-    await writeLog({
-      event: 'admin_repair_media_paths',
-      details: { checked, cleaned, episodePruned },
-    });
-    return res.json({ ok: true, checked, cleaned, episodePruned });
-  } catch (err) {
-    console.error('POST /api/admin/repair-media-paths error:', err);
-    await writeLog({
-      level: 'error',
-      event: 'admin_repair_media_paths',
-      details: { error: err.message },
-    });
-    return res.status(500).json({ ok: false, error: 'Server error during repair' });
-  }
-}
-
 module.exports = {
   listContentSummaries,
   getContentByExtId,
   createOrUpdateContent,
   deleteContent,
   upsertEpisode,
-  repairMediaPaths,
 };
