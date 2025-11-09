@@ -59,107 +59,27 @@ The backend is an **Express.js application** (`server/index.js`) responsible for
 
 #### Controllers (`server/controllers/`)
 Contain business logic for each route:
-- `videoController.js`
-- `adminController.js`
-- `authController.js`
 
 #### Models (`server/models/`)
 Define Mongoose schemas for:
-- `User`
-- `Profile`
-- `Video`
-- `Like`
-- `WatchProgress`
-- `Log`
 
 #### Middleware (`server/middlewares/`)
-- `auth.js` → Authentication / authorization checks  
-- `upload.js` → Configures Multer for file uploads  
-- `validation.js` → Server-side data validation
+- Authentication / authorization checks  
+- Configures Multer for file uploads  
+- Server-side data validation
 
 ---
 
 #### Key Client Scripts
-- `client_validation.js` — shared input validation  
-- `feed.js` — content browsing, search, likes  
-- `title.js` — detail page, playback & progress tracking  
-- `admin.js` — admin dashboard for content CRUD  
-- `settings.js` — profile management, statistics (Chart.js)
+- shared input validation  
+- content browsing, search, likes  
+- detail page, playback & progress tracking  
+- admin dashboard for content CRUD  
+- profile management, statistics (Chart.js)
 
 ---
 
-## 3. Data Models (Mongoose Schemas)
-
-Located in `server/models/`.
-
-### User
-```js
-{
-  email: { type: String, unique: true },
-  username: { type: String, unique: true },
-  password: String // bcrypt-hashed
-}
-````
-
-### Profile
-
-```js
-{
-  userId: { type: ObjectId, ref: "User" },
-  name: String,
-  avatar: String
-}
-```
-
-### Video (Content)
-
-```js
-{
-  extId: { type: String, unique: true },
-  title: String,
-  year: Number,
-  genres: [String],
-  likes: Number,
-  type: String, // "Movie" or "Series"
-  plot: String,
-  videoPath: String,
-  episodes: [
-    {
-      season: Number,
-      episode: Number,
-      title: String,
-      videoPath: String
-    }
-  ]
-}
-```
-
-### Like
-
-```js
-{
-  profileId: String,
-  contentExtId: String
-}
-```
-
-### WatchProgress
-
-```js
-{
-  profileId: String,
-  contentExtId: String,
-  season: Number,
-  episode: Number,
-  positionSec: Number,
-  durationSec: Number,
-  completed: Boolean
-}
-```
-
----
-
-## 4. API Reference
+## 3. API Reference
 
 ### Auth
 
@@ -178,6 +98,9 @@ Located in `server/models/`.
 | `POST`   | `/profiles`     | Create profile (max 5) |
 | `PUT`    | `/profiles/:id` | Update name/avatar     |
 | `DELETE` | `/profiles/:id` | Delete profile         |
+| `GET`    | `/progress`        | Fetch watch progress|
+| `POST`   | `/progress`        | Update progress     |
+| `DELETE` | `/progress`        | Reset progress      |
 
 ### Video / Content
 
@@ -189,12 +112,14 @@ Located in `server/models/`.
 | `GET`    | `/similar`         | Get similar content          |
 | `GET`    | `/recommendations` | Personalized recommendations |
 | `POST`   | `/likes/toggle`    | Like/unlike content          |
+| `GET`  | `/stats/daily-views`      | Daily view statistics   |
 
 ### User & Stats
 
 | Method | Endpoint                  | Description              |
 | ------ | ------------------------- | ------------------------ |
 | `GET`  | `/config`                 | Frontend config          |
+| `GET`  | `/stats/daily-views`      | Daily view statistics    |
 | `GET`  | `/stats/genre-popularity` | Genre popularity chart   |
 
 ### Admin *(Requires Admin Auth)*
@@ -203,10 +128,12 @@ Located in `server/models/`.
 | ------ | --------------------------- | -------------------------------------- |
 | `GET`  | `/admin/content`            | List all content                       |
 | `GET`  | `/admin/content/:extId`     | Get full item details                  |
+| `POST` | `/admin/episodes`           | Add or update series episode           |
+| `POST` | `/admin/repair-media-paths` | Fix broken media paths                 |
 
 ---
 
-## 5. Setup & Running
+## 4. Setup & Running
 
 ### Prerequisites
 
