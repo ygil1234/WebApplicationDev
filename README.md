@@ -13,7 +13,7 @@
 This project is a **full-stack Netflix Clone** designed for R&D and educational purposes.  
 It combines a **Node.js / Express / MongoDB backend** with a **vanilla JavaScript + HTML + Bootstrap** frontend.
 
-### 🧰 Tech Stack
+### Tech Stack
 
 | Layer | Technology |
 |-------|-------------|
@@ -30,7 +30,7 @@ It combines a **Node.js / Express / MongoDB backend** with a **vanilla JavaScrip
 
 ## 2. System Architecture
 
-### 🖥️ Backend (`server/`)
+### Backend (`server/`)
 
 The backend is an **Express.js application** (`server/index.js`) responsible for:
 - Business logic
@@ -92,7 +92,7 @@ Define Mongoose schemas for:
 
 Located in `server/models/`.
 
-### 🧑 User
+### User
 ```js
 {
   email: { type: String, unique: true },
@@ -101,7 +101,7 @@ Located in `server/models/`.
 }
 ````
 
-### 👤 Profile
+### Profile
 
 ```js
 {
@@ -111,7 +111,7 @@ Located in `server/models/`.
 }
 ```
 
-### 🎥 Video (Content)
+### Video (Content)
 
 ```js
 {
@@ -134,7 +134,7 @@ Located in `server/models/`.
 }
 ```
 
-### ❤️ Like
+### Like
 
 ```js
 {
@@ -143,7 +143,7 @@ Located in `server/models/`.
 }
 ```
 
-### ⏯️ WatchProgress
+### WatchProgress
 
 ```js
 {
@@ -161,7 +161,7 @@ Located in `server/models/`.
 
 ## 4. API Reference
 
-### 🔐 Auth
+### Auth
 
 | Method | Endpoint       | Description                |
 | ------ | -------------- | -------------------------- |
@@ -170,7 +170,7 @@ Located in `server/models/`.
 | `POST` | `/admin-login` | Login as admin             |
 | `POST` | `/logout`      | Logout and destroy session |
 
-### 👥 Profiles *
+### Profiles *
 
 | Method   | Endpoint        | Description            |
 | -------- | --------------- | ---------------------- |
@@ -179,7 +179,7 @@ Located in `server/models/`.
 | `PUT`    | `/profiles/:id` | Update name/avatar     |
 | `DELETE` | `/profiles/:id` | Delete profile         |
 
-### 🎬 Video / Content
+### Video / Content
 
 | Method   | Endpoint           | Description                  |
 | -------- | ------------------ | ---------------------------- |
@@ -190,7 +190,7 @@ Located in `server/models/`.
 | `GET`    | `/recommendations` | Personalized recommendations |
 | `POST`   | `/likes/toggle`    | Like/unlike content          |
 
-### 📊 User & Stats
+### User & Stats
 
 | Method | Endpoint                  | Description              |
 | ------ | ------------------------- | ------------------------ |
@@ -198,7 +198,7 @@ Located in `server/models/`.
 | `GET`  | `/config`                 | Frontend config          |
 | `GET`  | `/stats/genre-popularity` | Genre popularity chart   |
 
-### 🛠️ Admin *(Requires Admin Auth)*
+### Admin *(Requires Admin Auth)*
 
 | Method | Endpoint                    | Description                            |
 | ------ | --------------------------- | -------------------------------------- |
@@ -209,13 +209,13 @@ Located in `server/models/`.
 
 ## 5. Setup & Running
 
-### ⚙️ Prerequisites
+### Prerequisites
 
 * Node.js 
 * npm
 * MongoDB 
 
-### 🔧 Configuration
+### Configuration
 
 Create a `.env` file in `server/`:
 
@@ -228,19 +228,6 @@ OMDB_API_KEY=your_omdb_key_here
 NODE_ENV=development
 ADMIN_USER=a_very_strong_and_random_user
 ADMIN_PASSWORD=a_very_strong_and_random_password
-```
-
-### 📦 Installation
-
-```bash
-cd server
-npm install
-```
-
-### 🚀 Run the Application
-
-```bash
-npm start
 ```
 
 Access at: **[http://localhost:3000](http://localhost:3000)**
