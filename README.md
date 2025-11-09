@@ -58,16 +58,29 @@ The backend is an **Express.js application** (`server/index.js`) responsible for
 | `userRoutes.js` | Statistics and health checks |
 
 #### Controllers (`server/controllers/`)
-Contain business logic for each route
+Contain business logic for each route:
+- `videoController.js`
+- `adminController.js`
+- `authController.js`
+- `profileController.js`
+- `userController.js`
 
 #### Models (`server/models/`)
-Define Mongoose schemas
+Define Mongoose schemas for:
+- `User`
+- `Profile`
+- `Video`
+- `Like`
+- `WatchProgress`
+- `Log`
+- `Session`
 
 #### Middleware (`server/middlewares/`)
-- Authentication / authorization checks  
-- Configures Multer for file uploads  
-- Server-side data validation
+- `auth.js` → Authentication / authorization checks  
+- `upload.js` → Configures Multer for file uploads  
+- `validation.js` → Server-side data validation
 
+---
 ---
 
 #### Key Client Scripts
