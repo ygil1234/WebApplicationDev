@@ -416,17 +416,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    function measureBlockWidth(count) {
-      if (!count || !scroller.firstElementChild) return 0;
-      const nodes = Array.from(scroller.children).slice(0, count);
-      if (!nodes.length) return 0;
-      const first = nodes[0];
-      const last = nodes[nodes.length - 1];
-      const start = first.offsetLeft;
-      const end = last.offsetLeft + last.offsetWidth;
-      return Math.max(0, end - start);
-    }
-
     function appendLoopBlock() {
       if (!state.loopSeedCount) return;
       const sample = Array.from(scroller.children).slice(0, state.loopSeedCount);
@@ -435,16 +424,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       sample.forEach(node => frag.appendChild(node.cloneNode(true)));
       scroller.appendChild(frag);
       state.loopBlocks += 1;
-    }
-
-    function trimLeadingBlock() {
-      if (state.loopBlocks <= 2 || !state.loopSeedCount) return;
-      const toRemove = Array.from(scroller.children).slice(0, state.loopSeedCount);
-      if (!toRemove.length) return;
-      const adjust = measureBlockWidth(state.loopSeedCount);
-      toRemove.forEach(node => node.remove());
-      state.loopBlocks = Math.max(1, state.loopBlocks - 1);
-      if (adjust > 0) scroller.scrollLeft = Math.max(0, scroller.scrollLeft - adjust);
     }
 
     function ensureLoopContinuity() {
@@ -458,7 +437,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       const threshold = Math.max(loopThresholdPx(), scroller.clientWidth || 0);
       const remaining = Math.max(0, scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft);
       if (remaining < threshold) appendLoopBlock();
-      if (scroller.scrollLeft > threshold * 2) trimLeadingBlock();
     }
 
     async function fetchMore() {
