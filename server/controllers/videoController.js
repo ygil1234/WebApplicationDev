@@ -98,6 +98,9 @@ async function getFeed(req, res) {
         sortSpec = { ratingValue: -1, likes: -1, title: 1 };
         baseFilter.ratingValue = { $ne: null };
         break;
+      case 'newest':
+        sortSpec = { year: -1, createdAt: -1, title: 1 };
+        break;
       default:
         sortSpec = { likes: -1, title: 1 };
         break;
@@ -178,6 +181,9 @@ async function searchContent(req, res) {
       case 'rating':
         sortSpec = { ratingValue: -1, likes: -1, title: 1 };
         filter.ratingValue = { $ne: null };
+        break;
+      case 'newest':
+        sortSpec = { year: -1, createdAt: -1, title: 1 };
         break;
       default:
         sortSpec = { likes: -1, title: 1 };

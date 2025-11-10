@@ -130,6 +130,88 @@ document.addEventListener("DOMContentLoaded", async () => {
   const LOOP_MIN_ITEMS = 6;
   let ROW_SCROLL_STEP = DEFAULT_SCROLL_STEP;
   const ROW_META = new WeakMap();
+  const hideWatchedKey = `hide_watched_${selectedId}`;
+  let hideWatched = localStorage.getItem(hideWatchedKey) === "1";
+  const hideWatchedBtn = document.getElementById("toggleWatchedBtn");
+  const newestGenreBtn = document.getElementById("newestGenreBtn");
+  const alphaToggle = document.getElementById("alphaToggle");
+  const SORT_KEY = "nf_sort_mode";
+  const NEWEST_MODE_KEY = "nf_sort_newest";
+  let baseSort = localStorage.getItem(SORT_KEY) === "alpha" ? "alpha" : "popular";
+  let newestSortEnabled = localStorage.getItem(NEWEST_MODE_KEY) === "1";
+  let lastSort = newestSortEnabled ? "newest" : baseSort;
+
+  function applyCardVisibility(card) {
+    if (!card) return;
+    const isWatchedCard = card.dataset?.watched === "1";
+    const shouldHide = hideWatched && isWatchedCard;
+    if (shouldHide) {
+      card.style.display = "none";
+      card.setAttribute("aria-hidden", "true");
+      card.classList.add("nf-card--filtered");
+    } else {
+      card.style.display = "";
+      card.removeAttribute("aria-hidden");
+      card.classList.remove("nf-card--filtered");
+    }
+  }
+
+  function applyWatchedFilter(root = document) {
+    if (!root) return;
+    if (root.classList && root.classList.contains("nf-card")) {
+      applyCardVisibility(root);
+      return;
+    }
+    const scope =
+      typeof root.querySelectorAll === "function"
+        ? root.querySelectorAll(".nf-card")
+        : document.querySelectorAll(".nf-card");
+    scope.forEach((card) => applyCardVisibility(card));
+  }
+
+  function updateHideWatchedButton() {
+    if (!hideWatchedBtn) return;
+    hideWatchedBtn.textContent = hideWatched ? "Show Watched" : "Hide Watched";
+    hideWatchedBtn.setAttribute("aria-pressed", String(hideWatched));
+    hideWatchedBtn.classList.toggle("is-active", hideWatched);
+  }
+
+  function updateNewestButtonState() {
+    if (!newestGenreBtn) return;
+    newestGenreBtn.classList.toggle("is-active", newestSortEnabled);
+    newestGenreBtn.setAttribute("aria-pressed", String(newestSortEnabled));
+  }
+
+  function updateSortButtonStates() {
+    if (alphaToggle) alphaToggle.checked = baseSort === "alpha";
+    updateNewestButtonState();
+  }
+
+  if (hideWatchedBtn) {
+    hideWatchedBtn.addEventListener("click", () => {
+      hideWatched = !hideWatched;
+      localStorage.setItem(hideWatchedKey, hideWatched ? "1" : "0");
+      updateHideWatchedButton();
+      applyWatchedFilter(document);
+    });
+    updateHideWatchedButton();
+  }
+
+  if (newestGenreBtn) {
+    updateNewestButtonState();
+    newestGenreBtn.addEventListener("click", () => {
+      if (newestSortEnabled) {
+        setSort(baseSort, { persistBase: false });
+      } else {
+        setSort("newest");
+      }
+    });
+  }
+
+  if (hideWatched) {
+    applyWatchedFilter(document);
+  }
+  updateSortButtonStates();
 
   try {
     const cfg = await loadConfig();
@@ -268,6 +350,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // ===== 4) Rendering
+  function getWatchedTag(tags) {
+    if (!Array.isArray(tags)) return false;
+    return tags.some((tag) => String(tag).trim().toLowerCase() === "watched");
+  }
+
   function createCard(item, withProgress = false) {
     const pid = String(item.extId || item.id);
     const prog = progress[pid] || 0;
@@ -281,6 +368,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const coverSrc = normalizePath(item.cover || item.imagePath || '');
     const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
+    const isWatched = getWatchedTag(tags);
+    card.dataset.watched = isWatched ? "1" : "0";
+    card.classList.toggle("nf-card--watched", isWatched);
     const tagsHtml = tags.length
       ? `<div class="nf-card__tags">${tags.map((tag) => `<span class="nf-tag">${tag}</span>`).join('')}</div>`
       : '';
@@ -305,6 +395,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         </button>
       </div>
     `;
+    applyCardVisibility(card);
     return card;
   }
 
@@ -360,6 +451,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     `;
     const scroller = section.querySelector(".nf-row__scroller");
     initialItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
+    if (hideWatched) applyWatchedFilter(scroller);
 
     const left = section.querySelector(".nf-row__arrow--left");
     const right = section.querySelector(".nf-row__arrow--right");
@@ -455,6 +547,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           state.loopBlocks = allowLoop ? 1 : 0;
           state.loopActivated = false;
           nextItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
+          if (hideWatched) applyWatchedFilter(scroller);
         }
 
         state.offset += fetchedList.length;
@@ -597,10 +690,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // ===== 5a) Infinite scroll state & helpers =====
   async function loadHomeContent(sortMode = "popular") {
-    const POP_LIMIT = 16;
-    const GEN_LIMIT = 16;
-    const CLASSIC_LIMIT = 12;
-    const REC_LIMIT = 16;
+    const isNewest = sortMode === "newest";
+    const POP_LIMIT = isNewest ? 10 : 16;
+    const GEN_LIMIT = isNewest ? 10 : 16;
+    const CLASSIC_LIMIT = isNewest ? 10 : 12;
+    const REC_LIMIT = isNewest ? 10 : 16;
 
     const ratedPromise = sortMode === "alpha"
       ? Promise.resolve([])
@@ -626,7 +720,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       },
       { 
         id: "row-popular", 
-        title: sortMode === "alpha" ? "A–Z Catalog" : "Popular on Netflix", 
+        title: sortMode === "alpha"
+          ? "A–Z Catalog"
+          : (isNewest ? "Newest on Netflix" : "Popular on Netflix"), 
         items: popular || [],
         pageSize: POP_LIMIT,
         loadMore: ({ offset = 0, limit = POP_LIMIT } = {}) =>
@@ -645,7 +741,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       ),
     { 
       id: "row-sci",     
-      title: sortMode === "alpha" ? "Sci-Fi & Fantasy (A–Z)" : "Sci-Fi & Fantasy", 
+      title: sortMode === "alpha"
+        ? "Sci-Fi & Fantasy (A–Z)"
+        : (isNewest ? "Sci-Fi & Fantasy (Newest)" : "Sci-Fi & Fantasy"), 
         items: sciFi || [],
         pageSize: GEN_LIMIT,
         loadMore: ({ offset = 0, limit = GEN_LIMIT } = {}) =>
@@ -653,7 +751,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       },
       { 
         id: "row-drama",   
-        title: sortMode === "alpha" ? "Drama (A–Z)" : "Critically-acclaimed Drama", 
+        title: sortMode === "alpha"
+          ? "Drama (A–Z)"
+          : (isNewest ? "Drama (Newest)" : "Critically-acclaimed Drama"), 
         items: drama || [],
         pageSize: GEN_LIMIT,
         loadMore: ({ offset = 0, limit = GEN_LIMIT } = {}) =>
@@ -661,7 +761,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       },
       { 
         id: "row-classic", 
-        title: sortMode === "alpha" ? "Classics (A–Z)" : "Classics", 
+        title: sortMode === "alpha"
+          ? "Classics (A–Z)"
+          : (isNewest ? "Classics (Newest)" : "Classics"), 
         items: classics || [],
         pageSize: CLASSIC_LIMIT,
         loadMore: ({ offset = 0, limit = CLASSIC_LIMIT } = {}) =>
@@ -727,7 +829,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       // If we still have genres, load a small batch of 3 rows
       if (nextGenreIdx < GENRE_SEQ.length) {
         const sortForRow = lastSort;
-        const ROW_LIMIT = 16;
+        const ROW_LIMIT = sortForRow === "newest" ? 10 : 16;
         for (let k = 0; k < 3 && nextGenreIdx < GENRE_SEQ.length; k++) {
           const g = GENRE_SEQ[nextGenreIdx++];
           const itemsRaw = await searchContent({
@@ -738,9 +840,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           });
           const items = dedupeByExtId(itemsRaw);
           if (items.length) {
+            const cap = g[0].toUpperCase() + g.slice(1);
+            let rowTitle = cap;
+            if (sortForRow === "alpha") rowTitle = `${cap} (A–Z)`;
+            else if (sortForRow === "newest") rowTitle = `${cap} (Newest)`;
             batch.push({
               id: `row-${g}-${Date.now()}-${k}`,
-              title: (sortForRow === "alpha") ? `${g[0].toUpperCase()+g.slice(1)} (A–Z)` : (g[0].toUpperCase()+g.slice(1)),
+              title: rowTitle,
               items,
               pageSize: ROW_LIMIT,
               loadMore: ({ offset = 0, limit = ROW_LIMIT } = {}) =>
@@ -925,33 +1031,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   const searchInput = document.getElementById("searchInput");
   const searchBox   = document.getElementById("searchBox");
   const searchBtn   = document.getElementById("searchBtn");
-  const alphaToggle = document.getElementById("alphaToggle");
-  const SORT_KEY    = "nf_sort_mode";
-  let lastSort      = (localStorage.getItem(SORT_KEY) === "alpha") ? "alpha" : "popular";
-  if (alphaToggle) alphaToggle.checked = (lastSort === "alpha");
 
-  function setSort(mode) {
+  function applySort(mode) {
     lastSort = mode;
-    localStorage.setItem(SORT_KEY, lastSort);
-    if (alphaToggle && alphaToggle.checked !== (mode === "alpha")) {
-      alphaToggle.checked = (mode === "alpha");
-    }
-    
     const q = (searchInput?.value || "").trim();
     if (q) {
-      // If there's a search query, re-run the search with new sort
       performSearchNow(q);
     } else {
-      // No search query, reload default rows with new sort
       displayDefaultRows(lastSort);
     }
   }
 
+  function setSort(mode, { persistBase = false } = {}) {
+    if (mode === "newest") {
+      newestSortEnabled = true;
+      localStorage.setItem(NEWEST_MODE_KEY, "1");
+      updateSortButtonStates();
+      applySort("newest");
+      return;
+    }
+
+    newestSortEnabled = false;
+    localStorage.setItem(NEWEST_MODE_KEY, "0");
+
+    if (persistBase) {
+      baseSort = mode === "alpha" ? "alpha" : "popular";
+      localStorage.setItem(SORT_KEY, baseSort);
+    }
+
+    updateSortButtonStates();
+    applySort(baseSort);
+  }
+
   if (alphaToggle) {
-    const onAlpha = (e) => {
+    const onAlpha = () => {
       const newMode = alphaToggle.checked ? "alpha" : "popular";
-      console.log('A-Z toggle changed to:', newMode); // Debug log
-      setSort(newMode);
+      setSort(newMode, { persistBase: true });
     };
     alphaToggle.addEventListener("change", onAlpha);
     

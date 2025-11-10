@@ -672,6 +672,18 @@ a.nf-link:hover {
   border-radius: 3px;
 }
 
+.nf-filter-btn {
+  white-space: nowrap;
+  font-weight: 600;
+  min-width: 120px;
+}
+
+.nf-filter-btn.is-active {
+  color: #141414;
+  background-color: #fff;
+  border-color: #fff;
+}
+
 @media (max-width: 768px) {
   .nf-nav {
     flex-wrap: wrap;
