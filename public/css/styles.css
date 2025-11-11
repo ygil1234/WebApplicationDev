@@ -194,48 +194,42 @@ a.nf-link:hover {
 
 @font-face {
   font-family: 'Netflix Sans';
-  src: url('/fonts/NetflixSans_W_Th.woff2') format('woff2'),
-       url('/fonts/NetflixSans_W_Th.woff') format('woff');
+  src: url('/fonts/NetflixSans_W_Th.woff') format('woff');
   font-weight: 100;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Netflix Sans';
-  src: url('/fonts/NetflixSans_W_Lt.woff2') format('woff2'),
-       url('/fonts/NetflixSans_W_Lt.woff') format('woff');
+  src: url('/fonts/NetflixSans_W_Lt.woff') format('woff');
   font-weight: 300;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Netflix Sans';
-  src: url('/fonts/NetflixSans_W_Rg.woff2') format('woff2'),
-       url('/fonts/NetflixSans_W_Rg.woff') format('woff');
+  src: url('/fonts/NetflixSans_W_Rg.woff') format('woff');
   font-weight: 400;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Netflix Sans';
-  src: url('/fonts/NetflixSans_W_Md.woff2') format('woff2'),
-       url('/fonts/NetflixSans_W_Md.woff') format('woff');
+  src: url('/fonts/NetflixSans_W_Md.woff') format('woff');
   font-weight: 500;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Netflix Sans';
-  src: url('/fonts/NetflixSans_W_Bd.woff2') format('woff2'),
-       url('/fonts/NetflixSans_W_Bd.woff') format('woff');
+  src: url('/fonts/NetflixSans_W_Bd.woff') format('woff');
   font-weight: 700;
   font-style: normal;
 }
 
 @font-face {
   font-family: 'Netflix Sans';
-  src: url('/fonts/NetflixSans_W_Blk.woff2') format('woff2'),
-       url('fonts/NetflixSans_W_Blk.woff') format('woff');
+  src: url('/fonts/NetflixSans_W_Blk.woff') format('woff');
   font-weight: 900;
   font-style: normal;
 }
