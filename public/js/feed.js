@@ -1,7 +1,7 @@
 // JS/feed.js 
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // ===== 0) Guard anchors (prevent default on dead links)
+  // prevent default on dead links
   document.addEventListener('click', (e) => {
     const allow = e.target.closest('#alphaToggle, label[for="alphaToggle"], .sort-toggle, [data-allow-default], .allow-default, button, input, select, textarea');
     if (allow) return;
@@ -348,6 +348,50 @@ document.addEventListener("DOMContentLoaded", async () => {
     setTimeout(() => el.classList.add('is-shown'), 10);
     if (type !== 'error') setTimeout(() => el.remove(), 12000);
   }
+  
+  // Helper: Calculate scroll metrics (card width, gap, scroll amount, remaining distance)
+  function getScrollMetrics(scroller, step = ROW_SCROLL_STEP) {
+    const card = scroller.querySelector(".nf-card");
+    const cardWidth = card?.getBoundingClientRect().width || scroller.clientWidth;
+    const gap = parseFloat(window.getComputedStyle(scroller).gap || 0);
+    const scrollAmount = (cardWidth * Math.max(1, step)) + (gap * Math.max(0, step - 1));
+    const remaining = Math.max(0, scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft);
+    return { scrollAmount: scrollAmount || scroller.clientWidth, remaining };
+  }
+
+  // Helper: Update arrow button states based on scroll position and loop mode
+  function updateArrowStates(scroller, leftArrow, rightArrow, loopEnabled = false) {
+    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
+    const atStart = scroller.scrollLeft <= 5;
+    const atEnd = scroller.scrollLeft >= maxScroll - 5;
+    const hasScroll = scroller.scrollWidth > scroller.clientWidth + 1;
+    
+    // Helper to set arrow disabled state
+    const setArrow = (btn, disabled) => {
+      btn.disabled = disabled;
+      btn.setAttribute("aria-disabled", String(disabled));
+      btn.classList.toggle("is-disabled", disabled);
+    };
+    
+    // If loop is enabled and row is scrollable, keep both arrows active
+    if (loopEnabled && hasScroll) {
+      setArrow(leftArrow, false);
+      setArrow(rightArrow, false);
+    } else {
+      setArrow(leftArrow, atStart);
+      setArrow(rightArrow, atEnd);
+    }
+  }
+
+  // Helper: Deduplicate items by extId to prevent showing same content multiple times
+  function dedupeByExtId(items = [], seen = new Set()) {
+    return items.filter(item => {
+      const key = String(item?.extId ?? item?.id ?? "");
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
 
   // ===== 4) Rendering
   function getWatchedTag(tags) {
@@ -423,18 +467,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (countEl) countEl.textContent = String(Math.max(0, Number(likeCount || 0)));
     });
   }
-  
-  function updateArrowStates(scroller, leftArrow, rightArrow) {
-    const maxScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-    const x = scroller.scrollLeft;
-    setBtnDisabled(leftArrow,  x <= 5);
-    setBtnDisabled(rightArrow, x >= (maxScroll - 5));
-  }
 
   function makeRow({ id, title, items, withProgress = false, loadMore = null, pageSize = 0, initialOffset = 0, allowLoop = true }) {
+    // Track seen items to prevent duplicates in this row
     const rowSeen = new Set();
-    const rawItems = Array.isArray(items) ? items : [];
-    const initialItems = dedupeByExtId(rawItems, rowSeen);
+    const initialItems = dedupeByExtId(Array.isArray(items) ? items : [], rowSeen);
+    
+    // Build the row DOM structure
     const section = document.createElement("section");
     section.className = "nf-row";
     section.innerHTML = `
@@ -449,202 +488,156 @@ document.addEventListener("DOMContentLoaded", async () => {
         </button>
       </div>
     `;
+
     const scroller = section.querySelector(".nf-row__scroller");
+    const left = section.querySelector(".nf-row__arrow--left");
+    const right = section.querySelector(".nf-row__arrow--right");
+
+    // Render initial cards into the scroller
     initialItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
     if (hideWatched) applyWatchedFilter(scroller);
 
-    const left = section.querySelector(".nf-row__arrow--left");
-    const right = section.querySelector(".nf-row__arrow--right");
-    const initialCount = initialItems.length;
-    const initialCountRaw = rawItems.length;
-    const canLoop = allowLoop && !loadMore && initialCount >= LOOP_MIN_ITEMS;
+    // Initialize row state for pagination, looping, and loading
     const state = {
-      loadMore,
-      pageSize: pageSize > 0 ? pageSize : 0,
-      offset: initialOffset + initialCountRaw,
-      isFetching: false,
-      exhausted: !loadMore,
-      loop: canLoop,
-      loopSeedCount: canLoop ? Math.max(0, initialCount) : 0,
-      loopBlocks: canLoop ? 1 : 0,
-      loopActivated: false,
+      loadMore,                                                           // Function to fetch more items
+      pageSize: pageSize > 0 ? pageSize : 0,                             // Items per page
+      offset: initialOffset + (Array.isArray(items) ? items.length : 0), // Current offset for pagination
+      isFetching: false,                                                  // Prevent concurrent fetches
+      exhausted: !loadMore,                                               // True when no more items to load
+      loop: allowLoop && !loadMore && initialItems.length >= LOOP_MIN_ITEMS, // Enable seamless loop for static rows
+      loopSeed: allowLoop && !loadMore && initialItems.length >= LOOP_MIN_ITEMS ? initialItems.length : 0, // Number of items to clone for loop
+      loopActive: false                                                   // Track if loop has been activated
     };
-    if (loadMore) state.exhausted = false;
 
-    function getGapPx() {
-      const styles = window.getComputedStyle(scroller);
-      const gapStr = styles.columnGap || styles.gap || "0";
-      const parsed = parseFloat(gapStr);
-      return Number.isFinite(parsed) ? parsed : 0;
-    }
-
-    function cardWidthPx() {
-      const card = scroller.querySelector(".nf-card");
-      if (!card) return scroller.clientWidth || 0;
-      const rect = card.getBoundingClientRect();
-      return rect.width;
-    }
-
-    function scrollAmountPx() {
-      const cardWidth = cardWidthPx();
-      const gap = getGapPx();
-      const cardsToScroll = Math.max(1, ROW_SCROLL_STEP);
-      const totalGap = gap * Math.max(0, cardsToScroll - 1);
-      const amount = (cardWidth * cardsToScroll) + totalGap;
-      return amount > 0 ? amount : (scroller.clientWidth || 0);
-    }
-
-    function loopThresholdPx() {
-      const base = scrollAmountPx();
-      return base > 0 ? base : Math.max(12, scroller.clientWidth * 0.25);
-    }
-
-    function updateArrows() {
-      updateArrowStates(scroller, left, right);
-      const loopEnabled = state.loop && scroller.childElementCount > 0 && scroller.scrollWidth > scroller.clientWidth + 1;
-      if (loopEnabled) {
-        setBtnDisabled(left, false);
-        setBtnDisabled(right, false);
-      }
-    }
-
-    function appendLoopBlock() {
-      if (!state.loopSeedCount) return;
-      const sample = Array.from(scroller.children).slice(0, state.loopSeedCount);
+    // Loop: Append duplicate cards to create seamless infinite scrolling effect
+    const appendLoopBlock = () => {
+      if (!state.loopSeed) return;
+      const sample = Array.from(scroller.children).slice(0, state.loopSeed);
       if (!sample.length) return;
       const frag = document.createDocumentFragment();
       sample.forEach(node => frag.appendChild(node.cloneNode(true)));
       scroller.appendChild(frag);
-      state.loopBlocks += 1;
-    }
+    };
 
-    function ensureLoopContinuity() {
-      if (!state.loop || state.loopSeedCount === 0) return;
-      if (!state.loopActivated) {
-        state.loopSeedCount = Math.max(0, scroller.childElementCount);
-        state.loopBlocks = 1;
-        state.loopActivated = true;
+    // Ensure loop continuity: activate loop and append blocks as user scrolls near the end
+    const ensureLoop = () => {
+      if (!state.loop || !state.loopSeed) return;
+      if (!state.loopActive) {
+        state.loopSeed = scroller.childElementCount;
+        state.loopActive = true;
         appendLoopBlock();
       }
-      const threshold = Math.max(loopThresholdPx(), scroller.clientWidth || 0);
-      const remaining = Math.max(0, scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft);
-      if (remaining < threshold) appendLoopBlock();
-    }
+      const { scrollAmount, remaining } = getScrollMetrics(scroller);
+      if (remaining < Math.max(scrollAmount, scroller.clientWidth)) appendLoopBlock();
+    };
 
-    async function fetchMore() {
+    // Fetch more items from the server when user scrolls near the end
+    const fetchMore = async () => {
       if (!state.loadMore || state.exhausted || state.isFetching) return;
+      
       state.isFetching = true;
-      right.classList.add("is-loading");
+      right.classList.add("is-loading"); // Show loading indicator on right arrow
+      
       try {
         const params = { offset: state.offset };
         if (state.pageSize > 0) params.limit = state.pageSize;
+        
         const fetched = await state.loadMore(params);
         const fetchedList = Array.isArray(fetched) ? fetched : [];
-        const nextItems = dedupeByExtId(fetchedList, rowSeen);
+        const nextItems = dedupeByExtId(fetchedList, rowSeen); // Remove duplicates
+        
         if (nextItems.length) {
-          state.loop = false;
-          state.loopSeedCount = allowLoop ? Math.max(0, scroller.childElementCount + nextItems.length) : 0;
-          state.loopBlocks = allowLoop ? 1 : 0;
-          state.loopActivated = false;
+          state.loop = false; // Disable loop when adding new items
           nextItems.forEach(item => scroller.appendChild(createCard(item, withProgress)));
           if (hideWatched) applyWatchedFilter(scroller);
         }
-
+        
         state.offset += fetchedList.length;
-
-        if (state.pageSize > 0 && fetchedList.length < state.pageSize) {
+        
+        // Check if we've exhausted all items from the server
+        if ((state.pageSize > 0 && fetchedList.length < state.pageSize) || !nextItems.length) {
           state.exhausted = true;
-          if (scroller.childElementCount > 0) {
-            const total = scroller.childElementCount;
-            const loopPossible = allowLoop && total >= LOOP_MIN_ITEMS;
-            state.loop = loopPossible;
-            state.loopSeedCount = loopPossible ? Math.max(0, total) : 0;
-            state.loopBlocks = loopPossible ? 1 : 0;
-            state.loopActivated = false;
+          // Re-enable loop if we have enough items
+          if (allowLoop && scroller.childElementCount >= LOOP_MIN_ITEMS) {
+            state.loop = true;
+            state.loopSeed = scroller.childElementCount;
+            state.loopActive = false;
           }
         } else if (!nextItems.length && fetchedList.length) {
-          // All fetched items were duplicates already in the row; try again soon.
+          // All fetched items were duplicates, try fetching again
           requestAnimationFrame(maybeLoadMore);
-        } else if (!nextItems.length) {
-          state.exhausted = true;
-          if (scroller.childElementCount > 0) {
-            const total = scroller.childElementCount;
-            const loopPossible = allowLoop && total >= LOOP_MIN_ITEMS;
-            state.loop = loopPossible;
-            state.loopSeedCount = loopPossible ? Math.max(0, total) : 0;
-            state.loopBlocks = loopPossible ? 1 : 0;
-            state.loopActivated = false;
-          }
         }
       } catch (err) {
-        console.error(`loadMore failed for row ${id}:`, err);
+        console.error(`Row ${id} load error:`, err);
       } finally {
         state.isFetching = false;
         right.classList.remove("is-loading");
         requestAnimationFrame(() => {
-          updateArrows();
-          ensureLoopContinuity();
+          updateArrowStates(scroller, left, right, state.loop);
+          ensureLoop();
           maybeLoadMore();
         });
       }
-    }
+    };
 
-    function maybeLoadMore() {
+    // Check if we should load more items based on remaining scroll distance
+    const maybeLoadMore = () => {
       if (!state.loadMore || state.exhausted || state.isFetching) return;
       const maxScrollable = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-      if (maxScrollable <= 0) return; // nothing to scroll, no need to fetch more
-      const remaining =
-        Math.max(0, scroller.scrollWidth - scroller.clientWidth - scroller.scrollLeft);
-      if (remaining <= scrollAmountPx() * 1.5) {
-        fetchMore();
-      }
-    }
+      if (maxScrollable <= 0) return; // Nothing to scroll, no need to fetch
+      const { scrollAmount, remaining } = getScrollMetrics(scroller);
+      if (remaining <= scrollAmount * 1.5) fetchMore(); // Load when within 1.5 scroll amounts from end
+    };
 
-    requestAnimationFrame(() => {
-      updateArrows();
-      ensureLoopContinuity();
-      maybeLoadMore();
-    });
-
-    let t;
+    // Scroll event handler with debouncing for performance
+    let scrollTimer;
     scroller.addEventListener("scroll", () => {
-      clearTimeout(t);
-      ensureLoopContinuity();
-      t = setTimeout(() => {
-        updateArrows();
-        ensureLoopContinuity();
+      clearTimeout(scrollTimer);
+      ensureLoop();
+      scrollTimer = setTimeout(() => {
+        updateArrowStates(scroller, left, right, state.loop);
+        ensureLoop();
         maybeLoadMore();
       }, 50);
     });
 
-    left.addEventListener("click", (e) => {
-      e.preventDefault(); 
+    // Arrow click handlers: scroll left or right by calculated amount
+    const handleScroll = (direction) => (e) => {
+      e.preventDefault();
       e.stopPropagation();
-      if (left.disabled) return;
-      scroller.scrollBy({ left: -scrollAmountPx(), behavior: "smooth" });
+      const arrow = direction === 'left' ? left : right;
+      if (arrow.disabled) return;
+      
+      const { scrollAmount } = getScrollMetrics(scroller);
+      if (direction === 'right' && !state.loop) maybeLoadMore(); // Preload when scrolling right
+      
+      scroller.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: "smooth" });
+      
+      // Update UI after scroll animation completes
       setTimeout(() => {
-        updateArrows();
-        ensureLoopContinuity();
-        maybeLoadMore();
+        updateArrowStates(scroller, left, right, state.loop);
+        ensureLoop();
+        if (direction === 'right' && !state.loop) maybeLoadMore();
       }, 350);
-    });
-    
-    right.addEventListener("click", (e) => {
-      e.preventDefault(); 
-      e.stopPropagation();
-      if (right.disabled) return;
-      if (!state.loop) {
-        maybeLoadMore();
-      }
-      scroller.scrollBy({ left: scrollAmountPx(), behavior: "smooth" });
-      setTimeout(() => {
-        updateArrows();
-        ensureLoopContinuity();
-        if (!state.loop) maybeLoadMore();
-      }, 350);
+    };
+
+    left.addEventListener("click", handleScroll('left'));
+    right.addEventListener("click", handleScroll('right'));
+
+    // Initial setup: update arrows, activate loop if needed, and check for more items
+    requestAnimationFrame(() => {
+      updateArrowStates(scroller, left, right, state.loop);
+      ensureLoop();
+      maybeLoadMore();
     });
 
-    ROW_META.set(scroller, { maybeLoadMore, updateArrows, ensureLoopContinuity, state });
+    // Store metadata for external access (e.g., refreshAllArrows function)
+    ROW_META.set(scroller, { 
+      maybeLoadMore, 
+      updateArrows: () => updateArrowStates(scroller, left, right, state.loop), 
+      ensureLoopContinuity: ensureLoop, 
+      state 
+    });
 
     return section;
   }
@@ -655,8 +648,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const left = row.querySelector(".nf-row__arrow--left");
       const right = row.querySelector(".nf-row__arrow--right");
       if (scroller && left && right) {
-        updateArrowStates(scroller, left, right);
         const meta = ROW_META.get(scroller);
+        if (meta?.updateArrows) meta.updateArrows();
         if (meta?.ensureLoopContinuity) meta.ensureLoopContinuity();
         if (meta?.maybeLoadMore) meta.maybeLoadMore();
       }
@@ -796,16 +789,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   let nextGenreIdx = 0;
   let isLoadingMore = false;
   let isInfiniteEnabled = false;
-  function dedupeByExtId(items = [], seen = new Set()) {
-    const out = [];
-    items.forEach((item) => {
-      const key = String(item?.extId ?? item?.id ?? "");
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      out.push(item);
-    });
-    return out;
-  }
 
   let sentinel = null;
   let io = null;
@@ -815,7 +798,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     sentinel = document.createElement("div");
     sentinel.id = "infinite-sentinel";
     sentinel.style.cssText = "height:1px;margin:0;opacity:0;";
-    // place after the rows section so it’s near the bottom of the page
+    // place after the rows section so it's near the bottom of the page
     rowsRoot.parentElement.appendChild(sentinel);
     return sentinel;
   }
@@ -864,12 +847,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } catch (err) {
       console.error("Infinite scroll load error:", err);
-      showAlert({ type: "error", title: "Loading more failed", message: err?.message || "Couldn’t load more rows." });
+      showAlert({ type: "error", title: "Loading more failed", message: err?.message || "Couldn't load more rows." });
     } finally {
       isLoadingMore = false;
     }
   }
-
 
   function enableInfinite() {
     if (isInfiniteEnabled) return;
@@ -886,7 +868,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (io) { io.disconnect(); io = null; }
     if (sentinel) { sentinel.remove(); sentinel = null; }
   }
-
 
   async function displayDefaultRows(sortMode = "popular") {
     if (!rowsRoot) return;
@@ -918,26 +899,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-
-    function displaySearchResults(results, query) {
-      if (!rowsRoot) return;
-      disableInfinite();
-      rowsRoot.innerHTML = "";
-      
-      if (!results?.length) {
-        rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results for "${query}"</div>`;
-        return;
-      }
-      
-      CURRENT_ITEMS = results.slice();
-      const row = { 
-        id: "row-search", 
-        title: `Search Results for "${query}" (${results.length})`, 
-        items: results,
-        allowLoop: false,
-      };
-      rowsRoot.appendChild(makeRow(row));
+  function displaySearchResults(results, query) {
+    if (!rowsRoot) return;
+    disableInfinite();
+    rowsRoot.innerHTML = "";
+    
+    if (!results?.length) {
+      rowsRoot.innerHTML = `<div style="text-align:center; padding:40px; color:#999;">No results for "${query}"</div>`;
+      return;
     }
+    
+    CURRENT_ITEMS = results.slice();
+    const row = { 
+      id: "row-search", 
+      title: `Search Results for "${query}" (${results.length})`, 
+      items: results,
+      allowLoop: false,
+    };
+    rowsRoot.appendChild(makeRow(row));
+  }
 
   // ===== 6) Likes (delegation)
   if (rowsRoot) {
