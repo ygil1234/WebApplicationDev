@@ -1,10 +1,9 @@
-# 🎬 Netflix Clone — Technical R&D Documentation
+# 🎬 Netflix Project Technical R&D Documentation
 
 ![Node.js](https://img.shields.io/badge/Node.js-16+-green?logo=node.js)
 ![Express](https://img.shields.io/badge/Express.js-Backend-blue)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-success?logo=mongodb)
 ![Bootstrap](https://img.shields.io/badge/Frontend-Bootstrap%205-orange)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---
 
@@ -99,8 +98,8 @@ Define Mongoose schemas for:
 | Method | Endpoint       | Description                |
 | ------ | -------------- | -------------------------- |
 | `POST` | `/signup`      | Create new user account    |
-| `POST` | `/login`       | Login as regular user      |
-| `POST` | `/admin-login` | Login as admin             |
+| `POST` | `/login`       | Login as regular user (username + password) |
+| `POST` | `/admin-login` | Login as admin (admin username + password)  |
 | `POST` | `/logout`      | Logout and destroy session |
 
 ### Profiles *
@@ -168,5 +167,9 @@ NODE_ENV=development
 ADMIN_USER=a_very_strong_and_random_user
 ADMIN_PASSWORD=a_very_strong_and_random_password
 ```
+### Execute
+cd WebApplicationDev
+npm -i
+node server/index.js
 
 Access at: **[http://localhost:3000](http://localhost:3000)**

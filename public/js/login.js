@@ -7,7 +7,7 @@
     return; // Stop wiring the login form since we're leaving the page.
   }
   const form = document.getElementById("signinForm");
-  const emailInput = document.getElementById("emailPhone");
+  const usernameInput = document.getElementById("username");
   const passwordInput = document.getElementById("password");
   const generalErr = document.getElementById("loginGeneralError");
 
@@ -29,29 +29,29 @@
     form,
     [
       {
-        el: emailInput,
+        el: usernameInput,
         rules: [
           {
             test: (value) => {
-              if (value.trim().toLowerCase() === "admin") return true; 
-              return validators.email(value); 
+              if (value.trim().toLowerCase() === "admin") return true;
+              return validators.username(value);
             },
-            message: "Please enter a valid email address or 'admin'."
+            message: "Username must be 3-15 characters (letters, numbers, underscores)."
           }
         ]
       },
       {
         el: passwordInput,
         rules: [
-          { 
+          {
             test: (passValue) => {
-              const emailVal = emailInput.value.trim().toLowerCase();
-              if (emailVal === 'admin') {
-                return passValue.length > 0; 
+              const usernameVal = usernameInput.value.trim().toLowerCase();
+              if (usernameVal === "admin") {
+                return passValue.length > 0;
               }
-              return validators.minLength(6)(passValue); 
-            }, 
-            message: "Password is required." 
+              return validators.minLength(6)(passValue);
+            },
+            message: "Password is required."
           }
         ]
       }
@@ -59,16 +59,16 @@
     async () => {
       clearGeneral();
 
-      const emailVal = emailInput.value.trim().toLowerCase();
+      const usernameVal = usernameInput.value.trim().toLowerCase();
       const passVal = passwordInput.value.trim();
 
-      if (emailVal === "admin") {
+      if (usernameVal === "admin") {
         try {
           const res = await fetch("/api/admin-login", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            credentials: 'include', 
-            body: JSON.stringify({ email: emailVal, password: passVal })
+            credentials: "include",
+            body: JSON.stringify({ username: usernameVal, password: passVal })
           });
 
           if (!res.ok) {
@@ -80,7 +80,7 @@
           const data = await res.json();
           localStorage.setItem("loggedInUser", "admin");
           localStorage.setItem("loggedInUserEmail", "admin");
-          window.location.href = "admin.html"; 
+          window.location.href = "admin.html";
           return;
         } catch {
           showGeneral("Server Unreachable");
@@ -89,7 +89,7 @@
       }
 
       const payload = {
-        email: emailVal,
+        username: usernameVal,
         password: passVal
       };
 
@@ -97,7 +97,7 @@
         const res = await fetch("/api/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          credentials: 'include',
+          credentials: "include",
           body: JSON.stringify(payload)
         });
 
@@ -105,10 +105,10 @@
           const data = await res.json().catch(() => ({}));
           const msg = `[${res.status}] ${data?.error || "Unable to sign in."}`;
 
-          if (res.status === 400 && /email/i.test(data?.error || "")) {
-            showError(emailInput, msg);
-          } else if (res.status === 401 && /email/i.test(data?.error || "")) {
-            showError(emailInput, msg);
+          if (res.status === 400 && /username/i.test(data?.error || "")) {
+            showError(usernameInput, msg);
+          } else if (res.status === 401 && /username/i.test(data?.error || "")) {
+            showError(usernameInput, msg);
           } else if (res.status === 401 && /password/i.test(data?.error || "")) {
             showError(passwordInput, msg);
           } else {
@@ -120,10 +120,10 @@
         localStorage.setItem("loggedInUser", data.user.username);
         localStorage.setItem("loggedInUserEmail", data.user.email);
 
-        if (data.user.username.toLowerCase() === 'admin') {
-            window.location.href = "admin.html";
+        if (data.user.username.toLowerCase() === "admin") {
+          window.location.href = "admin.html";
         } else {
-            window.location.href = "profiles.html";
+          window.location.href = "profiles.html";
         }
       } catch {
         showGeneral("Server Unreachable");
