@@ -30,6 +30,7 @@ async function signup(req, res) {
       email: new RegExp(`^${sanitizeRegex(email)}$`, 'i'),
     });
     if (emailExists) {
+      writeLog({ level: 'error', event: 'signup_attempt', details: { email, reason: 'email exists' } });
       return res.status(409).json({ ok: false, error: 'Email already registered.' });
     }
 
@@ -37,6 +38,7 @@ async function signup(req, res) {
       username: new RegExp(`^${sanitizeRegex(username)}$`, 'i'),
     });
     if (usernameExists) {
+      writeLog({ level: 'error', event: 'signup_attempt', details: { username, reason: 'username exists' } });
       return res.status(409).json({ ok: false, error: 'Username already taken.' });
     }
 
@@ -67,14 +69,14 @@ async function signup(req, res) {
 
 async function adminLogin(req, res) {
   try {
-    const email = String(req.body?.email || '').trim();
+    const usernameInput = String(req.body?.username || '').trim();
     const password = String(req.body?.password || '');
 
-    if (email === ADMIN_USER && password === ADMIN_PASSWORD) {
+    if (usernameInput === ADMIN_USER && password === ADMIN_PASSWORD) {
       req.session.userId = 'admin-user-id';
       req.session.username = 'admin';
 
-      await writeLog({ event: 'admin_login', success: true, details: { email } });
+      await writeLog({ event: 'admin_login', success: true, details: { username: usernameInput } });
 
       return res.json({
         ok: true,
@@ -85,7 +87,7 @@ async function adminLogin(req, res) {
     await writeLog({
       event: 'admin_login',
       success: false,
-      details: { email, reason: 'invalid credentials' },
+      details: { username: usernameInput, reason: 'invalid credentials' },
     });
     return res.status(401).json({ ok: false, error: 'Invalid admin credentials.' });
   } catch (err) {
@@ -96,24 +98,24 @@ async function adminLogin(req, res) {
 
 async function login(req, res) {
   try {
-    const loginIdentifier = String(req.body?.email || '').trim();
+    const usernameInput = String(req.body?.username || '').trim();
     const password = String(req.body?.password || '');
 
-    if (!loginIdentifier) {
-      return res.status(400).json({ ok: false, error: 'Email or Username is required.' });
+    if (!usernameInput) {
+      return res.status(400).json({ ok: false, error: 'Username is required.' });
     }
 
-    const isEmail = validEmail(loginIdentifier);
-    const query = isEmail
-      ? { email: new RegExp(`^${sanitizeRegex(loginIdentifier)}$`, 'i') }
-      : { username: new RegExp(`^${sanitizeRegex(loginIdentifier)}$`, 'i') };
-
-    const user = await User.findOne(query);
+    const user = await User.findOne({
+      username: new RegExp(`^${sanitizeRegex(usernameInput)}$`, 'i'),
+    });
 
     if (!user) {
-      const reason = isEmail ? 'Email not found.' : 'Username not found.';
-      await writeLog({ event: 'login', success: false, details: { loginIdentifier, reason } });
-      return res.status(401).json({ ok: false, error: reason });
+      await writeLog({
+        event: 'login',
+        success: false,
+        details: { username: usernameInput, reason: 'Username not found.' },
+      });
+      return res.status(401).json({ ok: false, error: 'Username not found.' });
     }
 
     const passwordOk = await user.comparePassword(password);
@@ -122,7 +124,7 @@ async function login(req, res) {
         event: 'login',
         success: false,
         userId: String(user._id),
-        details: { loginIdentifier, reason: 'bad password' },
+        details: { username: usernameInput, reason: 'bad password' },
       });
       return res.status(401).json({ ok: false, error: 'Incorrect password.' });
     }
@@ -134,7 +136,7 @@ async function login(req, res) {
       event: 'login',
       success: true,
       userId: String(user._id),
-      details: { loginIdentifier },
+      details: { username: usernameInput },
     });
 
     return res.json({
@@ -149,7 +151,6 @@ async function login(req, res) {
 }
 
 async function logout(req, res) {
-  await writeLog({ event: 'logout', details: {} });
   req.session?.destroy(() => {
     res.clearCookie('sid');
     res.json({ ok: true });
