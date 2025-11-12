@@ -136,12 +136,13 @@ Define Mongoose schemas for:
 
 ### Admin *(Requires Admin Auth)*
 
-| Method | Endpoint                    | Description                            |
-| ------ | --------------------------- | -------------------------------------- |
-| `GET`  | `/admin/content`            | List all content                       |
-| `GET`  | `/admin/content/:extId`     | Get full item details                  |
-| `POST` | `/admin/episodes`           | Add or update series episode           |
-| `POST` | `/admin/repair-media-paths` | Fix broken media paths                 |
+| Method | Endpoint                | Description                                                   |
+| ------ | ----------------------- | ------------------------------------------------------------- |
+| `GET`  | `/admin/content`        | List content summaries (optionally filtered by type)         |
+| `GET`  | `/admin/content/:extId` | Fetch full metadata for a specific title                     |
+| `POST` | `/admin/content`        | Add new content or update an existing title (image/video)    |
+| `DELETE` | `/admin/content`      | Delete a title by `extId`                                     |
+| `POST` | `/admin/episodes`       | Upload or replace a single episode video for a series        |
 
 ---
 
