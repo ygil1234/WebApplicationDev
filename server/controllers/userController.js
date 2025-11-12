@@ -84,7 +84,12 @@ async function dailyViews(req, res) {
       profileName: profile.name,
       views: countsByKey.get(String(profile._id)) || 0,
     }));
-
+    const totalViews = payload.reduce((sum, entry) => sum + entry.views, 0);
+    await writeLog({
+      event: 'stats_daily_views',
+      userId: resolvedUserId,
+      details: { profiles: payload.length, totalViews, days },
+    });
     return res.json({
       profiles: payload,
       range: {
@@ -139,7 +144,11 @@ async function genrePopularity(req, res) {
     if (otherTotal > 0) {
       payload.push({ genre: 'Other', views: otherTotal });
     }
-
+    await writeLog({
+      event: 'stats_genre_popularity',
+      userId: resolvedUserId,
+      details: { genres: payload.length, topGenre: payload[0]?.genre || null },
+    });
     return res.json(payload);
   } catch (err) {
     console.error('GET /api/stats/genre-popularity error:', err);

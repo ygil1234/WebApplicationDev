@@ -18,25 +18,20 @@
     <main class="signin-card" style="max-width: 560px;">
       <h1 class="mb-4">Content Admin</h1>
 
-      <div class="mb-4">
-        <label class="form-label nf-label" for="adminAction">What would you like to do?</label>
-        <select class="form-select nf-input" id="adminAction">
-          <option value="manage" selected>Add or update content</option>
-          <option value="delete">Delete content</option>
-        </select>
-      </div>
-
       <form id="contentForm" novalidate enctype="multipart/form-data">
+        <!-- Step 1: Choose Action (Add/Update or Delete) -->
         <div class="mb-3">
-          <label class="form-label nf-label" for="contentMode">Action</label>
+          <label class="form-label nf-label" for="contentMode">What would you like to do?</label>
           <select class="form-select nf-input" id="contentMode">
             <option value="" disabled selected>Select an option...</option>
             <option value="existing">Update an existing movie or series</option>
             <option value="new">Add brand new content</option>
+            <option value="delete">Delete existing content</option>
           </select>
           <div class="login-error-message d-none" id="contentModeError"></div>
         </div>
 
+        <!-- Step 2: Select Content Type -->
         <div class="mb-3">
           <label for="type" class="form-label nf-label">Select the content type</label>
           <select class="form-select nf-input" id="type" required disabled>
@@ -47,21 +42,28 @@
           <div class="login-error-message d-none" id="typeError"></div>
         </div>
 
+        <!-- Step 3: External ID Selection -->
         <div class="mb-3">
-          <label for="extIdInput" class="form-label nf-label">External ID (automatically assigned for new titles)</label>
+          <label for="extIdInput" class="form-label nf-label">External ID</label>
+          
+          <!-- For NEW content: auto-generated ID (read-only) -->
           <div id="extIdNewGroup">
-          <input type="text" class="form-control nf-input" id="extIdInput" placeholder="Will be assigned automatically" readonly tabindex="-1" aria-readonly="true"/>
-          <div class="login-error-message d-none" id="extIdInputError"></div>
+            <input type="text" class="form-control nf-input" id="extIdInput" placeholder="Will be assigned automatically" readonly tabindex="-1" aria-readonly="true"/>
+            <div class="login-error-message d-none" id="extIdInputError"></div>
           </div>
+          
+          <!-- For EXISTING/DELETE content: dropdown selection -->
           <div id="extIdExistingGroup" class="d-none">
             <select class="form-select nf-input" id="extIdSelect" disabled>
               <option value="" disabled selected>Select an existing title...</option>
             </select>
             <div class="login-error-message d-none" id="extIdSelectError"></div>
           </div>
+          
           <input type="hidden" id="extIdHidden" />
         </div>
 
+        <!-- Display loaded content details (for EXISTING/DELETE modes) -->
         <div id="existingContentDetails" class="card bg-light border-0 mb-3 d-none">
           <div class="card-body p-3">
             <div class="d-flex gap-3">
@@ -75,100 +77,73 @@
           </div>
         </div>
 
-        <div class="mb-3">
-          <label for="title" class="form-label nf-label">Title</label>
-          <input type="text" class="form-control nf-input" id="title" placeholder="e.g., The Matrix" required/>
-          <div class="login-error-message d-none" id="titleError"></div>
-        </div>
-        
-        <div class="mb-3">
-          <label for="year" class="form-label nf-label">Year</label>
-          <input type="number" class="form-control nf-input" id="year" placeholder="e.g., 1999" required/>
-          <div class="login-error-message d-none" id="yearError"></div>
+        <!-- DELETE MODE: Confirmation section -->
+        <div id="deleteConfirmSection" class="alert alert-danger d-none" role="alert">
+          <h6 class="alert-heading">⚠️ Confirm Deletion</h6>
+          <p class="mb-2">You are about to permanently delete this content:</p>
+          <p class="mb-0 fw-bold" id="deleteConfirmTitle"></p>
+          <p class="mb-0 small" id="deleteConfirmMeta"></p>
         </div>
 
-        <div class="mb-3">
-          <label for="genres" class="form-label nf-label">Genres (comma-separated)</label>
-          <input type="text" class="form-control nf-input" id="genres" placeholder="e.g., Sci-Fi, Action" required/>
-          <div class="login-error-message d-none" id="genresError"></div>
-        </div>
-
-        <!-- Episode details (optional for Series). If filled with a video file, an episode will be added. -->
-        <div id="seriesEpisodeFields" class="border rounded p-3 mb-3 d-none">
-          <div class="mb-2">
-            <strong>Add or update an episode</strong>
+        <!-- MANAGE MODE: Metadata fields (hidden in DELETE mode) -->
+        <div id="metadataFields">
+          <div class="mb-3">
+            <label for="title" class="form-label nf-label">Title</label>
+            <input type="text" class="form-control nf-input" id="title" placeholder="e.g., The Matrix" required/>
+            <div class="login-error-message d-none" id="titleError"></div>
           </div>
-          <div class="row g-2">
-            <div class="col-6">
-              <label for="seasonNum" class="form-label nf-label">Season</label>
-              <input type="number" class="form-control nf-input" id="seasonNum" min="1" placeholder="e.g., 1"/>
-              <div class="login-error-message d-none" id="seasonNumError"></div>
+          
+          <div class="mb-3">
+            <label for="year" class="form-label nf-label">Year</label>
+            <input type="number" class="form-control nf-input" id="year" placeholder="e.g., 1999" required/>
+            <div class="login-error-message d-none" id="yearError"></div>
+          </div>
+
+          <div class="mb-3">
+            <label for="genres" class="form-label nf-label">Genres (comma-separated)</label>
+            <input type="text" class="form-control nf-input" id="genres" placeholder="e.g., Sci-Fi, Action" required/>
+            <div class="login-error-message d-none" id="genresError"></div>
+          </div>
+
+          <!-- Episode details (optional for Series). If filled with a video file, an episode will be added. -->
+          <div id="seriesEpisodeFields" class="border rounded p-3 mb-3 d-none">
+            <div class="mb-2">
+              <strong>Add or update an episode</strong>
             </div>
-            <div class="col-6">
-              <label for="episodeNum" class="form-label nf-label">Episode</label>
-              <input type="number" class="form-control nf-input" id="episodeNum" min="1" placeholder="e.g., 1"/>
-              <div class="login-error-message d-none" id="episodeNumError"></div>
+            <div class="row g-2">
+              <div class="col-6">
+                <label for="seasonNum" class="form-label nf-label">Season</label>
+                <input type="number" class="form-control nf-input" id="seasonNum" min="1" placeholder="e.g., 1"/>
+                <div class="login-error-message d-none" id="seasonNumError"></div>
+              </div>
+              <div class="col-6">
+                <label for="episodeNum" class="form-label nf-label">Episode</label>
+                <input type="number" class="form-control nf-input" id="episodeNum" min="1" placeholder="e.g., 1"/>
+                <div class="login-error-message d-none" id="episodeNumError"></div>
+              </div>
+            </div>
+            <div class="mb-2 mt-2">
+              <label for="episodeTitle" class="form-label nf-label">Episode Title (optional)</label>
+              <input type="text" class="form-control nf-input" id="episodeTitle" placeholder="Optional"/>
             </div>
           </div>
-          <div class="mb-2 mt-2">
-            <label for="episodeTitle" class="form-label nf-label">Episode Title (optional)</label>
-            <input type="text" class="form-control nf-input" id="episodeTitle" placeholder="Optional"/>
+
+          <div class="mb-3">
+            <label for="imageFile" class="form-label nf-label">Cover Image (JPG/PNG)</label>
+            <input type="file" class="form-control nf-input" id="imageFile" accept="image/png, image/jpeg" />
+            <div class="login-error-message d-none" id="imageFileError"></div>
+          </div>
+
+          <div class="mb-3">
+            <label for="videoFile" class="form-label nf-label">Video File (MP4)</label>
+            <input type="file" class="form-control nf-input" id="videoFile" accept="video/mp4" />
+            <div class="login-error-message d-none" id="videoFileError"></div>
           </div>
         </div>
 
-        <div class="mb-3">
-          <label for="imageFile" class="form-label nf-label">Cover Image (JPG/PNG)</label>
-          <input type="file" class="form-control nf-input" id="imageFile" accept="image/png, image/jpeg" />
-          <div class="login-error-message d-none" id="imageFileError"></div>
-        </div>
-
-        <div class="mb-3">
-          <label for="videoFile" class="form-label nf-label">Video File (MP4)</label>
-          <input type="file" class="form-control nf-input" id="videoFile" accept="video/mp4" />
-          <div class="login-error-message d-none" id="videoFileError"></div>
-        </div>
-
+        <!-- Submit buttons (text changes based on mode) -->
         <div class="d-grid mt-4">
           <button type="submit" class="btn btn-nf-primary" id="submitBtn">Submit Content</button>
-        </div>
-      </form>
-
-      <form id="deleteForm" class="d-none mt-4" novalidate>
-        <div class="mb-3">
-          <label for="deleteType" class="form-label nf-label">Select the content type</label>
-          <select class="form-select nf-input" id="deleteType" required>
-            <option value="" disabled selected>Select type...</option>
-            <option value="Movie">Movie</option>
-            <option value="Series">Series</option>
-          </select>
-          <div class="login-error-message d-none" id="deleteTypeError"></div>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label nf-label">Choose what to search by</label>
-          <div class="btn-group w-100" role="group" aria-label="Delete content options">
-            <input type="radio" class="btn-check" name="deleteBy" id="deleteByExtId" value="extId" autocomplete="off" checked>
-            <label class="btn btn-outline-danger" for="deleteByExtId">External ID</label>
-
-            <input type="radio" class="btn-check" name="deleteBy" id="deleteByTitle" value="title" autocomplete="off">
-            <label class="btn btn-outline-danger" for="deleteByTitle">Title</label>
-          </div>
-        </div>
-
-        <div class="mb-3" id="deleteExtIdGroup">
-          <label for="deleteExtId" class="form-label nf-label">External ID</label>
-          <input type="text" class="form-control nf-input" id="deleteExtId" placeholder="e.g., m12"/>
-          <div class="login-error-message d-none" id="deleteExtIdError"></div>
-        </div>
-
-        <div class="mb-3 d-none" id="deleteTitleGroup">
-          <label for="deleteTitle" class="form-label nf-label">Exact title</label>
-          <input type="text" class="form-control nf-input" id="deleteTitle" placeholder="e.g., The Matrix"/>
-          <div class="login-error-message d-none" id="deleteTitleError"></div>
-        </div>
-
-        <div class="d-grid mt-3">
-          <button type="submit" class="btn btn-danger" id="deleteSubmitBtn">Delete Content</button>
         </div>
       </form>
 

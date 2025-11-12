@@ -17,7 +17,8 @@
       "Al Pacino",
       "James Caan"
     ],
-    "ratingValue": "9.2/10 (IMDb)"
+    "ratingValue": 9.2,
+    "rating": "9.2/10 (IMDb)"
   },
   {
     "id": "m2",
@@ -37,7 +38,8 @@
       "Robert De Niro",
       "Robert Duvall"
     ],
-    "ratingValue": "9.0/10 (IMDb)"
+    "ratingValue": 9.0,
+    "rating": "9.0/10 (IMDb)"
   },
   {
     "id": "m3",
@@ -56,7 +58,8 @@
       "Morgan Freeman",
       "Bob Gunton"
     ],
-    "ratingValue": "9.3/10 (IMDb)"
+    "ratingValue": 9.3,
+    "rating": "9.3/10 (IMDb)"
   },
   {
     "id": "m4",
@@ -76,7 +79,8 @@
       "Uma Thurman",
       "Samuel L. Jackson"
     ],
-    "ratingValue": "8.8/10 (IMDb)"
+    "ratingValue": 8.8,
+    "rating": "8.8/10 (IMDb)"
   },
   {
     "id": "m5",
@@ -96,7 +100,8 @@
       "Heath Ledger",
       "Aaron Eckhart"
     ],
-    "ratingValue": "9.1/10 (IMDb)"
+    "ratingValue": 9.1,
+    "rating": "9.1/10 (IMDb)"
   },
   {
     "id": "m6",
@@ -117,7 +122,8 @@
       "Ralph Fiennes",
       "Ben Kingsley"
     ],
-    "ratingValue": "9.0/10 (IMDb)"
+    "ratingValue": 9.0,
+    "rating": "9.0/10 (IMDb)"
   },
   {
     "id": "m7",
@@ -137,7 +143,8 @@
       "Edward Norton",
       "Meat Loaf"
     ],
-    "ratingValue": "8.8/10 (IMDb)"
+    "ratingValue": 8.8,
+    "rating": "8.8/10 (IMDb)"
   },
   {
     "id": "m8",
@@ -157,10 +164,10 @@
       "Robin Wright",
       "Gary Sinise"
     ],
-    "ratingValue": "8.8/10 (IMDb)",
+    "ratingValue": 8.8,
     "imagePath": "img/feed/forrestgump.jpg",
     "videoPath": "/uploads/videos/videoFile-1762031760874-110576184.mp4",
-    "ratingValueValue": 8.8
+    "rating": "8.8/10 (IMDb)"
   },
   {
     "id": "m9",
@@ -180,7 +187,8 @@
       "Laurence Fishburne",
       "Carrie-Anne Moss"
     ],
-    "ratingValue": "8.7/10 (IMDb)"
+    "ratingValue": 8.7,
+    "rating": "8.7/10 (IMDb)"
   },
   {
     "id": "m10",
@@ -212,7 +220,8 @@
       "Harrison Ford",
       "Carrie Fisher"
     ],
-    "ratingValue": "8.7/10 (IMDb)"
+    "ratingValue": 8.7,
+    "rating": "8.7/10 (IMDb)"
   },
   {
     "id": "m12",
@@ -232,7 +241,8 @@
       "Christopher Lloyd",
       "Lea Thompson"
     ],
-    "ratingValue": "8.5/10 (IMDb)"
+    "ratingValue": 8.5,
+    "rating": "8.5/10 (IMDb)"
   },
   {
     "id": "m13",
@@ -252,7 +262,8 @@
       "Kate Winslet",
       "Billy Zane"
     ],
-    "ratingValue": "7.9/10 (IMDb)"
+    "ratingValue": 7.9,
+    "rating": "7.9/10 (IMDb)"
   },
   {
     "id": "m14",
@@ -272,7 +283,8 @@
       "Laura Dern",
       "Jeff Goldblum"
     ],
-    "ratingValue": "8.2/10 (IMDb)"
+    "ratingValue": 8.2,
+    "rating": "8.2/10 (IMDb)"
   },
   {
     "id": "m15",
@@ -292,7 +304,8 @@
       "Ingrid Bergman",
       "Paul Henreid"
     ],
-    "ratingValue": "8.5/10 (IMDb)"
+    "ratingValue": 8.5,
+    "rating": "8.5/10 (IMDb)"
   },
   {
     "id": "m16",
@@ -312,7 +325,8 @@
       "Joseph Cotten",
       "Dorothy Comingore"
     ],
-    "ratingValue": "8.2/10 (IMDb)"
+    "ratingValue": 8.2,
+    "rating": "8.2/10 (IMDb)"
   },
   {
     "id": "m17",
@@ -332,7 +346,8 @@
       "Janet Leigh",
       "Vera Miles"
     ],
-    "ratingValue": "8.5/10 (IMDb)"
+    "ratingValue": 8.5,
+    "rating": "8.5/10 (IMDb)"
   },
   {
     "id": "m18",
@@ -352,7 +367,8 @@
       "Frank Morgan",
       "Ray Bolger"
     ],
-    "ratingValue": "8.1/10 (IMDb)"
+    "ratingValue": 8.1,
+    "rating": "8.1/10 (IMDb)"
   },
   {
     "id": "m19",
@@ -384,7 +400,8 @@
       "Ray Liotta",
       "Joe Pesci"
     ],
-    "ratingValue": "8.7/10 (IMDb)"
+    "ratingValue": 8.7,
+    "rating": "8.7/10 (IMDb)"
   },
   {
     "id": "m21",
@@ -401,11 +418,12 @@
     "plot": "Farmers from a village exploited by bandits hire a veteran samurai for protection, and he gathers six other samurai to join him.",
     "director": "Akira Kurosawa",
     "actors": [
-      "Toshirō Mifune",
+      "Toshir\u014d Mifune",
       "Takashi Shimura",
       "Keiko Tsushima"
     ],
-    "ratingValue": "8.6/10 (IMDb)"
+    "ratingValue": 8.6,
+    "rating": "8.6/10 (IMDb)"
   },
   {
     "id": "m22",
@@ -426,7 +444,8 @@
       "Suzanne Pleshette",
       "Miyu Irino"
     ],
-    "ratingValue": "8.6/10 (IMDb)"
+    "ratingValue": 8.6,
+    "rating": "8.6/10 (IMDb)"
   },
   {
     "id": "m23",
@@ -446,7 +465,8 @@
       "Jeremy Irons",
       "James Earl Jones"
     ],
-    "ratingValue": "8.5/10 (IMDb)"
+    "ratingValue": 8.5,
+    "rating": "8.5/10 (IMDb)"
   },
   {
     "id": "m24",
@@ -466,10 +486,10 @@
       "Marlon Brando",
       "Robert Duvall"
     ],
-    "ratingValue": "8.4/10 (IMDb)",
+    "ratingValue": 8.4,
     "extId": "m24",
     "image": "img/feed/apocalypsenow.jpg",
-    "ratingValueValue": 8.4
+    "rating": "8.4/10 (IMDb)"
   },
   {
     "id": "m25",
@@ -490,7 +510,8 @@
       "Anthony Hopkins",
       "Scott Glenn"
     ],
-    "ratingValue": "8.6/10 (IMDb)"
+    "ratingValue": 8.6,
+    "rating": "8.6/10 (IMDb)"
   },
   {
     "id": "s1",
@@ -509,7 +530,8 @@
       "Courteney Cox",
       "Lisa Kudrow"
     ],
-    "ratingValue": "8.9/10 (IMDb)"
+    "ratingValue": 8.9,
+    "rating": "8.9/10 (IMDb)"
   },
   {
     "id": "s2",
@@ -538,7 +560,8 @@
       "Julia Louis-Dreyfus",
       "Michael Richards"
     ],
-    "ratingValue": "8.9/10 (IMDb)"
+    "ratingValue": 8.9,
+    "rating": "8.9/10 (IMDb)"
   },
   {
     "id": "s4",
@@ -558,7 +581,8 @@
       "Nancy Cartwright",
       "Julie Kavner"
     ],
-    "ratingValue": "8.6/10 (IMDb)"
+    "ratingValue": 8.6,
+    "rating": "8.6/10 (IMDb)"
   },
   {
     "id": "s5",
@@ -578,10 +602,9 @@
       "Aaron Paul",
       "Anna Gunn"
     ],
-    "ratingValue": "9.5/10 (IMDb)",
+    "ratingValue": 9.5,
     "imagePath": "img/feed/breakingbad.jpg",
     "director": "N/A",
-    "ratingValueValue": 9.5,
     "episodes": [
       {
         "season": 1,
@@ -604,7 +627,8 @@
         "videoPath": "/uploads/videos/videoFile-1762031838777-473164277.mp4",
         "durationSec": 0
       }
-    ]
+    ],
+    "rating": "9.5/10 (IMDb)"
   },
   {
     "id": "s6",
@@ -624,7 +648,8 @@
       "Peter Dinklage",
       "Kit Harington"
     ],
-    "ratingValue": "9.2/10 (IMDb)"
+    "ratingValue": 9.2,
+    "rating": "9.2/10 (IMDb)"
   },
   {
     "id": "s7",
@@ -644,7 +669,8 @@
       "Finn Wolfhard",
       "Winona Ryder"
     ],
-    "ratingValue": "8.6/10 (IMDb)"
+    "ratingValue": 8.6,
+    "rating": "8.6/10 (IMDb)"
   },
   {
     "id": "s8",
@@ -663,7 +689,8 @@
       "Lorraine Bracco",
       "Edie Falco"
     ],
-    "ratingValue": "9.2/10 (IMDb)"
+    "ratingValue": 9.2,
+    "rating": "9.2/10 (IMDb)"
   },
   {
     "id": "s9",
@@ -682,7 +709,8 @@
       "Lance Reddick",
       "Sonja Sohn"
     ],
-    "ratingValue": "9.3/10 (IMDb)"
+    "ratingValue": 9.3,
+    "rating": "9.3/10 (IMDb)"
   },
   {
     "id": "s10",
@@ -702,7 +730,8 @@
       "Martin Freeman",
       "Una Stubbs"
     ],
-    "ratingValue": "9.0/10 (IMDb)"
+    "ratingValue": 9.0,
+    "rating": "9.0/10 (IMDb)"
   },
   {
     "id": "s11",
@@ -734,7 +763,8 @@
       "Josh Holloway",
       "Yunjin Kim"
     ],
-    "ratingValue": "8.3/10 (IMDb)"
+    "ratingValue": 8.3,
+    "rating": "8.3/10 (IMDb)"
   },
   {
     "id": "s13",
@@ -754,7 +784,8 @@
       "Jeffrey Wright",
       "Ed Harris"
     ],
-    "ratingValue": "8.4/10 (IMDb)"
+    "ratingValue": 8.4,
+    "rating": "8.4/10 (IMDb)"
   },
   {
     "id": "s14",
@@ -774,7 +805,8 @@
       "Colin Farrell",
       "Rachel McAdams"
     ],
-    "ratingValue": "8.9/10 (IMDb)"
+    "ratingValue": 8.9,
+    "rating": "8.9/10 (IMDb)"
   },
   {
     "id": "s15",
@@ -792,9 +824,10 @@
     "actors": [
       "Jessie Buckley",
       "Jared Harris",
-      "Stellan Skarsgård"
+      "Stellan Skarsg\u00e5rd"
     ],
-    "ratingValue": "9.3/10 (IMDb)"
+    "ratingValue": 9.3,
+    "rating": "9.3/10 (IMDb)"
   },
   {
     "id": "s16",
@@ -813,7 +846,8 @@
       "Olivia Colman",
       "Imelda Staunton"
     ],
-    "ratingValue": "8.6/10 (IMDb)"
+    "ratingValue": 8.6,
+    "rating": "8.6/10 (IMDb)"
   },
   {
     "id": "s17",
@@ -831,7 +865,8 @@
       "Elisabeth Moss",
       "Vincent Kartheiser"
     ],
-    "ratingValue": "8.7/10 (IMDb)"
+    "ratingValue": 8.7,
+    "rating": "8.7/10 (IMDb)"
   },
   {
     "id": "s18",
@@ -850,12 +885,20 @@
       "Jason Segel",
       "Cobie Smulders"
     ],
-    "ratingValue": "8.3/10 (IMDb)",
+    "ratingValue": 8.3,
     "extId": "s18",
     "image": "img/feed/himym.jpg",
-    "ratingValueValue": 8.3,
     "director": "N/A",
-    "episodes": []
+    "episodes": [
+      {
+        "season": 1,
+        "episode": 1,
+        "title": "pilot",
+        "videoPath": "/uploads/videos/videoFile-1762981185542-56647854.mp4",
+        "durationSec": 0
+      }
+    ],
+    "rating": "8.3/10 (IMDb)"
   },
   {
     "id": "s19",
@@ -873,7 +916,8 @@
       "Jim Parsons",
       "Kaley Cuoco"
     ],
-    "ratingValue": "8.1/10 (IMDb)"
+    "ratingValue": 8.1,
+    "rating": "8.1/10 (IMDb)"
   },
   {
     "id": "s20",
@@ -893,7 +937,8 @@
       "Zach Tyler Eisen",
       "Mae Whitman"
     ],
-    "ratingValue": "9.3/10 (IMDb)"
+    "ratingValue": 9.3,
+    "rating": "9.3/10 (IMDb)"
   },
   {
     "id": "s21",
@@ -913,6 +958,31 @@
       "Spencer Grammer",
       "Sarah Chalke"
     ],
-    "ratingValue": "9.0/10 (IMDb)"
+    "ratingValue": 9.0,
+    "rating": "9.0/10 (IMDb)"
+  },
+  {
+    "id": "m26",
+    "extId": "m26",
+    "title": "Mean Girls",
+    "year": 2004,
+    "genres": [
+      "Comedy"
+    ],
+    "cover": "/uploads/images/imageFile-1762981007320-221490771.jpeg",
+    "image": "/uploads/images/imageFile-1762981007320-221490771.jpeg",
+    "rating": "7.1/10 (IMDb)",
+    "ratingValue": 7.1,
+    "plot": "Cady Heron is a hit with The Plastics, the A-list girl clique at her new school, until she makes the mistake of falling for Aaron Samuels, the ex-boyfriend of alpha Plastic Regina George.",
+    "director": "Mark Waters",
+    "actors": [
+      "Lindsay Lohan",
+      "Jonathan Bennett",
+      "Rachel McAdams"
+    ],
+    "type": "Movie",
+    "videoPath": "/uploads/videos/videoFile-1762981007330-584895867.mp4",
+    "episodes": [],
+    "likes": 0
   }
 ]

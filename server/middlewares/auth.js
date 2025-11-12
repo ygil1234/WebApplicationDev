@@ -1,8 +1,13 @@
 const User = require('../models/User');
 const { writeLog } = require('../utils/helpers');
 
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   if (!req.session || !req.session.userId) {
+    await writeLog({
+      level: 'warn',
+      event: 'auth_required_denied',
+      details: { path: req.originalUrl, method: req.method, ip: req.ip },
+    });
     return res.status(401).json({ ok: false, error: 'Authentication required' });
   }
   return next();
