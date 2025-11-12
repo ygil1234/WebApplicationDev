@@ -20,6 +20,16 @@ async function signup(req, res) {
           error: 'Username must be 3-15 characters (letters/numbers/underscores).',
         });
     }
+    if (username.toLowerCase() === 'admin') {
+      await writeLog({
+        level: 'warn',
+        event: 'signup',
+        details: { usernameAttempt: username, reason: 'admin_signup_attack' },
+      });
+      return res
+        .status(400)
+        .json({ ok: false, error: 'This username admin is reserved.' });
+    }
     if (!validPassword(password, username)) {
       return res
         .status(400)
