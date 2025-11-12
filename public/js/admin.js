@@ -41,7 +41,7 @@
   const existingMetaEl = document.getElementById("existingContentMeta");
   const existingEpisodesEl = document.getElementById("existingContentEpisodes");
 
-  // Delete confirmation section (new)
+  // Delete confirmation section
   const deleteConfirmSection = document.getElementById("deleteConfirmSection");
   const deleteConfirmTitle = document.getElementById("deleteConfirmTitle");
   const deleteConfirmMeta = document.getElementById("deleteConfirmMeta");
@@ -55,7 +55,7 @@
   const generalErr = document.getElementById("contentGeneralError");
   let successHideTimer = null;
 
-  const { validators, attach, showError, clearError } = window.Validation;
+  const { validators, attach, showError, clearError } = window.Validation; // Shared client-side validation helpers.
 
   const contentSummariesCache = new Map();
   let summariesLoading = null;
@@ -80,7 +80,7 @@
 
   // ---------- Helper Functions ----------
   
-  function getSelectedMode() {
+  function getSelectedMode() { // Normalize the dropdown selection into one of our known modes.
     const value = modeSelect ? String(modeSelect.value || "") : "";
     if (value === MODE_EXISTING || value === MODE_NEW || value === MODE_DELETE) return value;
     return "";
@@ -104,7 +104,7 @@
     }
   }
 
-  function setAutoExtIdValue(value) {
+  function setAutoExtIdValue(value) { // Mirror the generated extId into a hidden field so submit logic can read it uniformly.
     setHiddenExtId(value || "");
     if (!extIdInput) return;
     if (value) {
@@ -116,24 +116,24 @@
     }
   }
 
-  function resetEpisodeFields() {
+  function resetEpisodeFields() { // Ensure stale episode inputs never bleed into new submissions.
     if (seasonNumEl) seasonNumEl.value = "";
     if (episodeNumEl) episodeNumEl.value = "";
     if (episodeTitleEl) episodeTitleEl.value = "";
   }
 
-  function resetMetadataFields() {
+  function resetMetadataFields() { // Quickly clear high-level metadata when switching targets.
     if (titleEl) titleEl.value = "";
     if (yearEl) yearEl.value = "";
     if (genresEl) genresEl.value = "";
   }
 
-  function resetFileInputs() {
+  function resetFileInputs() { // Dropping the file input prevents accidental re-uploads after a mode change.
     if (imageFileEl) imageFileEl.value = "";
     if (videoFileEl) videoFileEl.value = "";
   }
 
-  function showSuccessMessage(text) {
+  function showSuccessMessage(text) { // Centralized toast so every flow behaves consistently when operations succeed.
     if (!successBox) return;
     successBox.textContent = text || "";
     successBox.classList.remove("d-none");
@@ -160,7 +160,7 @@
   }
 
   // Show/hide delete confirmation section
-  function updateDeleteConfirmation() {
+  function updateDeleteConfirmation() { // Keeps the warning card in sync with whatever record is queued for removal.
     if (!deleteConfirmSection) return;
     
     const showConfirm = isDeleteMode() && loadedContent;
@@ -180,7 +180,7 @@
   }
 
   // Render loaded content details (used for existing and delete modes)
-  function renderLoadedContent(content) {
+  function renderLoadedContent(content) { // Mirrors backend data into the preview card so admin know what he is editing.
     const shouldShow = Boolean(content) && (isExistingMode() || isDeleteMode());
     if (!existingDetails) return;
     existingDetails.classList.toggle("d-none", !shouldShow);
@@ -257,7 +257,7 @@
     }
   }
 
-  function clearLoadedContent(options = {}) {
+  function clearLoadedContent(options = {}) { // Drop cached doc + UI state whenever the selection becomes invalid.
     const { resetMetadata = false, keepExtId = false } = options;
     loadedContent = null;
     if (!keepExtId) {
@@ -271,7 +271,7 @@
     updateDeleteConfirmation();
   }
 
-  function populateFormFromContent(content, { preserveExtId = false } = {}) {
+  function populateFormFromContent(content, { preserveExtId = false } = {}) { // Pre-fill form fields so edits start from the current DB values.
     if (!content) return;
     if (!preserveExtId) {
       if (extIdSelect) extIdSelect.value = content.extId;
@@ -300,7 +300,7 @@
   }
 
   // Show/hide metadata fields based on mode
-  function syncMetadataFieldsVisibility() {
+  function syncMetadataFieldsVisibility() { // Delete mode hides every field that isn't required for confirmation.
     if (!metadataFields) return;
     const shouldHide = isDeleteMode(); // Hide all metadata fields in delete mode
     metadataFields.classList.toggle("d-none", shouldHide);
@@ -324,7 +324,7 @@
     });
   }
 
-  function ensurePlaceholderOption(selectEl, text) {
+  function ensurePlaceholderOption(selectEl, text) { // Rebuild the select so stale options can't linger after cache clears.
     if (!selectEl) return;
     selectEl.innerHTML = "";
     const opt = document.createElement("option");
@@ -415,7 +415,7 @@
       return null;
     }
 
-    const requestId = ++autoExtIdRequestId;
+    const requestId = ++autoExtIdRequestId; // Track the latest async request so older responses can be ignored.
     extIdInput.placeholder = "";
     extIdInput.value = "Generating next ID…";
     setAutoExtIdValue("");
@@ -471,7 +471,7 @@
     clearError(extIdSelect);
     
     try {
-      const res = await fetch(`/api/admin/content/${encodeURIComponent(trimmed)}`, {
+      const res = await fetch(`/api/admin/content/${encodeURIComponent(trimmed)}`, { // Pull the latest copy so edits always use server truth.
         credentials: "include",
       });
       const body = await res.json().catch(() => ({}));
@@ -540,7 +540,7 @@
     updateDeleteConfirmation();
   }
 
-  function updateModeUI() {
+  function updateModeUI() { // Primary orchestrator that toggles every section based on the selected action.
     const mode = getSelectedMode();
     const hasMode = mode === MODE_EXISTING || mode === MODE_NEW || mode === MODE_DELETE;
 
@@ -686,7 +686,7 @@
 
   // ---------- Form Submission ----------
   
-  attach(
+  attach( // Reuse the shared validator but relax rules automatically in delete mode.
     form,
     [
       { 
@@ -762,7 +762,7 @@
             extId: extIdValue
           };
 
-          const response = await fetch("/api/admin/content", {
+          const response = await fetch("/api/admin/content", { // API already enforces admin auth, so we only send the identifiers.
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
@@ -937,7 +937,7 @@
         console.error("submit content error:", err);
         if (generalErr) {
           generalErr.classList.remove("d-none");
-          generalErr.textContent = "Server unreachable or upload failed. Is the file too large?";
+          generalErr.textContent = "Server unreachable or upload failed. Is the file too large?";//default Express limits around 100 KB unless increased
         }
       } finally {
         submitBtn.disabled = false;
