@@ -21,7 +21,8 @@
     form,
     [
       { el: emailEl, rules: [{ test: validators.email, message: "Please enter a valid email." }] },
-      { el: userEl,  rules: [{ test: validators.username, message: "Username must be 3–15 characters (letters, numbers, underscores)." }] },
+      { el: userEl,  rules: [{ test: validators.username, message: "Username must be 3–15 characters (letters, numbers, underscores)." },
+        {test: (value) => String(value || "").trim().toLowerCase() !== "admin", message: 'The username admin is reserved.'}] },
       { 
         el: passEl,  
         rules: [

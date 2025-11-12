@@ -1,10 +1,9 @@
-# 🎬 Netflix Clone — Technical R&D Documentation
+# 🎬 Netflix Project Technical R&D Documentation
 
 ![Node.js](https://img.shields.io/badge/Node.js-16+-green?logo=node.js)
 ![Express](https://img.shields.io/badge/Express.js-Backend-blue)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose-success?logo=mongodb)
 ![Bootstrap](https://img.shields.io/badge/Frontend-Bootstrap%205-orange)
-![License](https://img.shields.io/badge/License-MIT-lightgrey)
 
 ---
 
@@ -163,10 +162,16 @@ PORT=3000
 MONGODB_URI=mongodb://127.0.0.1:27017/netflix_feed
 SESSION_SECRET=a_very_strong_and_random_secret_key
 SEED_CONTENT=1
+ROW_SCROLL_STEP=how_many_cards_to_scroll
 OMDB_API_KEY=your_omdb_key_here
 NODE_ENV=development
 ADMIN_USER=a_very_strong_and_random_user
 ADMIN_PASSWORD=a_very_strong_and_random_password
 ```
+
+### Execution
+cd WebApplicationDev
+npm i
+node server/index.js
 
 Access at: **[http://localhost:3000](http://localhost:3000)**
