@@ -133,6 +133,25 @@
     if (videoFileEl) videoFileEl.value = "";
   }
 
+  function resetFormForModeChange(nextMode) { // Used when switching actions so every control snaps back to the default state.
+    if (!form) return;
+    form.reset();
+    setHiddenExtId("");
+    resetMetadataFields();
+    resetEpisodeFields();
+    resetFileInputs();
+    loadedContent = null;
+    renderLoadedContent(null);
+    updateDeleteConfirmation();
+    if (extIdSelect) {
+      extIdSelect.value = "";
+      clearError(extIdSelect);
+    }
+    if (modeSelect) modeSelect.value = nextMode || "";
+    if (successBox) successBox.classList.add("d-none");
+    if (generalErr) generalErr.classList.add("d-none");
+  }
+
   function showSuccessMessage(text) { // Centralized toast so every flow behaves consistently when operations succeed.
     if (!successBox) return;
     successBox.textContent = text || "";
@@ -617,12 +636,10 @@
   }
 
   modeSelect.addEventListener("change", () => {
+    const nextMode = modeSelect.value;
+    resetFormForModeChange(nextMode);
     clearError(modeSelect);
     updateModeUI();
-    resetEpisodeFields();
-    resetFileInputs();
-    if (successBox) successBox.classList.add("d-none");
-    if (generalErr) generalErr.classList.add("d-none");
   });
 
   typeEl.addEventListener("change", () => {
