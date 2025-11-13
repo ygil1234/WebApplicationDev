@@ -389,6 +389,16 @@ async function getContentDetails(req, res) {
       imagePath: doc.imagePath || cover,
     };
     await annotateWatchedTags([item], profileId);
+    await writeLog({
+      event: 'content_details',
+      profileId: profileId || null,
+      details: {
+        extId,
+        liked,
+        episodes: episodes.length,
+        hasVideo: !!movieVideo,
+      },
+    });
     return res.json({ ok: true, item });
   } catch (err) {
     console.error('GET /api/content/:extId error:', err);
@@ -407,7 +417,13 @@ async function getSimilar(req, res) {
     const base = await Content.findOne({ extId }, 'genres').lean();
     if (!base) return res.status(404).json({ ok: false, error: 'Base content not found' });
     const genres = base.genres || [];
-    if (!genres.length) return res.json({ ok: true, items: [] });
+    if (!genres.length) {
+      await writeLog({
+        event: 'similar',
+        details: { baseExtId: extId, returned: 0, note: 'no_genres' },
+      });
+      return res.json({ ok: true, items: [] });
+    }
 
     let items = await Content.find({ extId: { $ne: extId }, genres: { $in: genres } })
       .sort({ likes: -1, title: 1 })
@@ -421,7 +437,13 @@ async function getSimilar(req, res) {
       })
     );
 
-    if (!profileId) return res.json({ ok: true, items });
+    if (!profileId) {
+      await writeLog({
+        event: 'similar',
+        details: { baseExtId: extId, genres: genres.slice(0, 5), returned: items.length },
+      });
+      return res.json({ ok: true, items });
+    }
 
     await annotateWatchedTags(items, profileId);
     const liked = await Like.find(
@@ -430,6 +452,11 @@ async function getSimilar(req, res) {
     ).lean();
     const likedSet = new Set(liked.map((l) => l.contentExtId));
     const annotated = items.map((item) => ({ ...item, liked: likedSet.has(item.extId) }));
+    await writeLog({
+      event: 'similar',
+      profileId,
+      details: { baseExtId: extId, genres: genres.slice(0, 5), returned: annotated.length },
+    });
     return res.json({ ok: true, items: annotated });
   } catch (err) {
     console.error('GET /api/similar error:', err);
@@ -487,6 +514,15 @@ async function getProgress(req, res) {
       overallPercent = percents.length ? Math.max(...percents) : 0;
     }
 
+    await writeLog({
+      event: 'progress_get',
+      profileId,
+      details: {
+        contentExtId,
+        episodesReturned: episodeProgress.length,
+        overallPercent,
+      },
+    });
     return res.json({
       ok: true,
       progress: {

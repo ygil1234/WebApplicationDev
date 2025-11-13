@@ -3,11 +3,10 @@
 (function () {
   const MODE_EXISTING = "existing";
   const MODE_NEW = "new";
-  const ACTION_MANAGE = "manage";
-  const ACTION_DELETE = "delete";
+  const MODE_DELETE = "delete"; // New mode for delete functionality
 
   // 1. Admin-only Check
-  const loggedInUser = sessionStorage.getItem("loggedInUser") || localStorage.getItem("loggedInUser"); // Accept either storage namespace when validating the admin session.
+  const loggedInUser = sessionStorage.getItem("loggedInUser") || localStorage.getItem("loggedInUser");
   if (loggedInUser !== "admin") {
     alert("Access Denied. You must be logged in as 'admin' to view this page.");
     window.location.href = "login.html";
@@ -15,37 +14,37 @@
   }
 
   // 2. Get DOM Elements
-  const adminActionSelect = document.getElementById("adminAction");
   const form = document.getElementById("contentForm");
   const submitBtn = document.getElementById("submitBtn");
   const modeSelect = document.getElementById("contentMode");
   const typeEl = document.getElementById("type");
-  const typeHelpEl = document.getElementById("typeHelp");
-  const extIdHelpEl = document.getElementById("extIdHelp");
   const extIdInputWrapper = document.getElementById("extIdNewGroup");
   const extIdInput = document.getElementById("extIdInput");
   const extIdSelectWrapper = document.getElementById("extIdExistingGroup");
   const extIdSelect = document.getElementById("extIdSelect");
   const extIdHidden = document.getElementById("extIdHidden");
-  const extIdAutoNote = document.getElementById("extIdAutoNote");
-  const clearLoadedBtn = document.getElementById("clearLoadedBtn");
+  
+  // Metadata fields container (hidden in delete mode)
+  const metadataFields = document.getElementById("metadataFields");
   const titleEl = document.getElementById("title");
   const yearEl = document.getElementById("year");
   const genresEl = document.getElementById("genres");
-  const titleHelpEl = document.getElementById("titleHelp");
-  const yearHelpEl = document.getElementById("yearHelp");
-  const genresHelpEl = document.getElementById("genresHelp");
   const imageFileEl = document.getElementById("imageFile");
-  const imageFileHelpEl = document.getElementById("imageFileHelp");
   const videoFileEl = document.getElementById("videoFile");
-  const videoFileHelpEl = document.getElementById("videoFileHelp");
-  const logoutLink = document.getElementById("adminLogoutLink"); // Locate the new logout anchor in the admin footer.
+  
+  const logoutLink = document.getElementById("adminLogoutLink");
 
+  // Existing content display elements
   const existingDetails = document.getElementById("existingContentDetails");
   const existingCoverImg = document.getElementById("existingContentCover");
   const existingSummaryEl = document.getElementById("existingContentSummary");
   const existingMetaEl = document.getElementById("existingContentMeta");
   const existingEpisodesEl = document.getElementById("existingContentEpisodes");
+
+  // Delete confirmation section
+  const deleteConfirmSection = document.getElementById("deleteConfirmSection");
+  const deleteConfirmTitle = document.getElementById("deleteConfirmTitle");
+  const deleteConfirmMeta = document.getElementById("deleteConfirmMeta");
 
   const seriesEpisodeFields = document.getElementById("seriesEpisodeFields");
   const seasonNumEl = document.getElementById("seasonNum");
@@ -54,42 +53,36 @@
 
   const successBox = document.getElementById("contentSuccess");
   const generalErr = document.getElementById("contentGeneralError");
-  const deleteForm = document.getElementById("deleteForm");
-  const deleteTypeEl = document.getElementById("deleteType");
-  const deleteExtIdGroup = document.getElementById("deleteExtIdGroup");
-  const deleteTitleGroup = document.getElementById("deleteTitleGroup");
-  const deleteExtIdEl = document.getElementById("deleteExtId");
-  const deleteTitleEl = document.getElementById("deleteTitle");
-  const deleteSubmitBtn = document.getElementById("deleteSubmitBtn");
-  const deleteByRadios = document.querySelectorAll('input[name="deleteBy"]');
+  let successHideTimer = null;
 
-  const { validators, attach, showError, clearError } = window.Validation; // Destructure client-side validation helpers.
+  const { validators, attach, showError, clearError } = window.Validation; // Shared client-side validation helpers.
 
-  const contentSummariesCache = new Map(); // type -> array of summaries
+  const contentSummariesCache = new Map();
   let summariesLoading = null;
   let loadedContent = null;
   let autoExtIdRequestId = 0;
-  const defaultAutoNote = extIdAutoNote ? extIdAutoNote.textContent : ""; // Cache the default auto-assignment hint for reuse.
 
-  if (logoutLink && !logoutLink.dataset.bound) { // Ensure we only attach one handler to the logout button.
-    logoutLink.dataset.bound = "1"; // Mark the button as wired.
+  // Logout handler
+  if (logoutLink && !logoutLink.dataset.bound) {
+    logoutLink.dataset.bound = "1";
     logoutLink.addEventListener("click", async (e) => {
-      e.preventDefault(); // Stop the button from submitting anything.
+      e.preventDefault();
       try {
-        await fetch("/api/logout", { method: "POST", credentials: "include" }); // Tell the backend to end the session.
+        await fetch("/api/logout", { method: "POST", credentials: "include" });
       } catch (err) {
-        console.warn("Logout request failed:", err); // Log failures so we know if the network is down.
+        console.warn("Logout request failed:", err);
       }
-      localStorage.clear(); // Purge any admin/user metadata stored locally.
-      sessionStorage.clear(); // Clear sessionStorage in tandem to avoid inconsistent state.
-      window.location.replace("login.html"); // Send the admin back to the login page in a clean state.
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.replace("login.html");
     });
   }
 
-  // ---------- Helpers ----------
-  function getSelectedMode() {
+  // ---------- Helper Functions ----------
+  
+  function getSelectedMode() { // Normalize the dropdown selection into one of our known modes.
     const value = modeSelect ? String(modeSelect.value || "") : "";
-    if (value === MODE_EXISTING || value === MODE_NEW) return value;
+    if (value === MODE_EXISTING || value === MODE_NEW || value === MODE_DELETE) return value;
     return "";
   }
 
@@ -101,13 +94,17 @@
     return getSelectedMode() === MODE_EXISTING;
   }
 
+  function isDeleteMode() {
+    return getSelectedMode() === MODE_DELETE;
+  }
+
   function setHiddenExtId(value) {
     if (extIdHidden) {
       extIdHidden.value = value ? String(value) : "";
     }
   }
 
-  function setAutoExtIdValue(value) {
+  function setAutoExtIdValue(value) { // Mirror the generated extId into a hidden field so submit logic can read it uniformly.
     setHiddenExtId(value || "");
     if (!extIdInput) return;
     if (value) {
@@ -119,73 +116,94 @@
     }
   }
 
-  function setAutoNoteText(text) {
-    if (!extIdAutoNote) return;
-    extIdAutoNote.textContent = text;
-  }
-
-  function getSelectedAction() {
-    const value = adminActionSelect ? String(adminActionSelect.value || "") : ACTION_MANAGE;
-    return value === ACTION_DELETE ? ACTION_DELETE : ACTION_MANAGE;
-  }
-
-  function isDeleteAction() {
-    return getSelectedAction() === ACTION_DELETE;
-  }
-
-  function getDeleteIdentifierMode() {
-    const radios = deleteByRadios ? Array.from(deleteByRadios) : [];
-    const selected = radios.find((radio) => radio.checked && radio.value);
-    return selected ? selected.value : "extId";
-  }
-
-  function syncDeleteIdentifierUI() {
-    if (!deleteForm) return;
-    const mode = getDeleteIdentifierMode();
-    const useExtId = mode !== "title";
-    if (deleteExtIdGroup) deleteExtIdGroup.classList.toggle("d-none", !useExtId);
-    if (deleteTitleGroup) deleteTitleGroup.classList.toggle("d-none", useExtId);
-    if (useExtId && deleteTitleEl) {
-      deleteTitleEl.value = "";
-      clearError(deleteTitleEl);
-    } else if (!useExtId && deleteExtIdEl) {
-      deleteExtIdEl.value = "";
-      clearError(deleteExtIdEl);
-    }
-  }
-
-  function clearDeleteErrors() {
-    [deleteTypeEl, deleteExtIdEl, deleteTitleEl].forEach((el) => {
-      if (el) clearError(el);
-    });
-  }
-
-  function syncActionUI() {
-    if (form) form.classList.toggle("d-none", isDeleteAction());
-    if (deleteForm) deleteForm.classList.toggle("d-none", !isDeleteAction());
-  }
-
-  function resetEpisodeFields() {
+  function resetEpisodeFields() { // Ensure stale episode inputs never bleed into new submissions.
     if (seasonNumEl) seasonNumEl.value = "";
     if (episodeNumEl) episodeNumEl.value = "";
     if (episodeTitleEl) episodeTitleEl.value = "";
   }
 
-  function resetMetadataFields() {
+  function resetMetadataFields() { // Quickly clear high-level metadata when switching targets.
     if (titleEl) titleEl.value = "";
     if (yearEl) yearEl.value = "";
     if (genresEl) genresEl.value = "";
   }
 
-  function resetFileInputs() {
+  function resetFileInputs() { // Dropping the file input prevents accidental re-uploads after a mode change.
     if (imageFileEl) imageFileEl.value = "";
     if (videoFileEl) videoFileEl.value = "";
   }
 
-  function renderLoadedContent(content) {
-    const shouldShow = Boolean(content) && isExistingMode();
+  function resetFormForModeChange(nextMode) { // Used when switching actions so every control snaps back to the default state.
+    if (!form) return;
+    form.reset();
+    setHiddenExtId("");
+    resetMetadataFields();
+    resetEpisodeFields();
+    resetFileInputs();
+    loadedContent = null;
+    renderLoadedContent(null);
+    updateDeleteConfirmation();
+    if (extIdSelect) {
+      extIdSelect.value = "";
+      clearError(extIdSelect);
+    }
+    if (modeSelect) modeSelect.value = nextMode || "";
+    if (successBox) successBox.classList.add("d-none");
+    if (generalErr) generalErr.classList.add("d-none");
+  }
+
+  function showSuccessMessage(text) { // Centralized toast so every flow behaves consistently when operations succeed.
+    if (!successBox) return;
+    successBox.textContent = text || "";
+    successBox.classList.remove("d-none");
+    if (successHideTimer) clearTimeout(successHideTimer);
+    successHideTimer = setTimeout(() => {
+      successBox.classList.add("d-none");
+      successBox.textContent = "";
+      successHideTimer = null;
+    }, 3000);
+  }
+
+  // Update submit button based on current mode
+  function updateSubmitButton() {
+    if (!submitBtn) return;
+    const mode = getSelectedMode();
+    
+    if (mode === MODE_DELETE) {
+      submitBtn.textContent = "Delete Content";
+      submitBtn.className = "btn btn-danger"; // Red button for delete
+    } else {
+      submitBtn.textContent = "Submit Content";
+      submitBtn.className = "btn btn-nf-primary"; // Netflix primary button
+    }
+  }
+
+  // Show/hide delete confirmation section
+  function updateDeleteConfirmation() { // Keeps the warning card in sync with whatever record is queued for removal.
+    if (!deleteConfirmSection) return;
+    
+    const showConfirm = isDeleteMode() && loadedContent;
+    deleteConfirmSection.classList.toggle("d-none", !showConfirm);
+    
+    if (showConfirm && loadedContent) {
+      if (deleteConfirmTitle) {
+        deleteConfirmTitle.textContent = `${loadedContent.title} (${loadedContent.extId})`;
+      }
+      if (deleteConfirmMeta) {
+        const year = loadedContent.year ? `${loadedContent.year}` : "";
+        const type = loadedContent.type || "";
+        const genres = Array.isArray(loadedContent.genres) ? loadedContent.genres.join(", ") : "";
+        deleteConfirmMeta.textContent = `${type} ${year ? `• ${year}` : ""} ${genres ? `• ${genres}` : ""}`.trim();
+      }
+    }
+  }
+
+  // Render loaded content details (used for existing and delete modes)
+  function renderLoadedContent(content) { // Mirrors backend data into the preview card so admin know what he is editing.
+    const shouldShow = Boolean(content) && (isExistingMode() || isDeleteMode());
     if (!existingDetails) return;
     existingDetails.classList.toggle("d-none", !shouldShow);
+    
     if (!shouldShow || !content) {
       if (existingCoverImg) {
         existingCoverImg.classList.add("d-none");
@@ -194,13 +212,11 @@
       if (existingSummaryEl) existingSummaryEl.textContent = "";
       if (existingMetaEl) existingMetaEl.textContent = "";
       if (existingEpisodesEl) existingEpisodesEl.innerHTML = "";
-      if (clearLoadedBtn) clearLoadedBtn.classList.add("d-none");
       return;
     }
 
-    if (clearLoadedBtn) clearLoadedBtn.classList.remove("d-none");
-
     const isSeries = String(content.type || "").toLowerCase() === "series";
+    
     if (existingCoverImg) {
       const coverPath = content.cover || content.imagePath;
       if (coverPath) {
@@ -260,23 +276,21 @@
     }
   }
 
-  function clearLoadedContent(options = {}) {
+  function clearLoadedContent(options = {}) { // Drop cached doc + UI state whenever the selection becomes invalid.
     const { resetMetadata = false, keepExtId = false } = options;
     loadedContent = null;
     if (!keepExtId) {
-      if (extIdSelect) {
-        extIdSelect.value = "";
-      }
+      if (extIdSelect) extIdSelect.value = "";
       setHiddenExtId("");
     }
     if (resetMetadata) {
       resetMetadataFields();
     }
     renderLoadedContent(null);
-    if (clearLoadedBtn) clearLoadedBtn.classList.add("d-none");
+    updateDeleteConfirmation();
   }
 
-  function populateFormFromContent(content, { preserveExtId = false } = {}) {
+  function populateFormFromContent(content, { preserveExtId = false } = {}) { // Pre-fill form fields so edits start from the current DB values.
     if (!content) return;
     if (!preserveExtId) {
       if (extIdSelect) extIdSelect.value = content.extId;
@@ -297,56 +311,18 @@
     syncEpisodeVisibility();
   }
 
-  function updateMetadataHelps() {
-    const mode = getSelectedMode();
-    const suffix = mode === MODE_EXISTING
-      ? "Loaded entries are pre-filled; adjust if you want to change details."
-      : "These fields are required for every new title.";
-    if (titleHelpEl) titleHelpEl.textContent = `Provide the on-screen title. ${suffix}`;
-    if (yearHelpEl) yearHelpEl.textContent = `Enter the release year. ${suffix}`;
-    if (genresHelpEl) genresHelpEl.textContent = `List one or more genres separated by commas. ${suffix}`;
-  }
-
-  function updateMediaHelps() {
-    const mode = getSelectedMode();
-    const type = getSelectedType();
-    const isExisting = mode === MODE_EXISTING;
-    const isSeries = type === "Series";
-    const isMovie = type === "Movie";
-
-    if (imageFileHelpEl) {
-      let text = "Upload a cover to accompany this title.";
-      if (mode === MODE_NEW) {
-        text = isSeries
-          ? "Required when creating a new series so viewers can find it."
-          : "Required when creating a new movie.";
-      } else if (isExisting) {
-        text = isSeries
-          ? "Optional: upload to replace the current series cover."
-          : "Optional: upload to replace the current movie cover.";
-      }
-      imageFileHelpEl.textContent = text;
-    }
-
-    if (videoFileHelpEl) {
-      let text = "Attach a video when needed for this action.";
-      if (mode === MODE_NEW) {
-        text = isMovie
-          ? "Required for new movies so the full video is available."
-          : "Optional. Combine with season/episode numbers to upload the first episode.";
-      } else if (isExisting && isSeries) {
-        text = "Provide a video along with season/episode numbers to upload a new episode.";
-      } else if (isExisting && isMovie) {
-        text = "Optional: attach to replace the stored movie file.";
-      }
-      videoFileHelpEl.textContent = text;
-    }
-  }
-
   function syncEpisodeVisibility() {
     if (!seriesEpisodeFields) return;
     const isSeries = getSelectedType() === "Series";
-    seriesEpisodeFields.classList.toggle("d-none", !isSeries);
+    const shouldShow = isSeries && !isDeleteMode(); // Hide in delete mode
+    seriesEpisodeFields.classList.toggle("d-none", !shouldShow);
+  }
+
+  // Show/hide metadata fields based on mode
+  function syncMetadataFieldsVisibility() { // Delete mode hides every field that isn't required for confirmation.
+    if (!metadataFields) return;
+    const shouldHide = isDeleteMode(); // Hide all metadata fields in delete mode
+    metadataFields.classList.toggle("d-none", shouldHide);
   }
 
   function clearFieldErrors() {
@@ -367,7 +343,7 @@
     });
   }
 
-  function ensurePlaceholderOption(selectEl, text) {
+  function ensurePlaceholderOption(selectEl, text) { // Rebuild the select so stale options can't linger after cache clears.
     if (!selectEl) return;
     selectEl.innerHTML = "";
     const opt = document.createElement("option");
@@ -397,11 +373,15 @@
   async function populateExistingOptions() {
     if (!extIdSelect) return;
     const type = getSelectedType();
-    if (!isExistingMode()) {
-      ensurePlaceholderOption(extIdSelect, "Switch to step 1 to choose an existing title.");
+    const mode = getSelectedMode();
+    
+    // Show dropdown for existing or delete modes
+    if (mode !== MODE_EXISTING && mode !== MODE_DELETE) {
+      ensurePlaceholderOption(extIdSelect, "Switch to update or delete mode to choose an existing title.");
       extIdSelect.disabled = true;
       return;
     }
+    
     if (!type) {
       ensurePlaceholderOption(extIdSelect, "Choose a type to see existing titles.");
       extIdSelect.disabled = true;
@@ -410,21 +390,26 @@
 
     ensurePlaceholderOption(extIdSelect, "Loading titles…");
     extIdSelect.disabled = true;
+    
     try {
       summariesLoading = fetchContentSummaries(type);
       const summaries = await summariesLoading;
       summariesLoading = null;
+      
       ensurePlaceholderOption(
         extIdSelect,
         summaries.length ? "Select an existing title..." : `No ${type.toLowerCase()}s found.`,
       );
+      
       summaries.forEach((item) => {
         const option = document.createElement("option");
         option.value = item.extId;
         option.textContent = `${item.title || item.extId} (${item.extId})`;
         extIdSelect.appendChild(option);
       });
+      
       extIdSelect.disabled = summaries.length === 0;
+      
       if (loadedContent && loadedContent.type === type) {
         extIdSelect.value = loadedContent.extId;
       }
@@ -446,21 +431,22 @@
     if (!type) {
       setAutoExtIdValue("");
       extIdInput.placeholder = "Select a type to generate the next ID";
-      setAutoNoteText(defaultAutoNote);
       return null;
     }
 
-    const requestId = ++autoExtIdRequestId;
+    const requestId = ++autoExtIdRequestId; // Track the latest async request so older responses can be ignored.
     extIdInput.placeholder = "";
     extIdInput.value = "Generating next ID…";
     setAutoExtIdValue("");
-    setAutoNoteText("Calculating the next available ID...");
+    
     try {
       const summaries = await fetchContentSummaries(type);
       if (requestId !== autoExtIdRequestId) return null;
+      
       const prefix = type === "Movie" ? "m" : "s";
       const regex = prefix === "m" ? /^m(\d+)$/i : /^s(\d+)$/i;
       let maxNum = 0;
+      
       summaries.forEach((item) => {
         const match = regex.exec(String(item.extId || ""));
         if (!match) return;
@@ -469,10 +455,10 @@
           maxNum = Math.max(maxNum, num);
         }
       });
+      
       const nextValue = `${prefix}${maxNum + 1}`;
       setAutoExtIdValue(nextValue);
       extIdInput.placeholder = "";
-      setAutoNoteText(defaultAutoNote);
       clearError(extIdInput);
       return nextValue;
     } catch (err) {
@@ -481,7 +467,6 @@
       setAutoExtIdValue("");
       extIdInput.value = "";
       extIdInput.placeholder = "Unable to generate ID";
-      setAutoNoteText("Unable to generate the next ID. Please try again.");
       return null;
     }
   }
@@ -489,21 +474,27 @@
   async function loadExistingContent(extId, options = {}) {
     const { silent = false } = options;
     const trimmed = String(extId || "").trim();
+    
     if (!trimmed) {
       if (!silent && extIdSelect) {
         showError(extIdSelect, "Select an existing External ID.");
       }
       return null;
     }
-    if (!isExistingMode()) {
+    
+    const mode = getSelectedMode();
+    if (mode !== MODE_EXISTING && mode !== MODE_DELETE) {
       return null;
     }
+    
     clearError(extIdSelect);
+    
     try {
-      const res = await fetch(`/api/admin/content/${encodeURIComponent(trimmed)}`, {
+      const res = await fetch(`/api/admin/content/${encodeURIComponent(trimmed)}`, { // Pull the latest copy so edits always use server truth.
         credentials: "include",
       });
       const body = await res.json().catch(() => ({}));
+      
       if (!res.ok) {
         if (!silent && extIdSelect) {
           showError(extIdSelect, body?.error || "Unable to load that ID.");
@@ -511,8 +502,10 @@
         clearLoadedContent({ resetMetadata: true, keepExtId: true });
         return null;
       }
+      
       const content = body.data;
       const docType = String(content.type || "");
+      
       if (typeEl) {
         const current = getSelectedType();
         if (!current) {
@@ -524,12 +517,17 @@
         }
         clearError(typeEl);
       }
+      
       loadedContent = content;
       setHiddenExtId(content.extId);
-      populateFormFromContent(content, { preserveExtId: true });
+      
+      // Only populate form fields if NOT in delete mode
+      if (!isDeleteMode()) {
+        populateFormFromContent(content, { preserveExtId: true });
+      }
+      
       renderLoadedContent(content);
-      updateMetadataHelps();
-      updateMediaHelps();
+      updateDeleteConfirmation();
       return content;
     } catch (err) {
       console.error("loadExistingContent error:", err);
@@ -544,22 +542,26 @@
   function updateExtIdUI() {
     const mode = getSelectedMode();
     const isExisting = mode === MODE_EXISTING;
-    if (extIdInputWrapper) extIdInputWrapper.classList.toggle("d-none", isExisting);
-    if (extIdSelectWrapper) extIdSelectWrapper.classList.toggle("d-none", !isExisting);
-    if (!isExisting) {
+    const isDelete = mode === MODE_DELETE;
+    const showDropdown = isExisting || isDelete;
+    
+    if (extIdInputWrapper) extIdInputWrapper.classList.toggle("d-none", showDropdown);
+    if (extIdSelectWrapper) extIdSelectWrapper.classList.toggle("d-none", !showDropdown);
+    
+    if (!showDropdown) {
       if (extIdSelect) extIdSelect.value = "";
-      if (clearLoadedBtn) clearLoadedBtn.classList.add("d-none");
       renderLoadedContent(null);
       loadedContent = null;
     } else {
       setAutoExtIdValue("");
-      setAutoNoteText(defaultAutoNote);
     }
+    
+    updateDeleteConfirmation();
   }
 
-  function updateModeUI() {
+  function updateModeUI() { // Primary orchestrator that toggles every section based on the selected action.
     const mode = getSelectedMode();
-    const hasMode = mode === MODE_EXISTING || mode === MODE_NEW;
+    const hasMode = mode === MODE_EXISTING || mode === MODE_NEW || mode === MODE_DELETE;
 
     if (!hasMode && typeEl) {
       typeEl.value = "";
@@ -568,22 +570,10 @@
       typeEl.disabled = false;
     }
 
-    if (typeHelpEl) {
-      typeHelpEl.textContent = hasMode
-        ? "Select whether this content is a movie or a series."
-        : "Choose a mode above to enable this step.";
-    }
-
-    if (extIdHelpEl) {
-      extIdHelpEl.textContent = mode === MODE_EXISTING
-        ? "Select the existing External ID to automatically load its details."
-        : "The External ID is assigned automatically for new titles.";
-    }
-
     updateExtIdUI();
-    updateMetadataHelps();
-    updateMediaHelps();
     syncEpisodeVisibility();
+    syncMetadataFieldsVisibility();
+    updateSubmitButton();
 
     if (mode === MODE_EXISTING) {
       setHiddenExtId(extIdSelect ? extIdSelect.value : "");
@@ -591,17 +581,21 @@
     } else if (mode === MODE_NEW) {
       clearLoadedContent({ keepExtId: true });
       refreshAutoExtId();
+    } else if (mode === MODE_DELETE) {
+      clearLoadedContent({ keepExtId: true });
+      populateExistingOptions();
     } else {
       setHiddenExtId("");
       clearLoadedContent({ keepExtId: false });
-      ensurePlaceholderOption(extIdSelect, "Select step 1 to see existing titles.");
+      ensurePlaceholderOption(extIdSelect, "Select a mode to see existing titles.");
       if (extIdSelect) extIdSelect.disabled = true;
     }
   }
 
   function validateExtIdField() {
     const mode = getSelectedMode();
-    if (mode === MODE_EXISTING) {
+    
+    if (mode === MODE_EXISTING || mode === MODE_DELETE) {
       if (!extIdSelect) return null;
       const value = String(extIdSelect.value || "").trim();
       clearError(extIdSelect);
@@ -612,6 +606,7 @@
       setHiddenExtId(value);
       return value;
     }
+    
     if (mode === MODE_NEW) {
       const value = resolveExtIdValue();
       if (extIdInput) clearError(extIdInput);
@@ -624,7 +619,8 @@
       }
       return value;
     }
-    if (modeSelect) showError(modeSelect, "Select whether the title already exists.");
+    
+    if (modeSelect) showError(modeSelect, "Select an action mode.");
     return null;
   }
 
@@ -632,50 +628,29 @@
     return extIdHidden ? extIdHidden.value.trim() : "";
   }
 
-  // ---------- Event wiring ----------
-  if (
-    !form
-    || !modeSelect
-    || !typeEl
-    || !titleEl
-    || !yearEl
-    || !genresEl
-    || !adminActionSelect
-    || !deleteForm
-    || !deleteTypeEl
-    || !deleteExtIdEl
-    || !deleteTitleEl
-    || !deleteSubmitBtn
-  ) {
+  // ---------- Event Wiring ----------
+  
+  if (!form || !modeSelect || !typeEl || !titleEl || !yearEl || !genresEl) {
     console.error("Admin form is missing required elements.");
     return;
   }
 
-  adminActionSelect.addEventListener("change", () => {
-    syncActionUI();
-    if (!isDeleteAction()) {
-      updateModeUI();
-    }
-    clearDeleteErrors();
-    if (successBox) successBox.classList.add("d-none");
-    if (generalErr) generalErr.classList.add("d-none");
-  });
-
   modeSelect.addEventListener("change", () => {
+    const nextMode = modeSelect.value;
+    resetFormForModeChange(nextMode);
     clearError(modeSelect);
     updateModeUI();
-    resetEpisodeFields();
-    resetFileInputs();
   });
 
   typeEl.addEventListener("change", () => {
     clearError(typeEl);
     syncEpisodeVisibility();
-    updateMediaHelps();
-    if (isExistingMode()) {
+    
+    const mode = getSelectedMode();
+    if (mode === MODE_EXISTING || mode === MODE_DELETE) {
       clearLoadedContent({ keepExtId: true });
       populateExistingOptions();
-    } else if (getSelectedMode() === MODE_NEW) {
+    } else if (mode === MODE_NEW) {
       refreshAutoExtId();
     }
   });
@@ -693,67 +668,85 @@
     });
   }
 
-  if (clearLoadedBtn) {
-    clearLoadedBtn.addEventListener("click", () => {
-      if (extIdSelect) extIdSelect.value = "";
-      setHiddenExtId("");
-      clearLoadedContent({ resetMetadata: true });
-      resetEpisodeFields();
-      resetFileInputs();
-      if (extIdSelect && !extIdSelect.disabled) extIdSelect.focus();
-    });
-  }
-
   if (seasonNumEl) {
     seasonNumEl.addEventListener("input", () => clearError(seasonNumEl));
   }
   if (episodeNumEl) {
     episodeNumEl.addEventListener("input", () => clearError(episodeNumEl));
   }
+  
   if (imageFileEl) {
     imageFileEl.addEventListener("change", () => {
-      clearError(imageFileEl); // Remove any previous validation message before re-checking.
+      clearError(imageFileEl);
       const file = imageFileEl.files?.[0];
       if (!file) return;
-      const allowedTypes = ["image/jpeg", "image/png"]; // List the image MIME types the backend accepts.
+      const allowedTypes = ["image/jpeg", "image/png"];
       if (!allowedTypes.includes(file.type)) {
-        imageFileEl.value = ""; // Reset the file input so an invalid file is not submitted.
-        showError(imageFileEl, "Unsupported image file. Please upload a JPG or PNG."); // Explain the allowed formats to the admin.
+        imageFileEl.value = "";
+        showError(imageFileEl, "Unsupported image file. Please upload a JPG or PNG.");
       }
     });
   }
+  
   if (videoFileEl) {
     videoFileEl.addEventListener("change", () => {
-      clearError(videoFileEl); // Remove any previous validation message before re-checking.
+      clearError(videoFileEl);
       const file = videoFileEl.files?.[0];
       if (!file) return;
-      const allowedTypes = ["video/mp4"]; // Restrict video uploads to the MP4 format handled on the server.
+      const allowedTypes = ["video/mp4"];
       if (!allowedTypes.includes(file.type)) {
-        videoFileEl.value = ""; // Reset the selected file so it cannot be submitted accidentally.
-        showError(videoFileEl, "Unsupported video file. Please upload an MP4 video."); // Tell the admin which format is required.
+        videoFileEl.value = "";
+        showError(videoFileEl, "Unsupported video file. Please upload an MP4 video.");
       }
     });
   }
 
-  // ---------- Validation + Submit ----------
-  attach(
+  // ---------- Form Submission ----------
+  
+  attach( // Reuse the shared validator but relax rules automatically in delete mode.
     form,
     [
-      { el: modeSelect, rules: [{ test: (val) => val === MODE_EXISTING || val === MODE_NEW, message: "Please choose whether the title already exists." }] },
-      { el: typeEl, rules: [{ test: (val) => val === "Movie" || val === "Series", message: "Please select a type." }] },
-      { el: titleEl, rules: [{ test: validators.minLength(1), message: "Title is required." }] },
+      { 
+        el: modeSelect, 
+        rules: [{ 
+          test: (val) => val === MODE_EXISTING || val === MODE_NEW || val === MODE_DELETE, 
+          message: "Please choose an action mode." 
+        }] 
+      },
+      { 
+        el: typeEl, 
+        rules: [{ 
+          test: (val) => val === "Movie" || val === "Series", 
+          message: "Please select a type." 
+        }] 
+      },
+      // Title, year, genres only required for non-delete modes
+      { 
+        el: titleEl, 
+        rules: [{ 
+          test: (val) => isDeleteMode() || validators.minLength(1)(val), 
+          message: "Title is required." 
+        }] 
+      },
       {
         el: yearEl,
         rules: [
           {
-            test: (val) => /^\d{4}$/.test(val) && +val > 1880 && +val < 2100,
+            test: (val) => isDeleteMode() || (/^\d{4}$/.test(val) && +val > 1880 && +val < 2100),
             message: "Must be a valid 4-digit year.",
           },
         ],
       },
-      { el: genresEl, rules: [{ test: validators.minLength(1), message: "At least one genre is required." }] },
+      { 
+        el: genresEl, 
+        rules: [{ 
+          test: (val) => isDeleteMode() || validators.minLength(1)(val), 
+          message: "At least one genre is required." 
+        }] 
+      },
     ],
     async () => {
+      // Clear previous messages
       [successBox, generalErr].forEach((box) => {
         if (!box) return;
         box.classList.add("d-none");
@@ -763,12 +756,75 @@
 
       const mode = getSelectedMode();
       const typeValue = getSelectedType();
-      const isExisting = mode === MODE_EXISTING;
       const isSeries = typeValue === "Series";
       const isMovie = typeValue === "Movie";
 
       const extIdValue = validateExtIdField();
       if (!extIdValue) return;
+
+      // Handle DELETE mode
+      if (mode === MODE_DELETE) {
+        if (!loadedContent) {
+          showError(extIdSelect, "Select an existing title to delete.");
+          return;
+        }
+
+        const prevBtnText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Deleting...";
+
+        try {
+          const payload = {
+            type: typeValue,
+            extId: extIdValue
+          };
+
+          const response = await fetch("/api/admin/content", { // API already enforces admin auth, so we only send the identifiers.
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload),
+          });
+          
+          const data = await response.json().catch(() => ({}));
+          
+          if (!response.ok) {
+            const msg = `[${response.status}] ${data?.error || "Unable to delete content."}`;
+            if (generalErr) {
+              generalErr.classList.remove("d-none");
+              generalErr.textContent = msg;
+            }
+            return;
+          }
+
+          // Clear cache
+          contentSummariesCache.delete(typeValue);
+          contentSummariesCache.delete("__all__");
+          
+          // Reset form
+          form.reset();
+          clearLoadedContent({ resetMetadata: true });
+          updateModeUI();
+
+          const deletedTitle = data?.data?.title || data?.data?.extId || "Selected content";
+          const deletedExtId = data?.data?.extId ? ` (${data.data.extId})` : "";
+          showSuccessMessage(`Successfully deleted '${deletedTitle}'${deletedExtId}.`);
+        } catch (err) {
+          console.error("delete content error:", err);
+          if (generalErr) {
+            generalErr.classList.remove("d-none");
+            generalErr.textContent = "Unable to delete content right now.";
+          }
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = prevBtnText;
+        }
+        
+        return; // Exit early for delete mode
+      }
+
+      // Handle ADD/UPDATE modes (existing code)
+      const isExisting = mode === MODE_EXISTING;
 
       if (isExisting && !loadedContent) {
         showError(extIdSelect, "Select an existing title to load before submitting.");
@@ -879,10 +935,7 @@
           }
         }
 
-        if (successBox) {
-          successBox.classList.remove("d-none");
-          successBox.textContent = message;
-        }
+        showSuccessMessage(message);
 
         resetFileInputs();
         resetEpisodeFields();
@@ -901,124 +954,17 @@
         console.error("submit content error:", err);
         if (generalErr) {
           generalErr.classList.remove("d-none");
-          generalErr.textContent = "Server unreachable or upload failed. Is the file too large?";
+          generalErr.textContent = "Server unreachable or upload failed. Is the file too large?";//default Express limits around 100 KB unless increased
         }
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = prevBtnText;
-        updateMediaHelps();
-      }
-    }
-  );
-
-  deleteTypeEl.addEventListener("change", () => clearError(deleteTypeEl));
-  deleteExtIdEl.addEventListener("input", () => clearError(deleteExtIdEl));
-  deleteTitleEl.addEventListener("input", () => clearError(deleteTitleEl));
-
-  if (deleteByRadios && deleteByRadios.length) {
-    deleteByRadios.forEach((radio) => {
-      radio.addEventListener("change", () => {
-        syncDeleteIdentifierUI();
-        clearDeleteErrors();
-      });
-    });
-  }
-
-  deleteForm.addEventListener(
-    "submit",
-    async (event) => {
-      event.preventDefault();
-      if (!isDeleteAction()) {
-        adminActionSelect.value = ACTION_DELETE;
-        syncActionUI();
-      }
-      clearDeleteErrors();
-      if (successBox) successBox.classList.add("d-none");
-      if (generalErr) generalErr.classList.add("d-none");
-
-      const typeValue = deleteTypeEl.value;
-      if (!typeValue) {
-        showError(deleteTypeEl, "Select a type to delete.");
-        return;
-      }
-
-      const identifierMode = getDeleteIdentifierMode();
-      const payload = { type: typeValue };
-      if (identifierMode === "extId") {
-        const extIdValue = deleteExtIdEl.value.trim();
-        if (!extIdValue) {
-          showError(deleteExtIdEl, "External ID is required.");
-          return;
-        }
-        payload.extId = extIdValue;
-      } else if (identifierMode === "title") {
-        const titleValue = deleteTitleEl.value.trim();
-        if (!titleValue) {
-          showError(deleteTitleEl, "Title is required.");
-          return;
-        }
-        payload.title = titleValue;
-      } else {
-        if (generalErr) {
-          generalErr.classList.remove("d-none");
-          generalErr.textContent = "Choose how to identify the content to delete.";
-        }
-        return;
-      }
-
-      const prevBtnText = deleteSubmitBtn.textContent;
-      deleteSubmitBtn.disabled = true;
-      deleteSubmitBtn.textContent = "Deleting...";
-
-      try {
-        const response = await fetch("/api/admin/content", {
-          method: "DELETE",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload),
-        });
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          const msg = `[${response.status}] ${data?.error || "Unable to delete content."}`;
-          if (generalErr) {
-            generalErr.classList.remove("d-none");
-            generalErr.textContent = msg;
-          }
-          return;
-        }
-
-        contentSummariesCache.delete(typeValue);
-        contentSummariesCache.delete("__all__");
-        if (isExistingMode() && getSelectedType() === typeValue) {
-          await populateExistingOptions();
-        }
-
-        deleteForm.reset();
-        syncDeleteIdentifierUI();
-
-        if (successBox) {
-          const deletedTitle = data?.data?.title || data?.data?.extId || "Selected content";
-          const deletedExtId = data?.data?.extId ? ` (${data.data.extId})` : "";
-          successBox.classList.remove("d-none");
-          successBox.textContent = `Deleted '${deletedTitle}'${deletedExtId}.`;
-        }
-      } catch (err) {
-        console.error("delete content error:", err);
-        if (generalErr) {
-          generalErr.classList.remove("d-none");
-          generalErr.textContent = "Unable to delete content right now.";
-        }
-      } finally {
-        deleteSubmitBtn.disabled = false;
-        deleteSubmitBtn.textContent = prevBtnText;
       }
     }
   );
 
   // Initial UI sync
-  ensurePlaceholderOption(extIdSelect, "Select step 1 to see existing titles.");
+  ensurePlaceholderOption(extIdSelect, "Select a mode to see existing titles.");
   if (extIdSelect) extIdSelect.disabled = true;
   updateModeUI();
-  syncDeleteIdentifierUI();
-  syncActionUI();
 })();

@@ -79,6 +79,13 @@ async function createProfile(req, res) {
     });
   } catch (err) {
     console.error('Error creating profile:', err);
+    const sessionUserId = req.session?.userId ? String(req.session.userId) : null;
+    await writeLog({
+      level: 'error',
+      event: 'profile_create',
+      userId: sessionUserId,
+      details: { error: err.message },
+    });
     return res.status(500).json({ error: 'Failed to create profile.' });
   }
 }
@@ -130,6 +137,13 @@ async function updateProfile(req, res) {
     });
   } catch (err) {
     console.error('Error updating profile:', err);
+    const sessionUserId = req.session?.userId ? String(req.session.userId) : null;
+    await writeLog({
+      level: 'error',
+      event: 'profile_update',
+      userId: sessionUserId,
+      details: { error: err.message, profileId: String(req.params.id || '') },
+    });
     return res.status(500).json({ error: 'Failed to update profile.' });
   }
 }
@@ -161,6 +175,13 @@ async function deleteProfile(req, res) {
     return res.json({ ok: true, message: 'Profile deleted successfully.' });
   } catch (err) {
     console.error('Error deleting profile:', err);
+    const sessionUserId = req.session?.userId ? String(req.session.userId) : null;
+    await writeLog({
+      level: 'error',
+      event: 'profile_delete',
+      userId: sessionUserId,
+      details: { error: err.message, profileId: String(req.params.id || '') },
+    });
     return res.status(500).json({ error: 'Failed to delete profile.' });
   }
 }

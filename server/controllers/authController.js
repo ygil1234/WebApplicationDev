@@ -161,6 +161,13 @@ async function login(req, res) {
 }
 
 async function logout(req, res) {
+  const userId = req.session?.userId ? String(req.session.userId) : null;
+  const username = req.session?.username || null;
+  await writeLog({
+    event: 'logout',
+    userId,
+    details: { username },
+  });
   req.session?.destroy(() => {
     res.clearCookie('sid');
     res.json({ ok: true });
