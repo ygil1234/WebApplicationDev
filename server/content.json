@@ -960,29 +960,5 @@
     ],
     "ratingValue": 9.0,
     "rating": "9.0/10 (IMDb)"
-  },
-  {
-    "id": "m26",
-    "extId": "m26",
-    "title": "Mean Girls",
-    "year": 2004,
-    "genres": [
-      "Comedy"
-    ],
-    "cover": "/uploads/images/imageFile-1762981007320-221490771.jpeg",
-    "image": "/uploads/images/imageFile-1762981007320-221490771.jpeg",
-    "rating": "7.1/10 (IMDb)",
-    "ratingValue": 7.1,
-    "plot": "Cady Heron is a hit with The Plastics, the A-list girl clique at her new school, until she makes the mistake of falling for Aaron Samuels, the ex-boyfriend of alpha Plastic Regina George.",
-    "director": "Mark Waters",
-    "actors": [
-      "Lindsay Lohan",
-      "Jonathan Bennett",
-      "Rachel McAdams"
-    ],
-    "type": "Movie",
-    "videoPath": "/uploads/videos/videoFile-1762981007330-584895867.mp4",
-    "episodes": [],
-    "likes": 0
   }
 ]
