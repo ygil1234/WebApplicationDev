@@ -171,8 +171,8 @@ ADMIN_PASSWORD=a_very_strong_and_random_password
 ```
 
 ### Execution
-cd WebApplicationDev
-npm i
+cd WebApplicationDev <br/>
+npm i <br/>
 node server/index.js
 
 Access at: **[http://localhost:3000](http://localhost:3000)**
